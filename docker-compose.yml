@@ -50,7 +50,7 @@ services:
       - .:/app
     ports:
       - "5173:5173"
-    command: ["sh", "-c", "cd /app/sites/artisans-shared && npm install && cd /app/sites/webiartisan-livry && npm install && npm run dev"]
+    command: ["sh", "-c", "cd /app/sites/artisans-shared && npm install && cd /app/sites/webiartisan-livry && npm install && npm run dev -- --host"]
     networks:
       - webiartisan
 
