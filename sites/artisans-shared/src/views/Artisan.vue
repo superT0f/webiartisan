@@ -182,6 +182,36 @@
           </aside>
         </div>
       </div>
+
+      <!-- Recettes -->
+      <section v-if="artisan.recipes?.length" class="section">
+        <div class="container">
+          <h2 class="section-title">Recettes avec ses produits</h2>
+          <div class="recipe-grid">
+            <RecipeMiniCard
+              v-for="recipe in artisan.recipes"
+              :key="recipe.id"
+              :recipe="recipe"
+            />
+          </div>
+        </div>
+      </section>
+
+      <!-- À proximité -->
+      <section v-if="artisan.nearby?.length" class="section">
+        <div class="container">
+          <h2 class="section-title">Autour de {{ artisan.company_name }}</h2>
+          <ArtisanNearbyMap :artisan="artisan" :nearby="artisan.nearby" />
+          <div class="nearby-list">
+            <div v-for="place in artisan.nearby" :key="`${place.kind}-${place.id}`" class="nearby-item">
+              <span class="kind" :class="place.kind">{{ place.kind === 'prospect' ? 'Commerce' : 'Service' }}</span>
+              <strong>{{ place.name }}</strong>
+              <span class="type">{{ place.type }}</span>
+              <span class="distance">{{ Math.round(place.distance_meters) }} m</span>
+            </div>
+          </div>
+        </div>
+      </section>
     </template>
   </div>
 </template>
@@ -190,6 +220,8 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { fetchArtisan, postReview, contactArtisan, CITY_NAME } from '../api.js'
+import RecipeMiniCard from '../components/RecipeMiniCard.vue'
+import ArtisanNearbyMap from '../components/ArtisanNearbyMap.vue'
 
 const route = useRoute()
 const id    = parseInt(route.params.id)
@@ -367,4 +399,36 @@ onMounted(async () => {
   .artisan-hero-info h1 { font-size: 1.5rem; }
   .info-card { padding: 20px; }
 }
+
+/* Recipes & nearby */
+.section { padding: 40px 0; }
+.section-title { font-size: 1.25rem; margin-bottom: 20px; }
+.recipe-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+.nearby-list {
+  display: grid;
+  gap: 0.5rem;
+}
+.nearby-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem;
+  background: #f8f8f8;
+  border-radius: 6px;
+}
+.nearby-item .kind {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #fff;
+}
+.nearby-item .kind.prospect { background: #f97316; }
+.nearby-item .kind.poi { background: #3b82f6; }
+.nearby-item .type { color: #666; font-size: 0.85rem; }
+.nearby-item .distance { margin-left: auto; font-size: 0.85rem; color: #888; }
 </style>
