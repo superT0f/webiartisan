@@ -14,6 +14,7 @@ const routes = [
   { path: '/recette/:slug', component: () => import('./views/RecipeDetail.vue'), meta: { title: 'Fiche recette' } },
   { path: '/recette/nouvelle', component: () => import('./views/RecipeForm.vue'), meta: { title: 'Proposer une recette' } },
   { path: '/recette/:id/suggérer', component: () => import('./views/RecipeForm.vue'), meta: { title: 'Proposer un complément' } },
+  { path: '/espace/admin-recettes', component: () => import('./views/AdminRecipes.vue'), meta: { title: 'Modération recettes' } },
   { path: '/flyers', component: () => import('./views/Flyer.vue'), meta: { title: 'Imprimer les flyers / plaquettes' } },
   { path: '/plaquette', redirect: '/flyers' },
   { path: '/:pathMatch(.*)*', redirect: '/' }
