@@ -4,7 +4,13 @@ dev:
 	npm run dev
 
 build:
-	npm run build
+	VITE_API_URL=https://api.prigent.tech \
+	VITE_CITY_SLUG=livry \
+	VITE_CITY_NAME=Livry \
+	VITE_CITY_LAT=49.1081 \
+	VITE_CITY_LNG=-0.7658 \
+	VITE_CITY_CP=14240 \
+		npm run build
 
 push: build
 	rsync -avz --no-owner --no-group --delete dist/ $(HOME)/mnt/gandi/vhosts/artisans-livry.prigent.tech/htdocs/

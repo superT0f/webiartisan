@@ -261,6 +261,28 @@ function recipes_report(PDO $pdo, int $id, array $body): void
     $reason = trim($body['reason'] ?? '');
     $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
 
+    // Vérifier que la recette existe
+    $check = $pdo->prepare("SELECT id FROM local_recipes WHERE id = ? LIMIT 1");
+    $check->execute([$id]);
+    if (!$check->fetch()) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Recette non trouvée']);
+        return;
+    }
+
+    // Limiter à un signalement par IP + recette sur 24h
+    $recent = $pdo->prepare("
+        SELECT id FROM local_recipe_reports
+        WHERE recipe_id = ? AND reporter_ip = ? AND created_at > DATE_SUB(NOW(), INTERVAL 1 DAY)
+        LIMIT 1
+    ");
+    $recent->execute([$id, $ip]);
+    if ($recent->fetch()) {
+        http_response_code(429);
+        echo json_encode(['success' => false, 'error' => 'Vous avez déjà signalé cette recette récemment.']);
+        return;
+    }
+
     $pdo->prepare("INSERT INTO local_recipe_reports (recipe_id, reason, reporter_ip) VALUES (?, ?, ?)")
         ->execute([$id, $reason, $ip]);
 

@@ -1,9 +1,9 @@
 const API_BASE  = import.meta.env.VITE_API_URL   || 'https://api.prigent.tech'
-export const CITY_SLUG  = import.meta.env.VITE_CITY_SLUG  || 'combs-la-ville'
-export const CITY_NAME  = import.meta.env.VITE_CITY_NAME  || 'Combs-la-Ville'
-export const CITY_LAT   = parseFloat(import.meta.env.VITE_CITY_LAT   || '48.66')
-export const CITY_LNG   = parseFloat(import.meta.env.VITE_CITY_LNG   || '2.565')
-export const CITY_CP    = import.meta.env.VITE_CITY_CP    || '77380'
+export const CITY_SLUG  = import.meta.env.VITE_CITY_SLUG  || 'livry'
+export const CITY_NAME  = import.meta.env.VITE_CITY_NAME  || 'Livry'
+export const CITY_LAT   = parseFloat(import.meta.env.VITE_CITY_LAT   || '49.1081')
+export const CITY_LNG   = parseFloat(import.meta.env.VITE_CITY_LNG   || '-0.7658')
+export const CITY_CP    = import.meta.env.VITE_CITY_CP    || '14240'
 
 export async function fetchArtisans(params = {}) {
   const qs = new URLSearchParams({ city: CITY_SLUG, ...params }).toString()
