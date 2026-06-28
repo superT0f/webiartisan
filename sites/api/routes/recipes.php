@@ -195,11 +195,13 @@ function recipes_create(PDO $pdo, array $body): void
         ? $body['season']
         : 'all';
 
+    $parentRecipeId = !empty($body['parent_recipe_id']) ? (int)$body['parent_recipe_id'] : null;
+
     $pdo->prepare("
         INSERT INTO local_recipes
             (city_id, title, slug, description, image_url, prep_time_minutes, cook_time_minutes,
-             servings, difficulty, season, is_premium, is_incomplete, submitted_by, submitter_email)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             servings, difficulty, season, is_premium, is_incomplete, parent_recipe_id, submitted_by, submitter_email)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ")->execute([
         $cityId,
         $title,
@@ -213,6 +215,7 @@ function recipes_create(PDO $pdo, array $body): void
         $season,
         !empty($body['is_premium']) ? 1 : 0,
         !empty($body['is_incomplete']) ? 1 : 0,
+        $parentRecipeId,
         trim($body['submitted_by'] ?? 'Anonyme'),
         trim($body['submitter_email'] ?? '') ?: null,
     ]);
