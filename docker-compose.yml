@@ -4,7 +4,7 @@ services:
   nginx:
     image: nginx:alpine
     ports:
-      - "80:80"
+      - "8080:80"
     volumes:
       - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
       - ./sites/api:/var/www/api:ro
@@ -39,7 +39,7 @@ services:
       - mysql_data:/var/lib/mysql
       - ./sites/api/migrations:/docker-entrypoint-initdb.d:ro
     ports:
-      - "3306:3306"
+      - "3307:3306"
     networks:
       - webiartisan
 
