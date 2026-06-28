@@ -22,6 +22,8 @@ switch ($method) {
     case 'GET':
         if ($action === '' || $action === 'list') {
             artisan_list($pdo);
+        } elseif ($action === 'me' && $param === 'prospects') {
+            artisan_my_prospects($pdo);
         } elseif ($action === 'me') {
             artisan_me($pdo);
         } elseif (is_numeric($action) && !$param) {
@@ -49,6 +51,17 @@ switch ($method) {
             artisan_contact($pdo, (int)$action, $body);
         } elseif (is_numeric($action) && $param === 'review') {
             artisan_add_review($pdo, (int)$action, $body);
+        } elseif ($action === 'me' && $param === 'prospects' && is_numeric($segments[3] ?? '')) {
+            artisan_follow_prospect($pdo, (int)$segments[3], $body);
+        } else {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'Endpoint inconnu']);
+        }
+        break;
+
+    case 'DELETE':
+        if ($action === 'me' && $param === 'prospects' && is_numeric($segments[3] ?? '')) {
+            artisan_unfollow_prospect($pdo, (int)$segments[3]);
         } else {
             http_response_code(404);
             echo json_encode(['success' => false, 'error' => 'Endpoint inconnu']);
@@ -608,6 +621,36 @@ function artisan_get_token(): ?string
 }
 
 /**
+ * Résout l'artisan authentifié depuis son token.
+ */
+function artisan_require_auth(PDO $pdo): array
+{
+    $token = artisan_get_token();
+    if (!$token) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'error' => 'Authentification requise']);
+        exit;
+    }
+
+    $stmt = $pdo->prepare("
+        SELECT id, company_name, email, is_admin
+        FROM local_artisans
+        WHERE auth_token = ? AND auth_token_exp > NOW()
+        LIMIT 1
+    ");
+    $stmt->execute([$token]);
+    $artisan = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$artisan) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'error' => 'Session invalide']);
+        exit;
+    }
+
+    return $artisan;
+}
+
+/**
  * GET /artisans/me — Profil de l'artisan authentifié
  */
 function artisan_me(PDO $pdo): void
@@ -755,4 +798,76 @@ function artisan_update(PDO $pdo, int $id, array $body): void
         ->execute($params);
 
     echo json_encode(['success' => true, 'message' => 'Profil mis à jour']);
+}
+
+/**
+ * GET /artisans/me/prospects — Prospects suivis par l'artisan
+ */
+function artisan_my_prospects(PDO $pdo): void
+{
+    $artisan = artisan_require_auth($pdo);
+
+    $stmt = $pdo->prepare("
+        SELECT p.*, f.status AS follow_status, f.notes AS follow_notes, f.updated_at AS follow_updated_at
+        FROM local_prospects p
+        LEFT JOIN local_prospect_follow_ups f ON f.prospect_id = p.id AND f.artisan_id = ?
+        WHERE p.is_active = 1
+        ORDER BY FIELD(f.status, 'tocontact', 'contacted', 'meeting', 'converted', 'declined'), p.name ASC
+    ");
+    $stmt->execute([$artisan['id']]);
+    $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    echo json_encode([
+        'success' => true,
+        'data'    => $items,
+        'total'   => count($items),
+    ]);
+}
+
+/**
+ * POST /artisans/me/prospects/:id — Suivre / mettre à jour un prospect
+ */
+function artisan_follow_prospect(PDO $pdo, int $prospectId, array $body): void
+{
+    $artisan = artisan_require_auth($pdo);
+
+    $status = $body['status'] ?? 'tocontact';
+    $allowed = ['tocontact', 'contacted', 'meeting', 'converted', 'declined'];
+    if (!in_array($status, $allowed, true)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Statut invalide']);
+        return;
+    }
+
+    $notes = trim($body['notes'] ?? '');
+
+    // verify prospect exists
+    $check = $pdo->prepare("SELECT id FROM local_prospects WHERE id = ? AND is_active = 1");
+    $check->execute([$prospectId]);
+    if (!$check->fetch()) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Prospect non trouvé']);
+        return;
+    }
+
+    $pdo->prepare("
+        INSERT INTO local_prospect_follow_ups (prospect_id, artisan_id, status, notes)
+        VALUES (?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE status = VALUES(status), notes = VALUES(notes)
+    ")->execute([$prospectId, $artisan['id'], $status, $notes]);
+
+    echo json_encode(['success' => true, 'message' => 'Suivi mis à jour']);
+}
+
+/**
+ * DELETE /artisans/me/prospects/:id — Ne plus suivre un prospect
+ */
+function artisan_unfollow_prospect(PDO $pdo, int $prospectId): void
+{
+    $artisan = artisan_require_auth($pdo);
+
+    $pdo->prepare("DELETE FROM local_prospect_follow_ups WHERE prospect_id = ? AND artisan_id = ?")
+        ->execute([$prospectId, $artisan['id']]);
+
+    echo json_encode(['success' => true, 'message' => 'Suivi supprimé']);
 }
