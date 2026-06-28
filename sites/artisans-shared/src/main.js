@@ -10,6 +10,10 @@ const routes = [
   { path: '/espace', component: () => import('./views/Dashboard.vue'), meta: { title: 'Mon espace artisan' } },
   { path: '/prospection', component: () => import('./views/Prospects.vue'), meta: { title: 'Prospection locale' } },
   { path: '/prospect/:id', component: () => import('./views/ProspectDetail.vue'), meta: { title: 'Fiche prospect' } },
+  { path: '/recettes', component: () => import('./views/Recipes.vue'), meta: { title: 'Recettes locales' } },
+  { path: '/recette/:slug', component: () => import('./views/RecipeDetail.vue'), meta: { title: 'Fiche recette' } },
+  { path: '/recette/nouvelle', component: () => import('./views/RecipeForm.vue'), meta: { title: 'Proposer une recette' } },
+  { path: '/recette/:id/suggérer', component: () => import('./views/RecipeForm.vue'), meta: { title: 'Proposer un complément' } },
   { path: '/flyers', component: () => import('./views/Flyer.vue'), meta: { title: 'Imprimer les flyers / plaquettes' } },
   { path: '/plaquette', redirect: '/flyers' },
   { path: '/:pathMatch(.*)*', redirect: '/' }
