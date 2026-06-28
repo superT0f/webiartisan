@@ -37,7 +37,8 @@ services:
       MYSQL_PASSWORD: webiartisan_dev
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./sites/api/migrations:/docker-entrypoint-initdb.d:ro
+      - ./sites/api/migrations/025_artisans_local.sql:/docker-entrypoint-initdb.d/025_artisans_local.sql:ro
+      - ./data/seeds/livry.sql:/docker-entrypoint-initdb.d/livry.sql:ro
     ports:
       - "3307:3306"
     networks:

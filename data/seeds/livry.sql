@@ -2,6 +2,8 @@
 -- WebIArtisan — Seed data : Livry (Calvados, 14240)
 -- ============================================================
 
+SET NAMES utf8mb4;
+
 -- Ville : Livry
 INSERT IGNORE INTO local_cities (slug, name, postal_code, department, region, country,
                     latitude, longitude, population, description,
@@ -97,7 +99,7 @@ INSERT IGNORE INTO local_pois (city_id, type, name, address, phone, website, lat
 (@livry_id, 'pharmacie', 'Pharmacie de Livry', '2 rue Principale, 14240 Livry', '02 31 77 80 32', NULL, 49.1078000, -0.7654000, 'Pharmacie de la commune', TRUE, 5);
 
 -- Horaires Mairie de Livry (lun-ven 9h-17h, pause 12h-13h30, fermé week-end)
-SET @livry_mairie_id = (SELECT id FROM local_pois WHERE name = 'Mairie de Livry' AND city_id = @livry_id);
+SET @livry_mairie_id = (SELECT id FROM local_pois WHERE name = 'Mairie de Livry' AND city_id = @livry_id LIMIT 1);
 INSERT IGNORE INTO local_schedules (poi_id, day_of_week, open_time, close_time, break_start, break_end, is_closed) VALUES
 (@livry_mairie_id, 0, '09:00:00', '17:00:00', '12:00:00', '13:30:00', FALSE),
 (@livry_mairie_id, 1, '09:00:00', '17:00:00', '12:00:00', '13:30:00', FALSE),
@@ -108,7 +110,7 @@ INSERT IGNORE INTO local_schedules (poi_id, day_of_week, open_time, close_time, 
 (@livry_mairie_id, 6, NULL, NULL, NULL, NULL, TRUE);
 
 -- Horaires La Poste — Livry (lun-ven 9h-12h / 14h-17h, sam 9h-12h, dim fermé)
-SET @livry_poste_id = (SELECT id FROM local_pois WHERE name = 'La Poste — Livry' AND city_id = @livry_id);
+SET @livry_poste_id = (SELECT id FROM local_pois WHERE name = 'La Poste — Livry' AND city_id = @livry_id LIMIT 1);
 INSERT IGNORE INTO local_schedules (poi_id, day_of_week, open_time, close_time, break_start, break_end, is_closed) VALUES
 (@livry_poste_id, 0, '09:00:00', '17:00:00', '12:00:00', '14:00:00', FALSE),
 (@livry_poste_id, 1, '09:00:00', '17:00:00', '12:00:00', '14:00:00', FALSE),

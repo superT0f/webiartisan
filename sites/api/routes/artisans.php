@@ -15,6 +15,8 @@
  * POST /artisans/magic-link        — Connexion par lien magique
  */
 
+require_once __DIR__ . '/../lib/Mailer.php';
+
 switch ($method) {
 
     case 'GET':
@@ -446,11 +448,45 @@ function artisan_magic_link(PDO $pdo, array $body): void
     $pdo->prepare("UPDATE local_artisans SET auth_token = ?, auth_token_exp = ? WHERE id = ?")
         ->execute([$token, $exp, $artisan['id']]);
 
-    // TODO: Envoyer l'email avec le lien magique
-    // mail($email, 'Connexion WebiArtisans', "Votre lien : https://artisans-combs.prigent.tech/auth?token={$token}");
-    error_log("[MAGIC-LINK] https://artisans-livry.prigent.tech/espace?token={$token}");
+    $portalUrl = artisan_portal_url();
+    $link      = rtrim($portalUrl, '/') . '/espace?token=' . urlencode($token);
+
+    $subject = 'Votre lien de connexion WebIArtisan';
+    $html    = <<<HTML
+<!DOCTYPE html>
+<html><body style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #1a1a2e;">Bonjour {$artisan['company_name']},</h2>
+  <p>Voici votre lien de connexion sécurisé à votre espace artisan :</p>
+  <div style="text-align: center; margin: 24px 0;">
+    <a href="{$link}" style="display: inline-block; background: #1a1a2e; color: #fff; padding: 14px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">Me connecter</a>
+  </div>
+  <p style="color: #888; font-size: 13px;">Ce lien est valable 1 heure. Si vous n'avez pas demandé ce lien, ignorez cet email.</p>
+  <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+  <p style="color: #aaa; font-size: 12px;">WebIArtisan</p>
+</body></html>
+HTML;
+
+    $sent = send_html_email($email, $subject, $html, null, 'WebIArtisan');
+    if (!$sent) {
+        error_log("[MAGIC-LINK] Échec envoi email à {$email}");
+    }
+
+    // Toujours logger en dev / secours
+    error_log("[MAGIC-LINK] {$link}");
 
     echo json_encode(['success' => true, 'message' => 'Lien de connexion envoyé par email.']);
+}
+
+/**
+ * Détermine l'URL du portail artisan à partir de l'origine de la requête.
+ */
+function artisan_portal_url(): string {
+    $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+    if ($origin && filter_var($origin, FILTER_VALIDATE_URL)) {
+        return $origin;
+    }
+    $config = getAppConfig();
+    return $config['url'] ?? 'https://artisans-livry.prigent.tech';
 }
 
 /**
@@ -483,8 +519,40 @@ function artisan_contact(PDO $pdo, int $id, array $body): void
     $pdo->prepare("UPDATE local_artisans SET contact_count = contact_count + 1 WHERE id = ?")
         ->execute([$id]);
 
-    // TODO: Envoyer email à l'artisan
-    // Loguer le contact (on pourrait ajouter une table contacts)
+    // Envoyer l'email à l'artisan
+    $safeCompany = htmlspecialchars($artisan['company_name']);
+    $safeName    = htmlspecialchars($name);
+    $safeEmail   = htmlspecialchars($email);
+    $safeMessage = nl2br(htmlspecialchars($message));
+
+    $contactSubject = "Nouveau message depuis WebIArtisan — {$safeCompany}";
+    $contactHtml    = <<<HTML
+<!DOCTYPE html>
+<html><body style="font-family: -apple-system, sans-serif; max-width: 520px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #1a1a2e;">Nouveau message pour {$safeCompany}</h2>
+  <p><strong>De :</strong> {$safeName} &lt;{$safeEmail}&gt;</p>
+  <p><strong>Message :</strong></p>
+  <div style="background: #f8f8f8; padding: 16px; border-radius: 8px; border-left: 4px solid #1a1a2e;">
+    {$safeMessage}
+  </div>
+  <p style="margin-top: 24px; color: #888; font-size: 13px;">Répondez directement à cet email pour contacter {$safeName}.</p>
+  <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+  <p style="color: #aaa; font-size: 12px;">WebIArtisan</p>
+</body></html>
+HTML;
+
+    $contactSent = send_html_email(
+        $artisan['email'],
+        $contactSubject,
+        $contactHtml,
+        null,
+        'WebIArtisan',
+        $email
+    );
+
+    if (!$contactSent) {
+        error_log("[CONTACT] Échec envoi email à {$artisan['email']} depuis {$email}");
+    }
 
     echo json_encode([
         'success' => true,

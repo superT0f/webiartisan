@@ -4,6 +4,8 @@
 -- Compatible avec la base existante (aucune table modifiée)
 -- ============================================================
 
+SET NAMES utf8mb4;
+
 -- --------------------------------------------------------
 -- TABLE : local_cities — Villes / Points d'intérêt principal
 -- --------------------------------------------------------
@@ -246,7 +248,7 @@ INSERT IGNORE INTO local_pois (city_id, type, name, address, phone, website, lat
 (@combs_id, 'dechetterie', 'Déchetterie de Combs-la-Ville', 'Route de Lieusaint, 77380 Combs-la-Ville', '01 64 13 70 00', NULL, 48.6570, 2.5680, 'Déchetterie intercommunale', TRUE, 7);
 
 -- Horaires Mairie de Combs-la-Ville
-SET @combs_mairie_id = (SELECT id FROM local_pois WHERE name = 'Mairie de Combs-la-Ville' AND city_id = @combs_id);
+SET @combs_mairie_id = (SELECT id FROM local_pois WHERE name = 'Mairie de Combs-la-Ville' AND city_id = @combs_id LIMIT 1);
 INSERT IGNORE INTO local_schedules (poi_id, day_of_week, open_time, close_time, break_start, break_end, is_closed) VALUES
 (@combs_mairie_id, 0, '08:30:00', '17:00:00', '12:30:00', '13:30:00', FALSE),
 (@combs_mairie_id, 1, '08:30:00', '17:00:00', '12:30:00', '13:30:00', FALSE),
@@ -257,7 +259,7 @@ INSERT IGNORE INTO local_schedules (poi_id, day_of_week, open_time, close_time, 
 (@combs_mairie_id, 6, NULL, NULL, NULL, NULL, TRUE);
 
 -- Horaires Piscine Aquatis
-SET @combs_piscine_id = (SELECT id FROM local_pois WHERE name = 'Piscine Aquatis' AND city_id = @combs_id);
+SET @combs_piscine_id = (SELECT id FROM local_pois WHERE name = 'Piscine Aquatis' AND city_id = @combs_id LIMIT 1);
 INSERT IGNORE INTO local_schedules (poi_id, day_of_week, open_time, close_time, is_closed) VALUES
 (@combs_piscine_id, 0, '07:00:00', '21:00:00', FALSE),
 (@combs_piscine_id, 1, '07:00:00', '21:00:00', FALSE),
@@ -268,7 +270,7 @@ INSERT IGNORE INTO local_schedules (poi_id, day_of_week, open_time, close_time, 
 (@combs_piscine_id, 6, '09:00:00', '13:00:00', FALSE);
 
 -- Horaires La Poste
-SET @combs_poste_id = (SELECT id FROM local_pois WHERE name = 'La Poste — Combs-la-Ville' AND city_id = @combs_id);
+SET @combs_poste_id = (SELECT id FROM local_pois WHERE name = 'La Poste — Combs-la-Ville' AND city_id = @combs_id LIMIT 1);
 INSERT IGNORE INTO local_schedules (poi_id, day_of_week, open_time, close_time, is_closed) VALUES
 (@combs_poste_id, 0, '09:00:00', '18:00:00', FALSE),
 (@combs_poste_id, 1, '09:00:00', '18:00:00', FALSE),
@@ -308,7 +310,7 @@ INSERT IGNORE INTO local_pois (city_id, type, name, address, phone, website, lat
 (@vsd_id, 'mediatheque', 'Ferme des Arts', '60 rue Pasteur, 77240 Vert-Saint-Denis', '01 64 10 59 02', 'https://www.vert-saint-denis.fr', 48.5670, 2.6170, 'Médiathèque et centre culturel', TRUE, 2);
 
 -- Horaires Mairie de Vert-Saint-Denis
-SET @vsd_mairie_id = (SELECT id FROM local_pois WHERE name = 'Mairie de Vert-Saint-Denis' AND city_id = @vsd_id);
+SET @vsd_mairie_id = (SELECT id FROM local_pois WHERE name = 'Mairie de Vert-Saint-Denis' AND city_id = @vsd_id LIMIT 1);
 INSERT IGNORE INTO local_schedules (poi_id, day_of_week, open_time, close_time, break_start, break_end, is_closed) VALUES
 (@vsd_mairie_id, 0, '09:00:00', '17:30:00', '12:00:00', '13:30:00', FALSE),
 (@vsd_mairie_id, 1, '09:00:00', '17:30:00', '12:00:00', '13:30:00', FALSE),

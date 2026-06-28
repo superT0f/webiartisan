@@ -11,7 +11,9 @@ function handleCors(): void {
         'https://app.prigent.tech',
         'https://web.prigent.tech',
         'https://artisans-combs.prigent.tech',
-        'https://artisans-vert-saint-denis.prigent.tech',    ];
+        'https://artisans-vert-saint-denis.prigent.tech',
+        'https://artisans-livry.prigent.tech',
+    ];
 
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 
