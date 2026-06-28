@@ -655,4 +655,11 @@ INSERT IGNORE INTO local_recipe_steps (recipe_id, step_number, instruction) VALU
 (@pain_id, 1, 'Battre les œufs avec le lait et le sucre.'),
 (@pain_id, 2, 'Tremper les tranches de brioche dans le mélange.'),
 (@pain_id, 3, 'Faire dorer 2-3 minutes de chaque côté dans une poêle beurrée.');
+
+-- Lien recettes ↔ artisans producteurs
+SET @boulangerie_id = (SELECT id FROM local_artisans WHERE company_name = 'Boulangerie du Village' AND city_id = @livry_id LIMIT 1);
+
+INSERT IGNORE INTO local_recipe_artisans (recipe_id, artisan_id) VALUES
+(@tarte_id, @boulangerie_id),
+(@pain_id, @boulangerie_id);
 -- Reset complete
