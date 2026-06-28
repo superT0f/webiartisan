@@ -1,0 +1,267 @@
+/* ============================================================
+   Webi Artisans
+   Design system : Local · Chaleureux · Premium · Mobile-first
+   ============================================================ */
+
+/* --- Tokens ------------------------------------------------- */
+:root {
+  --c-green:      #2D6A4F;
+  --c-green-dark: #1B4332;
+  --c-green-light:#52B788;
+  --c-gold:       #F4A261;
+  --c-gold-dark:  #E76F51;
+  --c-cream:      #FEFAE0;
+  --c-cream-2:    #F8F4E3;
+  --c-white:      #FFFFFF;
+  --c-text:       #1A1A2E;
+  --c-text-2:     #4A5568;
+  --c-text-3:     #718096;
+  --c-border:     #E2D9C8;
+  --c-shadow:     rgba(45, 106, 79, 0.12);
+
+  --r-sm:   8px;
+  --r-md:   14px;
+  --r-lg:   20px;
+  --r-xl:   32px;
+  --r-full: 9999px;
+
+  --font-title: 'Outfit', sans-serif;
+  --font-body:  'Inter', sans-serif;
+
+  --nav-h: 64px;
+  --max-w: 1200px;
+
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* --- Reset -------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; scroll-behavior: smooth; }
+body {
+  font-family: var(--font-body);
+  background: var(--c-cream);
+  color: var(--c-text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+img, video { max-width: 100%; display: block; }
+a { color: inherit; text-decoration: none; }
+button { cursor: pointer; border: none; background: none; font: inherit; }
+ul { list-style: none; }
+
+/* --- Layout ------------------------------------------------- */
+.container {
+  width: 100%;
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: 0 20px;
+}
+.section { padding: 64px 0; }
+.section-sm { padding: 40px 0; }
+
+/* --- Typography --------------------------------------------- */
+h1, h2, h3, h4 {
+  font-family: var(--font-title);
+  font-weight: 700;
+  line-height: 1.2;
+}
+h1 { font-size: clamp(2rem, 5vw, 3.2rem); }
+h2 { font-size: clamp(1.6rem, 3.5vw, 2.4rem); }
+h3 { font-size: 1.25rem; }
+
+.text-green  { color: var(--c-green); }
+.text-gold   { color: var(--c-gold-dark); }
+.text-muted  { color: var(--c-text-3); }
+.text-center { text-align: center; }
+
+/* --- Buttons ------------------------------------------------ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-radius: var(--r-full);
+  font-family: var(--font-title);
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: all 0.25s var(--ease-spring);
+  white-space: nowrap;
+}
+.btn-primary {
+  background: var(--c-green);
+  color: var(--c-white);
+  box-shadow: 0 4px 16px var(--c-shadow);
+}
+.btn-primary:hover {
+  background: var(--c-green-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px var(--c-shadow);
+}
+.btn-gold {
+  background: var(--c-gold);
+  color: var(--c-white);
+  box-shadow: 0 4px 16px rgba(244, 162, 97, 0.3);
+}
+.btn-gold:hover {
+  background: var(--c-gold-dark);
+  transform: translateY(-2px);
+}
+.btn-outline {
+  border: 2px solid var(--c-green);
+  color: var(--c-green);
+  background: transparent;
+}
+.btn-outline:hover {
+  background: var(--c-green);
+  color: var(--c-white);
+}
+.btn-sm { padding: 8px 16px; font-size: 0.85rem; }
+.btn-lg { padding: 16px 36px; font-size: 1.1rem; }
+
+/* --- Cards -------------------------------------------------- */
+.card {
+  background: var(--c-white);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--c-border);
+  overflow: hidden;
+  transition: all 0.3s var(--ease-spring);
+}
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px var(--c-shadow);
+  border-color: var(--c-green-light);
+}
+.card-body { padding: 20px; }
+
+/* --- Badge -------------------------------------------------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: var(--r-full);
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-family: var(--font-title);
+}
+.badge-green  { background: #D8F3DC; color: var(--c-green-dark); }
+.badge-gold   { background: #FFF3E0; color: var(--c-gold-dark); }
+.badge-grey   { background: #F0EDE8; color: var(--c-text-2); }
+.badge-open   { background: #D8F3DC; color: #1B5E20; }
+.badge-closed { background: #FFEBEE; color: #B71C1C; }
+
+/* --- Stars -------------------------------------------------- */
+.stars { display: flex; gap: 2px; align-items: center; }
+.star { color: #E0E0E0; font-size: 0.9rem; }
+.star.filled { color: #FFB300; }
+
+/* --- Skeleton loader ---------------------------------------- */
+.skeleton {
+  background: linear-gradient(90deg, #EFE9D8 25%, #F8F4E3 50%, #EFE9D8 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: var(--r-sm);
+}
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+/* --- Tag pill ----------------------------------------------- */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--r-full);
+  border: 1.5px solid var(--c-border);
+  font-size: 0.85rem;
+  font-weight: 500;
+  background: var(--c-white);
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.tag:hover, .tag.active {
+  border-color: var(--c-green);
+  background: var(--c-green);
+  color: var(--c-white);
+}
+
+/* --- Form --------------------------------------------------- */
+.form-group { margin-bottom: 20px; }
+.form-label {
+  display: block;
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 6px;
+  color: var(--c-text-2);
+}
+.form-input, .form-textarea, .form-select {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid var(--c-border);
+  border-radius: var(--r-md);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  background: var(--c-white);
+  color: var(--c-text);
+  transition: border-color 0.2s;
+  outline: none;
+}
+.form-input:focus, .form-textarea:focus, .form-select:focus {
+  border-color: var(--c-green);
+}
+.form-textarea { min-height: 120px; resize: vertical; }
+
+/* --- Divider ------------------------------------------------ */
+.divider {
+  border: none;
+  border-top: 1px solid var(--c-border);
+  margin: 32px 0;
+}
+
+/* --- Alert -------------------------------------------------- */
+.alert {
+  padding: 14px 18px;
+  border-radius: var(--r-md);
+  font-size: 0.9rem;
+  margin: 16px 0;
+}
+.alert-success { background: #D8F3DC; color: #1B5E20; border-left: 4px solid var(--c-green); }
+.alert-error   { background: #FFEBEE; color: #B71C1C; border-left: 4px solid #E53935; }
+.alert-info    { background: #E3F2FD; color: #0D47A1; border-left: 4px solid #1E88E5; }
+
+/* --- Grid helpers ------------------------------------------ */
+.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.grid-auto { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+
+/* --- Flex helpers ------------------------------------------ */
+.flex       { display: flex; }
+.flex-center { display: flex; align-items: center; justify-content: center; }
+.flex-between { display: flex; align-items: center; justify-content: space-between; }
+.gap-8  { gap: 8px; }
+.gap-12 { gap: 12px; }
+.gap-16 { gap: 16px; }
+
+/* --- Animations -------------------------------------------- */
+.fade-enter-active, .fade-leave-active { transition: opacity 0.3s; }
+.fade-enter-from, .fade-leave-to       { opacity: 0; }
+
+.slide-up-enter-active { transition: all 0.4s var(--ease-spring); }
+.slide-up-enter-from   { opacity: 0; transform: translateY(24px); }
+
+/* --- Responsive -------------------------------------------- */
+@media (max-width: 768px) {
+  .section { padding: 44px 0; }
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  .container { padding: 0 16px; }
+  h1 { font-size: 2rem; }
+  h2 { font-size: 1.5rem; }
+  .btn-lg { padding: 14px 24px; font-size: 1rem; }
+}
+@media (max-width: 480px) {
+  .grid-auto { grid-template-columns: 1fr; }
+}

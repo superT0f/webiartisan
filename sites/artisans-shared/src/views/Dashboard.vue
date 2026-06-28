@@ -1,0 +1,286 @@
+<template>
+  <div class="container section dashboard">
+    <!-- État non connecté : formulaire de lien magique -->
+    <template v-if="!token">
+      <div class="auth-card">
+        <h1>Espace artisan</h1>
+        <p class="text-muted">Recevez un lien de connexion sécurisé par email.</p>
+
+        <form @submit.prevent="sendMagicLink" class="auth-form">
+          <label for="email">Adresse email</label>
+          <input
+            id="email"
+            v-model="email"
+            type="email"
+            class="form-input"
+            placeholder="votre@email.fr"
+            required
+            :disabled="sending"
+          />
+          <button type="submit" class="btn btn-primary" :disabled="sending || !email">
+            {{ sending ? 'Envoi…' : 'Recevoir mon lien' }}
+          </button>
+        </form>
+
+        <div v-if="message" class="auth-message" :class="messageType">
+          {{ message }}
+        </div>
+      </div>
+    </template>
+
+    <!-- État connecté : formulaire de profil -->
+    <template v-else>
+      <div class="dashboard-header flex-between">
+        <div>
+          <h1>Mon espace artisan</h1>
+          <p class="text-muted">Gérez votre profil visible dans l'annuaire.</p>
+        </div>
+        <button class="btn btn-outline" @click="logout">Se déconnecter</button>
+      </div>
+
+      <div v-if="loading" class="skeleton" style="height: 200px; border-radius: 12px;"></div>
+
+      <form v-else-if="artisan" @submit.prevent="saveProfile" class="profile-form card">
+        <div class="form-group">
+          <label for="company_name">Nom de l'entreprise</label>
+          <input id="company_name" v-model="form.company_name" class="form-input" required />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="phone">Téléphone</label>
+            <input id="phone" v-model="form.phone" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label for="website">Site web</label>
+            <input id="website" v-model="form.website" class="form-input" placeholder="https://..." />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="address">Adresse</label>
+          <input id="address" v-model="form.address" class="form-input" />
+        </div>
+
+        <div class="form-group">
+          <label for="description">Description</label>
+          <textarea id="description" v-model="form.description" class="form-input" rows="5"></textarea>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" :disabled="saving">
+            {{ saving ? 'Enregistrement…' : 'Enregistrer les modifications' }}
+          </button>
+          <RouterLink to="/" class="btn btn-outline">Retour à l'annuaire</RouterLink>
+        </div>
+
+        <div v-if="message" class="auth-message" :class="messageType">
+          {{ message }}
+        </div>
+      </form>
+
+      <div v-else class="empty-state">
+        <div class="empty-icon">🔐</div>
+        <h3>Session invalide</h3>
+        <p>Votre lien de connexion a peut-être expiré.</p>
+        <button class="btn btn-primary" style="margin-top: 16px;" @click="logout">
+          Recommencer
+        </button>
+      </div>
+    </template>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { requestMagicLink, fetchMe, updateMe } from '../api.js'
+
+const route = useRoute()
+const router = useRouter()
+
+const STORAGE_KEY = 'artisan_token'
+const token = ref(localStorage.getItem(STORAGE_KEY) || '')
+const email = ref('')
+const artisan = ref(null)
+const form = reactive({
+  company_name: '',
+  phone: '',
+  website: '',
+  address: '',
+  description: '',
+})
+
+const loading = ref(false)
+const sending = ref(false)
+const saving = ref(false)
+const message = ref('')
+const messageType = ref('')
+
+function setMessage(text, type = 'info') {
+  message.value = text
+  messageType.value = type
+}
+
+// Connexion via ?token=xxx dans l'URL
+if (route.query.token) {
+  token.value = route.query.token
+  localStorage.setItem(STORAGE_KEY, route.query.token)
+  router.replace('/espace')
+}
+
+async function sendMagicLink() {
+  sending.value = true
+  message.value = ''
+  try {
+    const res = await requestMagicLink(email.value)
+    setMessage(res.message || 'Si votre email est valide, vous recevrez un lien de connexion.', 'success')
+  } catch (e) {
+    setMessage('Erreur lors de l\'envoi. Veuillez réessayer.', 'error')
+  } finally {
+    sending.value = false
+  }
+}
+
+async function loadProfile() {
+  if (!token.value) return
+  loading.value = true
+  message.value = ''
+  try {
+    const res = await fetchMe(token.value)
+    if (res.success && res.data) {
+      artisan.value = res.data
+      Object.assign(form, {
+        company_name: res.data.company_name || '',
+        phone: res.data.phone || '',
+        website: res.data.website || '',
+        address: res.data.address || '',
+        description: res.data.description || '',
+      })
+    } else {
+      logout()
+      setMessage('Votre session a expiré. Veuillez vous reconnecter.', 'error')
+    }
+  } catch (e) {
+    setMessage('Impossible de charger votre profil.', 'error')
+  } finally {
+    loading.value = false
+  }
+}
+
+async function saveProfile() {
+  saving.value = true
+  message.value = ''
+  try {
+    const res = await updateMe(token.value, { ...form })
+    if (res.success) {
+      setMessage('Profil mis à jour avec succès.', 'success')
+    } else {
+      setMessage(res.error || 'Erreur lors de la mise à jour.', 'error')
+    }
+  } catch (e) {
+    setMessage('Erreur lors de la sauvegarde.', 'error')
+  } finally {
+    saving.value = false
+  }
+}
+
+function logout() {
+  token.value = ''
+  artisan.value = null
+  localStorage.removeItem(STORAGE_KEY)
+  message.value = ''
+}
+
+onMounted(() => {
+  loadProfile()
+})
+</script>
+
+<style scoped>
+.dashboard { max-width: 720px; }
+
+.auth-card {
+  max-width: 420px;
+  margin: 40px auto;
+  text-align: center;
+}
+.auth-card h1 { margin-bottom: 8px; }
+.auth-card .text-muted { margin-bottom: 28px; }
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: left;
+}
+.auth-form label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--c-text-2);
+}
+
+.auth-message {
+  margin-top: 16px;
+  padding: 12px 16px;
+  border-radius: var(--r-md);
+  font-size: 0.9rem;
+}
+.auth-message.success {
+  background: rgba(45, 106, 79, 0.1);
+  color: var(--c-green-dark);
+}
+.auth-message.error {
+  background: rgba(183, 28, 28, 0.08);
+  color: #b71c1c;
+}
+
+.dashboard-header {
+  margin-bottom: 24px;
+  align-items: flex-start;
+  gap: 16px;
+}
+.dashboard-header h1 { margin-bottom: 4px; }
+
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 28px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.form-group label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--c-text-2);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+}
+.empty-icon { font-size: 3rem; margin-bottom: 16px; }
+
+@media (max-width: 600px) {
+  .form-row { grid-template-columns: 1fr; }
+  .dashboard-header { flex-direction: column; }
+}
+</style>

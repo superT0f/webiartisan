@@ -20,6 +20,8 @@ switch ($method) {
     case 'GET':
         if ($action === '' || $action === 'list') {
             artisan_list($pdo);
+        } elseif ($action === 'me') {
+            artisan_me($pdo);
         } elseif (is_numeric($action) && !$param) {
             artisan_get($pdo, (int)$action);
         } elseif (is_numeric($action) && $param === 'services') {
@@ -53,7 +55,9 @@ switch ($method) {
 
     case 'PUT':
         $body = json_decode(file_get_contents('php://input'), true) ?? [];
-        if (is_numeric($action)) {
+        if ($action === 'me') {
+            artisan_update_me($pdo, $body);
+        } elseif (is_numeric($action)) {
             artisan_update($pdo, (int)$action, $body);
         } else {
             http_response_code(404);
@@ -444,6 +448,7 @@ function artisan_magic_link(PDO $pdo, array $body): void
 
     // TODO: Envoyer l'email avec le lien magique
     // mail($email, 'Connexion WebiArtisans', "Votre lien : https://artisans-combs.prigent.tech/auth?token={$token}");
+    error_log("[MAGIC-LINK] https://artisans-livry.prigent.tech/espace?token={$token}");
 
     echo json_encode(['success' => true, 'message' => 'Lien de connexion envoyé par email.']);
 }
@@ -525,13 +530,122 @@ function artisan_add_review(PDO $pdo, int $id, array $body): void
 }
 
 /**
+ * Récupère le token artisan depuis les en-têtes.
+ */
+function artisan_get_token(): ?string
+{
+    $token = $_SERVER['HTTP_X_ARTISAN_TOKEN'] ?? ($_SERVER['HTTP_AUTHORIZATION'] ?? '');
+    $token = str_replace('Bearer ', '', $token);
+    return $token ?: null;
+}
+
+/**
+ * GET /artisans/me — Profil de l'artisan authentifié
+ */
+function artisan_me(PDO $pdo): void
+{
+    $token = artisan_get_token();
+    if (!$token) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'error' => 'Token requis']);
+        return;
+    }
+
+    $stmt = $pdo->prepare("
+        SELECT
+            a.id, a.company_name, a.description,
+            a.phone, a.email, a.website, a.address,
+            a.latitude, a.longitude,
+            a.logo_url, a.cover_url,
+            a.is_verified, a.is_featured, a.status,
+            c.slug AS city_slug, c.name AS city_name, c.postal_code,
+            cat.slug AS category_slug, cat.name AS category_name,
+            cat.icon AS category_icon, cat.color AS category_color,
+            COALESCE(ROUND(AVG(r.rating), 1), 0) AS rating_avg,
+            COUNT(DISTINCT r.id)                  AS rating_count
+        FROM local_artisans a
+        JOIN local_cities c            ON a.city_id = c.id
+        LEFT JOIN local_categories cat ON a.category_id = cat.id
+        LEFT JOIN local_reviews r      ON r.artisan_id = a.id AND r.is_approved = 1
+        WHERE a.auth_token = ? AND a.auth_token_exp > NOW()
+        GROUP BY a.id
+        LIMIT 1
+    ");
+    $stmt->execute([$token]);
+    $artisan = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$artisan) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Token invalide ou expiré']);
+        return;
+    }
+
+    unset($artisan['password_hash'], $artisan['auth_token'], $artisan['auth_token_exp']);
+    $artisan['is_featured']    = (bool)$artisan['is_featured'];
+    $artisan['is_verified']    = (bool)$artisan['is_verified'];
+    $artisan['email_verified'] = (bool)($artisan['email_verified'] ?? 0);
+    $artisan['rating_avg']     = (float)$artisan['rating_avg'];
+    $artisan['rating_count']   = (int)$artisan['rating_count'];
+
+    echo json_encode(['success' => true, 'data' => $artisan]);
+}
+
+/**
+ * PUT /artisans/me — Mise à jour profil artisan authentifié
+ */
+function artisan_update_me(PDO $pdo, array $body): void
+{
+    $token = artisan_get_token();
+    if (!$token) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'error' => 'Token requis']);
+        return;
+    }
+
+    $stmt = $pdo->prepare("
+        SELECT id FROM local_artisans
+        WHERE auth_token = ? AND auth_token_exp > NOW() AND status = 'active'
+    ");
+    $stmt->execute([$token]);
+    $artisan = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$artisan) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Token invalide ou expiré']);
+        return;
+    }
+
+    $allowed = ['company_name', 'description', 'phone', 'website', 'address', 'logo_url', 'cover_url'];
+    $updates = [];
+    $params  = [];
+
+    foreach ($allowed as $field) {
+        if (array_key_exists($field, $body)) {
+            $updates[] = "{$field} = ?";
+            $params[]  = trim($body[$field]);
+        }
+    }
+
+    if (empty($updates)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Aucun champ à mettre à jour']);
+        return;
+    }
+
+    $params[] = $artisan['id'];
+    $pdo->prepare("UPDATE local_artisans SET " . implode(', ', $updates) . " WHERE id = ?")
+        ->execute($params);
+
+    echo json_encode(['success' => true, 'message' => 'Profil mis à jour']);
+}
+
+/**
  * PUT /artisans/{id} — Mise à jour profil artisan (authentifié)
  */
 function artisan_update(PDO $pdo, int $id, array $body): void
 {
     // Vérification token artisan
-    $token = $_SERVER['HTTP_X_ARTISAN_TOKEN'] ?? ($_SERVER['HTTP_AUTHORIZATION'] ?? '');
-    $token = str_replace('Bearer ', '', $token);
+    $token = artisan_get_token();
 
     if (!$token) {
         http_response_code(401);
