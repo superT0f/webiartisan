@@ -226,7 +226,74 @@ function artisan_get(PDO $pdo, int $id): void
     $stmt2->execute([$id]);
     $artisan['services'] = $stmt2->fetchAll(PDO::FETCH_ASSOC);
 
+    $artisan['recipes'] = artisan_recipes($pdo, $artisan['id'], $artisan['email'] ?? '');
+    $artisan['nearby'] = artisan_nearby(
+        $pdo,
+        (float)$artisan['latitude'],
+        (float)$artisan['longitude'],
+        (int)$artisan['city_id'],
+        (int)$artisan['id']
+    );
+
     echo json_encode(['success' => true, 'data' => $artisan]);
+}
+
+function artisan_recipes(PDO $pdo, int $artisanId, string $artisanEmail): array
+{
+    $stmt = $pdo->prepare("
+        SELECT DISTINCT
+            r.id, r.title, r.slug, r.description, r.image_url,
+            r.servings, r.prep_time_minutes, r.cook_time_minutes,
+            r.submitted_by, r.created_at,
+            (ra.artisan_id IS NOT NULL) AS is_product_recipe
+        FROM local_recipes r
+        LEFT JOIN local_recipe_artisans ra ON ra.recipe_id = r.id AND ra.artisan_id = ?
+        WHERE r.status = 'published'
+          AND (ra.artisan_id IS NOT NULL OR r.submitter_email = ?)
+        ORDER BY r.created_at DESC
+        LIMIT 6
+    ");
+    $stmt->execute([$artisanId, $artisanEmail]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+function artisan_nearby(PDO $pdo, float $lat, float $lng, int $cityId, int $artisanId): array
+{
+    $sql = "
+        SELECT 'prospect' AS kind, id, name, type, address, latitude, longitude,
+               (6371000 * acos(
+                   cos(radians(?)) * cos(radians(latitude)) *
+                   cos(radians(longitude) - radians(?)) +
+                   sin(radians(?)) * sin(radians(latitude))
+               )) AS distance_meters
+        FROM local_prospects
+        WHERE city_id = ? AND is_active = 1
+        HAVING distance_meters <= 2000
+
+        UNION ALL
+
+        SELECT 'poi' AS kind, id, name, type, address, latitude, longitude,
+               (6371000 * acos(
+                   cos(radians(?)) * cos(radians(latitude)) *
+                   cos(radians(longitude) - radians(?)) +
+                   sin(radians(?)) * sin(radians(latitude))
+               )) AS distance_meters
+        FROM local_pois
+        WHERE city_id = ? AND is_active = 1
+        HAVING distance_meters <= 2000
+
+        ORDER BY distance_meters ASC
+        LIMIT 10
+    ";
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([
+        $lat, $lng, $lat,
+        $cityId,
+        $lat, $lng, $lat,
+        $cityId,
+    ]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 /**
