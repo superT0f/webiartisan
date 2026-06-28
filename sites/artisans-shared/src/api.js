@@ -111,6 +111,90 @@ export async function updateMe(token, data) {
   return res.json()
 }
 
+// --- Prospection B2B ---------------------------------------------
+
+export async function getProspects(filters = {}) {
+  const qs = new URLSearchParams({ city: CITY_SLUG, ...filters }).toString()
+  const res = await fetch(`${API_BASE}/prospects?${qs}`)
+  if (!res.ok) throw new Error('Erreur chargement prospects')
+  return res.json()
+}
+
+export async function getProspect(id) {
+  const res = await fetch(`${API_BASE}/prospects/${id}`)
+  if (!res.ok) throw new Error('Prospect non trouvé')
+  return res.json()
+}
+
+export async function getMyProspects(token) {
+  const res = await fetch(`${API_BASE}/artisans/me/prospects`, {
+    headers: { 'X-Artisan-Token': token },
+  })
+  return res.json()
+}
+
+export async function followProspect(token, prospectId, data) {
+  const res = await fetch(`${API_BASE}/artisans/me/prospects/${prospectId}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Artisan-Token': token,
+    },
+    body: JSON.stringify(data),
+  })
+  return res.json()
+}
+
+export async function unfollowProspect(token, prospectId) {
+  const res = await fetch(`${API_BASE}/artisans/me/prospects/${prospectId}`, {
+    method: 'DELETE',
+    headers: { 'X-Artisan-Token': token },
+  })
+  return res.json()
+}
+
+// --- Recettes locales ----------------------------------------------
+
+export async function getRecipes(filters = {}) {
+  const qs = new URLSearchParams({ city: CITY_SLUG, ...filters }).toString()
+  const res = await fetch(`${API_BASE}/recipes?${qs}`)
+  if (!res.ok) throw new Error('Erreur chargement recettes')
+  return res.json()
+}
+
+export async function getRecipe(slug) {
+  const res = await fetch(`${API_BASE}/recipes/${slug}`)
+  if (!res.ok) throw new Error('Recette non trouvée')
+  return res.json()
+}
+
+export async function createRecipe(data) {
+  const res = await fetch(`${API_BASE}/recipes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ city_slug: CITY_SLUG, ...data }),
+  })
+  return res.json()
+}
+
+export async function reportRecipe(id, reason) {
+  const res = await fetch(`${API_BASE}/recipes/${id}/report`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason }),
+  })
+  return res.json()
+}
+
+export async function suggestRecipe(id, data) {
+  const res = await fetch(`${API_BASE}/recipes/${id}/suggest`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ city_slug: CITY_SLUG, ...data }),
+  })
+  return res.json()
+}
+
 // Codes météo WMO → description + emoji
 export function weatherInfo(code) {
   const map = {
