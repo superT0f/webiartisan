@@ -1,6 +1,7 @@
 <script setup>
 defineProps({
-  recipe: { type: Object, required: true }
+  recipe: { type: Object, required: true },
+  artisanEmail: { type: String, default: '' }
 });
 </script>
 
@@ -10,7 +11,8 @@ defineProps({
     <div class="content">
       <h4>{{ recipe.title }}</h4>
       <p>{{ recipe.description }}</p>
-      <span v-if="recipe.is_product_recipe" class="badge">Avec ses produits</span>
+      <span v-if="recipe.is_product_recipe" class="badge badge-product">Avec ses produits</span>
+      <span v-else-if="recipe.submitter_email && recipe.submitter_email === artisanEmail" class="badge badge-owner">Sa recette</span>
     </div>
   </RouterLink>
 </template>
@@ -50,9 +52,10 @@ defineProps({
   display: inline-block;
   margin-top: 0.4rem;
   font-size: 0.75rem;
-  background: #22c55e;
   color: #fff;
   padding: 2px 8px;
   border-radius: 12px;
 }
+.badge-product { background: #22c55e; }
+.badge-owner { background: #16a34a; }
 </style>

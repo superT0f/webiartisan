@@ -14,11 +14,28 @@ check() {
   fi
 }
 
+# Ensure the demo recipe used below is published (previous runs may have archived it)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if command -v docker >/dev/null 2>&1 && docker compose ps | grep -q mysql; then
+  (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
+    -e "UPDATE local_recipes SET status='published' WHERE slug='tarte-aux-pommes-normandes';" >/dev/null 2>&1 || true)
+fi
+
 echo "== Public endpoints =="
 for endpoint in "/" "/cities/livry" "/artisans?city=livry" "/cities/livry/pois" "/cities/livry/schedules" "/prospects?city=livry" "/recipes?city=livry" "/recipes/tarte-aux-pommes-normandes"; do
   code=$(curl -s -o /dev/null -w "%{http_code}" "${BASE_URL}${endpoint}" || true)
   check "$code" "GET $endpoint" "200"
 done
+
+echo ""
+echo "== Artisan detail enrichment =="
+ARTISAN_JSON=$(curl -s "${BASE_URL}/artisans/1" || true)
+if echo "$ARTISAN_JSON" | python3 -c "import sys,json; d=json.load(sys.stdin).get('data',{}); sys.exit(0 if 'recipes' in d and 'nearby' in d else 1)" 2>/dev/null; then
+  echo "✅ GET /artisans/1 contains recipes and nearby"
+else
+  echo "❌ GET /artisans/1 missing recipes or nearby"
+  FAILED=1
+fi
 
 echo ""
 echo "== Admin auth (requires local MySQL) =="
@@ -57,6 +74,12 @@ if [[ -n "$ADMIN_TOKEN" && -n "$USER_TOKEN" ]]; then
 
     code=$(curl -s -o /dev/null -w "%{http_code}" -X PUT "${BASE_URL}/artisans/me/admin-recipes/${FIRST_ID}/archive" -H "X-Artisan-Token: $ADMIN_TOKEN" || true)
     check "$code" "Archive recipe with admin" "200"
+
+    # Restore recipe so public endpoint tests remain idempotent across runs
+    if command -v docker >/dev/null 2>&1 && docker compose ps | grep -q mysql; then
+      (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
+        -e "UPDATE local_recipes SET status='published' WHERE id=${FIRST_ID};" >/dev/null 2>&1 || true)
+    fi
   fi
 fi
 

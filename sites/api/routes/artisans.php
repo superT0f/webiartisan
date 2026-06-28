@@ -244,7 +244,7 @@ function artisan_recipes(PDO $pdo, int $artisanId, string $artisanEmail): array
         SELECT DISTINCT
             r.id, r.title, r.slug, r.description, r.image_url,
             r.servings, r.prep_time_minutes, r.cook_time_minutes,
-            r.submitted_by, r.created_at,
+            r.submitted_by, r.submitter_email, r.created_at,
             (ra.artisan_id IS NOT NULL) AS is_product_recipe
         FROM local_recipes r
         LEFT JOIN local_recipe_artisans ra ON ra.recipe_id = r.id AND ra.artisan_id = ?

@@ -192,6 +192,7 @@
               v-for="recipe in artisan.recipes"
               :key="recipe.id"
               :recipe="recipe"
+              :artisan-email="artisan.email"
             />
           </div>
         </div>
