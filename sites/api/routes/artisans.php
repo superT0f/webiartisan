@@ -24,6 +24,8 @@ switch ($method) {
             artisan_list($pdo);
         } elseif ($action === 'me' && $param === 'prospects') {
             artisan_my_prospects($pdo);
+        } elseif ($action === 'me' && $param === 'admin-recipes') {
+            artisan_admin_recipes($pdo);
         } elseif ($action === 'me') {
             artisan_me($pdo);
         } elseif (is_numeric($action) && !$param) {
@@ -70,7 +72,9 @@ switch ($method) {
 
     case 'PUT':
         $body = json_decode(file_get_contents('php://input'), true) ?? [];
-        if ($action === 'me') {
+        if ($action === 'me' && $param === 'admin-recipes' && is_numeric($segments[3] ?? '')) {
+            artisan_archive_recipe($pdo, (int)$segments[3]);
+        } elseif ($action === 'me') {
             artisan_update_me($pdo, $body);
         } elseif (is_numeric($action)) {
             artisan_update($pdo, (int)$action, $body);
@@ -651,6 +655,20 @@ function artisan_require_auth(PDO $pdo): array
 }
 
 /**
+ * Vérifie que l'artisan authentifié est administrateur.
+ */
+function artisan_require_admin(PDO $pdo): array
+{
+    $artisan = artisan_require_auth($pdo);
+    if (empty($artisan['is_admin'])) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Accès réservé aux administrateurs']);
+        exit;
+    }
+    return $artisan;
+}
+
+/**
  * GET /artisans/me — Profil de l'artisan authentifié
  */
 function artisan_me(PDO $pdo): void
@@ -870,4 +888,69 @@ function artisan_unfollow_prospect(PDO $pdo, int $prospectId): void
         ->execute([$prospectId, $artisan['id']]);
 
     echo json_encode(['success' => true, 'message' => 'Suivi supprimé']);
+}
+
+/**
+ * GET /artisans/me/admin-recipes — Recettes à modérer (admin)
+ */
+function artisan_admin_recipes(PDO $pdo): void
+{
+    artisan_require_admin($pdo);
+
+    $status = $_GET['status'] ?? '';
+    $allowedStatuses = ['published', 'reported', 'archived'];
+
+    $sql = "
+        SELECT r.id, r.title, r.slug, r.description, r.image_url,
+               r.prep_time_minutes, r.cook_time_minutes, r.servings,
+               r.difficulty, r.season, r.is_premium, r.is_incomplete,
+               r.status, r.submitted_by, r.submitter_email, r.created_at,
+               c.slug AS city_slug, c.name AS city_name
+        FROM local_recipes r
+        JOIN local_cities c ON c.id = r.city_id
+    ";
+    $params = [];
+
+    if ($status && in_array($status, $allowedStatuses, true)) {
+        $sql .= " WHERE r.status = ?";
+        $params[] = $status;
+    }
+
+    $sql .= " ORDER BY r.created_at DESC";
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($items as &$item) {
+        $item['is_premium']    = (bool)$item['is_premium'];
+        $item['is_incomplete'] = (bool)$item['is_incomplete'];
+    }
+
+    echo json_encode([
+        'success' => true,
+        'data'    => $items,
+        'total'   => count($items),
+    ]);
+}
+
+/**
+ * PUT /artisans/me/admin-recipes/:id/archive — Archiver une recette
+ */
+function artisan_archive_recipe(PDO $pdo, int $recipeId): void
+{
+    artisan_require_admin($pdo);
+
+    $check = $pdo->prepare("SELECT id FROM local_recipes WHERE id = ?");
+    $check->execute([$recipeId]);
+    if (!$check->fetch()) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Recette non trouvée']);
+        return;
+    }
+
+    $pdo->prepare("UPDATE local_recipes SET status = 'archived' WHERE id = ?")
+        ->execute([$recipeId]);
+
+    echo json_encode(['success' => true, 'message' => 'Recette archivée']);
 }
