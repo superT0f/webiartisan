@@ -29,36 +29,47 @@ function prospects_list(PDO $pdo): void
     $zone     = $_GET['zone'] ?? '';
     $type     = $_GET['type'] ?? '';
     $search   = trim($_GET['search'] ?? '');
+    $limit    = min((int)($_GET['limit'] ?? 50), 100);
+    $offset   = (int)($_GET['offset'] ?? 0);
 
-    $sql = "
-        SELECT p.*, c.slug AS city_slug, c.name AS city_name
-        FROM local_prospects p
-        JOIN local_cities c ON c.id = p.city_id
-        WHERE p.is_active = 1
-    ";
+    $where = "WHERE p.is_active = 1";
     $params = [];
 
     if ($citySlug) {
-        $sql .= " AND c.slug = ?";
+        $where .= " AND c.slug = ?";
         $params[] = $citySlug;
     }
     if ($zone) {
-        $sql .= " AND p.zone = ?";
+        $where .= " AND p.zone = ?";
         $params[] = $zone;
     }
     if ($type) {
-        $sql .= " AND p.type = ?";
+        $where .= " AND p.type = ?";
         $params[] = $type;
     }
     if ($search) {
-        $sql .= " AND (p.name LIKE ? OR p.type LIKE ? OR p.zone LIKE ?)";
+        $where .= " AND (p.name LIKE ? OR p.type LIKE ? OR p.zone LIKE ?)";
         $like = '%' . $search . '%';
         $params[] = $like;
         $params[] = $like;
         $params[] = $like;
     }
 
-    $sql .= " ORDER BY p.name ASC";
+    $countSql = "SELECT COUNT(*) FROM local_prospects p JOIN local_cities c ON c.id = p.city_id $where";
+    $stmt = $pdo->prepare($countSql);
+    $stmt->execute($params);
+    $total = (int)$stmt->fetchColumn();
+
+    $sql = "
+        SELECT p.*, c.slug AS city_slug, c.name AS city_name
+        FROM local_prospects p
+        JOIN local_cities c ON c.id = p.city_id
+        $where
+        ORDER BY p.name ASC
+        LIMIT ? OFFSET ?
+    ";
+    $params[] = $limit;
+    $params[] = $offset;
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
@@ -67,7 +78,9 @@ function prospects_list(PDO $pdo): void
     echo json_encode([
         'success' => true,
         'data'    => $items,
-        'total'   => count($items),
+        'total'   => $total,
+        'limit'   => $limit,
+        'offset'  => $offset,
     ]);
 }
 

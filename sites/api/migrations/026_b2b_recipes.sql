@@ -4,6 +4,18 @@
 
 SET NAMES utf8mb4;
 
+-- Ensure rate limiting table exists for fresh dev environments
+CREATE TABLE IF NOT EXISTS api_rate_limits (
+    id           INT AUTO_INCREMENT PRIMARY KEY,
+    ip           VARCHAR(45) NOT NULL,
+    endpoint     VARCHAR(100) NOT NULL,
+    window_start INT NOT NULL,
+    count        INT NOT NULL DEFAULT 1,
+    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_rate_limit (ip, endpoint, window_start),
+    INDEX idx_window (window_start)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 ALTER TABLE local_artisans
     ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT FALSE AFTER is_featured;
 
