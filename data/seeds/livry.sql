@@ -1,0 +1,2 @@
+-- Placeholder: Livry (Calvados, 14240) seed data.
+-- Will be populated in Task 3.
