@@ -1,0 +1,258 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "WebIArtisan API",
+    "description": "Documentation publique de l'API WebIArtisan. Permet la gestion des sites, de l'authentification et de la marque.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Support WebIArtisan",
+      "url": "https://webiartisan.prigent.tech"
+    }
+  },
+  "servers": [
+    {
+      "url": "/api",
+      "description": "Serveur API local/relatif"
+    },
+    {
+      "url": "https://api.prigent.tech",
+      "description": "Serveur API Production"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Vérification de l'état du service",
+        "responses": {
+          "200": {
+            "description": "Service opérationnel",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "service": { "type": "string" },
+                    "version": { "type": "string" },
+                    "time": { "type": "string", "format": "date-time" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/lookup": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Recherche un utilisateur par email ou identifiant",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "identifier": { "type": "string", "example": "demo@web.prigent.tech" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Utilisateur trouvé" },
+          "404": { "description": "Aucun compte trouvé" }
+        }
+      }
+    },
+    "/auth/request-code": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Génère et envoie un code de connexion par email (Magic Link style)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "identifier": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Code envoyé" }
+        }
+      }
+    },
+    "/auth/verify-code": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Vérifie le code et retourne un jeton JWT",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "identifier": { "type": "string" },
+                  "code": { "type": "string" },
+                  "remember_me": { "type": "boolean", "default": true }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Connecté avec succès. Retourne le jeton JWT." }
+        }
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Création d'un nouveau compte",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "company_name"],
+                "properties": {
+                  "email": { "type": "string" },
+                  "company_name": { "type": "string" },
+                  "slug": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Compte créé" }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "tags": ["Auth"],
+        "security": [{ "bearerAuth": [] }],
+        "summary": "Récupère les informations de l'utilisateur connecté",
+        "responses": {
+          "200": { "description": "Infos utilisateur" }
+        }
+      }
+    },
+    "/status/public": {
+      "get": {
+        "tags": ["Status"],
+        "summary": "Récupère l'état de santé public des services",
+        "responses": {
+          "200": { "description": "Tableau de bord de statut" }
+        }
+      }
+    },
+    "/public/view/{token}": {
+      "get": {
+        "tags": ["Public"],
+        "summary": "Affiche un site publié",
+        "parameters": [
+          { "name": "token", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Contenu HTML du site" }
+        }
+      }
+    },
+    "/website/builder-meta": {
+      "get": {
+        "tags": ["Website"],
+        "summary": "Récupère les métadonnées pour le constructeur de site (marque, modèles, composants)",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Métadonnées du builder" }
+        }
+      }
+    },
+    "/website/templates": {
+      "get": {
+        "tags": ["Website"],
+        "summary": "Catalogue des modèles de sites disponibles",
+        "responses": {
+          "200": { "description": "Liste de modèles" }
+        }
+      }
+    },
+    "/website/components": {
+      "get": {
+        "tags": ["Website"],
+        "summary": "Catalogue des composants de sites disponibles",
+        "responses": {
+          "200": { "description": "Liste de composants" }
+        }
+      }
+    },
+    "/website/list": {
+      "get": {
+        "tags": ["Website"],
+        "summary": "Liste des sites créés par l'utilisateur (tenant)",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Liste de sites" }
+        }
+      }
+    },
+    "/website/generate": {
+      "post": {
+        "tags": ["Website"],
+        "summary": "Génère un nouveau site à partir d'une configuration",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "config": { "type": "object" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Site généré" },
+          "403": { "description": "Quota dépassé ou composant premium verrouillé" }
+        }
+      }
+    },
+    "/status/server-status": {
+      "get": {
+        "tags": ["Status"],
+        "summary": "Métriques serveur détaillées (proxy Gandi)",
+        "security": [{ "basicAuth": [] }],
+        "responses": {
+          "200": { "description": "Métriques internes Apache/Gandi" },
+          "401": { "description": "Authentification Basic requise" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      },
+      "basicAuth": {
+        "type": "http",
+        "scheme": "basic"
+      }
+    }
+  }
+}

@@ -1,0 +1,169 @@
+<?php
+/**
+ * WebIArtisan API — Front Controller (Livry POC)
+ * All requests are routed through this file via .htaccess rewrite.
+ *
+ * URL pattern: /api/{module}/{action}[/{param}]
+ * Example:     /api/cities/livry
+ *              /api/artisans/register
+ */
+
+// Debug mode (remove in production)
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+ini_set('log_errors', 1);
+
+// Load unified Logger - handle both local and production paths
+$adminLoggerPath = __DIR__ . '/../admin/lib/Logger.php';
+if (!file_exists($adminLoggerPath)) {
+    // Production: admin is in a different vhost
+    $adminLoggerPath = '/srv/data/web/vhosts/admin.prigent.tech/htdocs/lib/Logger.php';
+}
+if (file_exists($adminLoggerPath)) {
+    require_once $adminLoggerPath;
+    $logger = Logger::getInstance();
+} else {
+    // Fallback: create a simple logger stub
+    $logger = new class {
+        public function info($m, $c = []) { }
+        public function debug($m, $c = []) { }
+        public function error($m, $c = []) { error_log($m); }
+        public function warning($m, $c = []) { }
+    };
+}
+
+header('Content-Type: application/json; charset=UTF-8');
+
+// Load core
+require_once __DIR__ . '/config/database.php';
+require_once __DIR__ . '/config/app.php';
+require_once __DIR__ . '/middleware/Cors.php';
+require_once __DIR__ . '/middleware/Auth.php';
+require_once __DIR__ . '/middleware/Tenant.php';
+require_once __DIR__ . '/middleware/PlanQuota.php';
+require_once __DIR__ . '/middleware/RateLimit.php';
+
+// Load environment variables globally (docker-compose env vars take precedence)
+$env = loadEnv(__DIR__ . '/.env');
+foreach ($env as $key => $value) {
+    if (!isset($_ENV[$key])) {
+        $_ENV[$key] = $value;
+    }
+}
+
+// Database connection used by rate limiting and route files
+$pdo = getDatabase();
+
+// Handle CORS
+handleCors();
+
+if (isset($logger)) {
+    $logger->debug('API Request', [
+        'uri' => $_SERVER['REQUEST_URI'] ?? 'N/A',
+        'r_get' => $_GET['r'] ?? 'N/A',
+        'method' => $_SERVER['REQUEST_METHOD'] ?? 'N/A'
+    ]);
+}
+
+// Parse the request path - support both URL rewriting and query string
+$requestUri = $_SERVER['REQUEST_URI'] ?? '/';
+$basePath = '/api';
+
+// Check for query string routing (Gandi compatible: ?r=module/action/param)
+if (isset($_GET['r']) && !empty($_GET['r'])) {
+    $path = $_GET['r'];
+} else {
+    // Strip query string from URL
+    $path = parse_url($requestUri, PHP_URL_PATH);
+    if ($path === null) $path = '/';
+}
+
+if (isset($logger)) {
+    $logger->debug('Raw Path Info', [
+        'requestUri' => $requestUri,
+        'basePath' => $basePath,
+        'path_before_ltrim' => $path
+    ]);
+}
+
+// Robust removal of base path /api
+$path = '/' . ltrim($path, '/');
+if (strpos($path, $basePath . '/') === 0) {
+    $path = substr($path, strlen($basePath));
+} elseif ($path === $basePath) {
+    $path = '/';
+}
+
+$path = trim($path, '/');
+$segments = $path ? explode('/', $path) : [];
+
+if (isset($logger)) {
+    $logger->debug('API Routing', [
+        'path' => $path,
+        'segments' => $segments
+    ]);
+}
+
+$module = $segments[0] ?? '';
+$action = $segments[1] ?? '';
+$param  = $segments[2] ?? null;
+
+$method = $_SERVER['REQUEST_METHOD'];
+
+// Route map
+$publicRoutes = ['cities', 'artisans'];
+$protectedRoutes = [];
+
+// Global auth instance (kept harmless; no protected routes in POC)
+$auth = new Auth();
+
+// Routes publiques artisans locaux (pas d'auth requise pour lecture)
+if ($module === 'cities') {
+    applyRateLimit($pdo, 'public');
+    require_once __DIR__ . '/routes/cities.php';
+    exit;
+}
+
+if ($module === 'artisans') {
+    // Rate limit plus strict sur le register
+    $rlEndpoint = ($action === 'register') ? 'login' : 'public';
+    applyRateLimit($pdo, $rlEndpoint);
+    require_once __DIR__ . '/routes/artisans.php';
+    exit;
+}
+
+// Inject auth + tenant context for protected routes
+$authUser = null;
+if (in_array($module, $protectedRoutes)) {
+    $authUser = $auth->requireAuth();
+    TenantContext::setFromAuth($authUser);
+}
+
+// Route to the correct module
+$routeFile = __DIR__ . "/routes/{$module}.php";
+
+if ($module && file_exists($routeFile)) {
+    $logger->info('API route loaded', [
+        'module' => $module,
+        'action' => $action,
+        'method' => $method,
+        'user_id' => $authUser['sub'] ?? null,
+        'tenant_id' => $authUser['tenant_id'] ?? null
+    ]);
+    require_once $routeFile;
+} elseif ($module === '' || $module === 'health') {
+    $logger->debug('Health check');
+    echo json_encode([
+        'success' => true,
+        'service' => 'WebIArtisan API',
+        'version' => '1.0.0',
+        'time'    => date('c'),
+    ]);
+} else {
+    $logger->warning('Unknown API module', ['module' => $module, 'action' => $action]);
+    http_response_code(404);
+    echo json_encode([
+        'success' => false,
+        'error'   => "Unknown module: $module",
+    ]);
+}

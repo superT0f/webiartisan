@@ -1,0 +1,163 @@
+<?php
+/**
+ * WebIArtisan API — Front Controller
+ * All requests are routed through this file via .htaccess rewrite.
+ *
+ * URL pattern: /api/{module}/{action}[/{param}]
+ * Example:     /api/auth/login
+ *              /api/brand/get
+ *              /api/website/save
+ */
+
+// Debug mode (remove in production)
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('log_errors', 0); // Disable PHP error_log, we use unified Logger
+
+// Load unified Logger - handle both local and production paths
+$adminLoggerPath = __DIR__ . '/../admin/lib/Logger.php';
+if (!file_exists($adminLoggerPath)) {
+    // Production: admin is in a different vhost
+    $adminLoggerPath = '/srv/data/web/vhosts/admin.prigent.tech/htdocs/lib/Logger.php';
+}
+if (file_exists($adminLoggerPath)) {
+    require_once $adminLoggerPath;
+    $logger = Logger::getInstance();
+} else {
+    // Fallback: create a simple logger stub
+    $logger = new class {
+        public function info($m, $c = []) { }
+        public function debug($m, $c = []) { }
+        public function error($m, $c = []) { error_log($m); }
+        public function warning($m, $c = []) { }
+    };
+}
+
+header('Content-Type: application/json; charset=UTF-8');
+
+// Load core
+require_once __DIR__ . '/config/database.php';
+require_once __DIR__ . '/config/app.php';
+require_once __DIR__ . '/middleware/Cors.php';
+require_once __DIR__ . '/middleware/Auth.php';
+require_once __DIR__ . '/middleware/Tenant.php';
+require_once __DIR__ . '/middleware/PlanQuota.php';
+
+// Load environment variables globally (needed for Stripe config)
+$env = loadEnv(__DIR__ . '/.env');
+foreach ($env as $key => $value) {
+    $_ENV[$key] = $value;
+}
+
+// Handle CORS
+handleCors();
+
+// Parse the request path - support both URL rewriting and query string
+$requestUri = $_SERVER['REQUEST_URI'] ?? '/';
+$basePath = '/api';
+
+// Check for query string routing (Gandi compatible: ?r=module/action/param)
+if (isset($_GET['r']) && !empty($_GET['r'])) {
+    $path = $_GET['r'];
+} else {
+    // Strip query string from URL
+    $path = parse_url($requestUri, PHP_URL_PATH);
+}
+
+// Robust removal of base path /api
+$path = '/' . ltrim($path, '/');
+if (strpos($path, $basePath . '/') === 0) {
+    $path = substr($path, strlen($basePath));
+} elseif ($path === $basePath) {
+    $path = '/';
+}
+
+$path = trim($path, '/');
+$segments = $path ? explode('/', $path) : [];
+
+$module = $segments[0] ?? '';
+$action = $segments[1] ?? '';
+$param  = $segments[2] ?? null;
+
+$method = $_SERVER['REQUEST_METHOD'];
+
+// Route map
+$publicRoutes = ['auth', 'public', 'status', 'webhooks', 'docs', 'client', 'track', 'test'];
+$protectedRoutes = ['brand', 'website', 'gestion', 'mobile', 'payments', 'subscription', 'client-links', 'reviews', 'clients', 'tenant'];
+
+// Global auth instance
+$auth = new Auth();
+
+// Special case: client portal (/client/{token})
+if ($module === 'client') {
+    require_once __DIR__ . '/routes/client-public.php';
+    exit;
+}
+
+// Special case: tracking endpoints (/track/*) - public routes
+if ($module === 'track') {
+    require_once __DIR__ . '/routes/tracking.php';
+    exit;
+}
+
+// Special case: public site viewer (/public/view/{token})
+if ($module === 'public' && $action === 'view') {
+    require_once __DIR__ . '/routes/public.php';
+    exit;
+}
+
+// Special case: API documentation (/docs/ui or /docs/spec)
+if ($module === 'docs') {
+    require_once __DIR__ . '/routes/docs.php';
+    exit;
+}
+
+// Special case: test endpoints (/test/*) - public routes for debugging
+if ($module === 'test') {
+    require_once __DIR__ . '/routes/test-mail.php';
+    exit;
+}
+
+// Compatibility route: /site/{token} redirects to /public/view/{token}
+if ($module === 'site' && $action && !$segments[2]) {
+    // Redirect /site/{token} to /public/view/{token}
+    header("Location: /api/public/view/{$action}");
+    http_response_code(301);
+    exit;
+}
+
+// Inject auth + tenant context for protected routes
+$authUser = null;
+if (in_array($module, $protectedRoutes)) {
+    $authUser = $auth->requireAuth();
+    TenantContext::setFromAuth($authUser);
+}
+
+// Route to the correct module
+$routeFile = __DIR__ . "/routes/{$module}.php";
+
+if ($module && file_exists($routeFile)) {
+    $logger->info('API route loaded', [
+        'module' => $module,
+        'action' => $action,
+        'method' => $method,
+        'user_id' => $authUser['sub'] ?? null,
+        'tenant_id' => $authUser['tenant_id'] ?? null
+    ]);
+    require_once $routeFile;
+} elseif ($module === '' || $module === 'health') {
+    $logger->debug('Health check');
+    echo json_encode([
+        'success' => true,
+        'service' => 'WebIArtisan API',
+        'version' => '1.0.0',
+        'time'    => date('c'),
+    ]);
+} else {
+    $logger->warning('Unknown API module', ['module' => $module, 'action' => $action]);
+    http_response_code(404);
+    echo json_encode([
+        'success' => false,
+        'error'   => "Unknown module: $module",
+    ]);
+}
