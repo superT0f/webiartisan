@@ -132,6 +132,12 @@ if ($module === 'artisans') {
     exit;
 }
 
+if ($module === 'prospects') {
+    applyRateLimit($pdo, 'public');
+    require_once __DIR__ . '/routes/prospects.php';
+    exit;
+}
+
 // Inject auth + tenant context for protected routes
 $authUser = null;
 if (in_array($module, $protectedRoutes)) {
