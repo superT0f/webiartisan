@@ -16,6 +16,7 @@ Le POC Livry (`artisans-livry.prigent.tech`) dispose déjà d’un annuaire publ
 - **Recettes** : recettes seed/admin + possibilité pour artisans et particuliers de proposer des recettes.
 - **Recettes** : publication immédiate + bouton de signalement.
 - **Recettes** : ingrédients structurés avec quantité, unité et nombre de portions.
+- **Recettes** : prevoir un ajout "incomplet", qui puisse etre ameliorer completer par la communaute.
 
 ---
 
@@ -110,6 +111,8 @@ Un script SQL `data/seeds/livry_prospects.sql` crée les prospects à partir des
 | `difficulty` | ENUM | `very_easy`, `easy`, `medium`, `hard` |
 | `season` | VARCHAR(50) | `spring`, `summer`, `autumn`, `winter`, `all` |
 | `is_premium` | BOOLEAN | Mise en avant |
+| `is_incomplete` | BOOLEAN | Recette marquée comme incomplète ; ouverte aux compléments |
+| `parent_recipe_id` | INT FK nullable | Lien vers la recette d’origine pour les variantes / compléments |
 | `status` | ENUM | `published`, `reported`, `archived` |
 | `submitted_by` | VARCHAR(100) | Nom affiché du contributeur |
 | `submitter_email` | VARCHAR(255) | Email du contributeur |
@@ -153,6 +156,7 @@ Routes publiques (module `recipes`) :
 - `GET /recipes/:slug` — détail d’une recette (ingrédients, étapes, artisans liés).
 - `POST /recipes` — proposition d’une recette par un visiteur ou artisan.
 - `POST /recipes/:id/report` — signalement.
+- `POST /recipes/:id/suggest` — proposer un complément / variante (crée une nouvelle recette liée via `parent_recipe_id`).
 
 Routes privées admin (dans l’espace artisan, protégées par un flag `is_admin` sur le compte artisan) :
 
@@ -170,6 +174,8 @@ Routes privées admin (dans l’espace artisan, protégées par un flag `is_admi
   - Liste des ingrédients (locaux mis en avant avec lien vers artisan).
   - Étapes numérotées.
   - Bouton “Proposer une recette”.
+  - Badge “Recette incomplète” + bouton “Proposer un complément / variante”.
+  - Liste des variantes / compléments proposés par la communauté.
 - **Formulaire** `/recette/nouvelle` :
   - Champs titre, description, image URL, temps, portions, difficulté, saison.
   - Ajout dynamique d’ingrédients (nom, quantité, unité, local, optionnel).
