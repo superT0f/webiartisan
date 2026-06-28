@@ -7,7 +7,7 @@ build:
 	npm run build
 
 push: build
-	rsync -avz --delete dist/ /mnt/gandi/vhosts/artisans-livry.prigent.tech/htdocs/
+	rsync -avz --no-owner --no-group --delete dist/ $(HOME)/mnt/gandi/vhosts/artisans-livry.prigent.tech/htdocs/
 
 clean:
 	rm -rf dist node_modules
