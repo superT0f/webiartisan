@@ -40,7 +40,30 @@
 
       <div v-if="loading" class="skeleton" style="height: 200px; border-radius: 12px;"></div>
 
-      <form v-else-if="artisan" @submit.prevent="saveProfile" class="profile-form card">
+      <div v-if="loadingProspects" class="skeleton" style="height: 120px; border-radius: 12px; margin-top: 24px;"></div>
+
+      <section v-else-if="myProspects.length" class="dashboard-section card">
+        <div class="section-title">
+          <h2>Ma prospection</h2>
+          <RouterLink to="/prospection" class="btn btn-outline btn-sm">Voir tout</RouterLink>
+        </div>
+        <div class="prospect-list">
+          <RouterLink
+            v-for="p in myProspects"
+            :key="p.id"
+            :to="`/prospect/${p.id}`"
+            class="prospect-mini"
+          >
+            <div>
+              <strong>{{ p.name }}</strong>
+              <span class="text-muted small">{{ p.type }}</span>
+            </div>
+            <span class="badge" :class="'status-' + p.follow_status">{{ statusLabel[p.follow_status] || p.follow_status }}</span>
+          </RouterLink>
+        </div>
+      </section>
+
+      <form v-if="artisan" @submit.prevent="saveProfile" class="profile-form card">
         <div class="form-group">
           <label for="company_name">Nom de l'entreprise</label>
           <input id="company_name" v-model="form.company_name" class="form-input" required />
@@ -94,7 +117,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { requestMagicLink, fetchMe, updateMe } from '../api.js'
+import { requestMagicLink, fetchMe, updateMe, getMyProspects } from '../api.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -116,6 +139,8 @@ const sending = ref(false)
 const saving = ref(false)
 const message = ref('')
 const messageType = ref('')
+const myProspects = ref([])
+const loadingProspects = ref(false)
 
 function setMessage(text, type = 'info') {
   message.value = text
@@ -168,6 +193,27 @@ async function loadProfile() {
   }
 }
 
+async function loadMyProspects() {
+  if (!token.value) return
+  loadingProspects.value = true
+  try {
+    const res = await getMyProspects(token.value)
+    myProspects.value = (res.data || []).filter(p => p.follow_status)
+  } catch (e) {
+    console.error('Erreur chargement prospects suivis', e)
+  } finally {
+    loadingProspects.value = false
+  }
+}
+
+const statusLabel = {
+  tocontact: 'À contacter',
+  contacted: 'Contacté',
+  meeting: 'RDV pris',
+  converted: 'Converti',
+  declined: 'Refus',
+}
+
 async function saveProfile() {
   saving.value = true
   message.value = ''
@@ -194,11 +240,44 @@ function logout() {
 
 onMounted(() => {
   loadProfile()
+  loadMyProspects()
 })
 </script>
 
 <style scoped>
 .dashboard { max-width: 720px; }
+
+.dashboard-section { padding: 24px; margin-bottom: 24px; }
+.section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.section-title h2 { font-size: 1.2rem; }
+
+.prospect-list { display: flex; flex-direction: column; gap: 10px; }
+.prospect-mini {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: var(--c-cream);
+  color: inherit;
+  text-decoration: none;
+  transition: background 0.2s;
+}
+.prospect-mini:hover { background: var(--c-cream-2); }
+.prospect-mini strong { display: block; }
+.prospect-mini .small { font-size: 0.8rem; }
+
+.status-tocontact { background: #E3F2FD; color: #0D47A1; }
+.status-contacted { background: #FFF3E0; color: #E65100; }
+.status-meeting { background: #F3E5F5; color: #6A1B9A; }
+.status-converted { background: #D8F3DC; color: #1B5E20; }
+.status-declined { background: #FFEBEE; color: #B71C1C; }
 
 .auth-card {
   max-width: 420px;
