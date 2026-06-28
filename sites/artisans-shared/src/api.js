@@ -195,6 +195,24 @@ export async function suggestRecipe(id, data) {
   return res.json()
 }
 
+// --- Administration recettes ---------------------------------------
+
+export async function getAdminRecipes(token, filters = {}) {
+  const qs = new URLSearchParams(filters).toString()
+  const res = await fetch(`${API_BASE}/artisans/me/admin-recipes${qs ? '?' + qs : ''}`, {
+    headers: { 'X-Artisan-Token': token },
+  })
+  return res.json()
+}
+
+export async function archiveRecipe(token, recipeId) {
+  const res = await fetch(`${API_BASE}/artisans/me/admin-recipes/${recipeId}/archive`, {
+    method: 'PUT',
+    headers: { 'X-Artisan-Token': token },
+  })
+  return res.json()
+}
+
 // Codes météo WMO → description + emoji
 export function weatherInfo(code) {
   const map = {
