@@ -16,8 +16,20 @@ CREATE TABLE IF NOT EXISTS api_rate_limits (
     INDEX idx_window (window_start)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-ALTER TABLE local_artisans
-    ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT FALSE AFTER is_featured;
+SET @dbname = DATABASE();
+SET @tablename = 'local_artisans';
+SET @columnname = 'is_admin';
+SET @preparedStatement = (SELECT IF(
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+   WHERE TABLE_SCHEMA = @dbname
+     AND TABLE_NAME = @tablename
+     AND COLUMN_NAME = @columnname) > 0,
+  'SELECT 1',
+  'ALTER TABLE local_artisans ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT FALSE AFTER is_featured'
+));
+PREPARE alterIfNotExists FROM @preparedStatement;
+EXECUTE alterIfNotExists;
+DEALLOCATE PREPARE alterIfNotExists;
 
 CREATE TABLE IF NOT EXISTS local_prospects (
     id              INT AUTO_INCREMENT PRIMARY KEY,
