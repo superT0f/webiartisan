@@ -39,6 +39,7 @@ services:
       - mysql_data:/var/lib/mysql
       - ./sites/api/migrations/025_artisans_local.sql:/docker-entrypoint-initdb.d/025_artisans_local.sql:ro
       - ./sites/api/migrations/026_b2b_recipes.sql:/docker-entrypoint-initdb.d/026_b2b_recipes.sql:ro
+      - ./sites/api/migrations/027_spin_wheel.sql:/docker-entrypoint-initdb.d/027_spin_wheel.sql:ro
       - ./data/seeds/livry.sql:/docker-entrypoint-initdb.d/livry.sql:ro
       - ./data/seeds/livry_prospects.sql:/docker-entrypoint-initdb.d/livry_prospects.sql:ro
       - ./data/seeds/livry_recipes.sql:/docker-entrypoint-initdb.d/livry_recipes.sql:ro
