@@ -50,7 +50,7 @@
       </div>
 
       <div class="footer-bottom">
-        <span>© {{ year }} WebiArtisan · {{ CITY_NAME }} · {{ CITY_CP }}</span>
+        <span>© {{ year }} WebiArtisan · {{ CITY_NAME }} · {{ CITY_CP }} · v{{ APP_VERSION }}</span>
         <span>Fait avec ❤️ en Seine-et-Marne</span>
       </div>
     </div>
@@ -58,7 +58,7 @@
 </template>
 
 <script setup>
-import { CITY_NAME, CITY_CP, CITY_SLUG } from '../api.js'
+import { CITY_NAME, CITY_CP, CITY_SLUG, APP_VERSION } from '../api.js'
 
 const year = new Date().getFullYear()
 </script>
