@@ -10,6 +10,7 @@ build:
 	VITE_CITY_LAT=49.1081 \
 	VITE_CITY_LNG=-0.7658 \
 	VITE_CITY_CP=14240 \
+	VITE_APP_VERSION=1.1.0 \
 		npm run build
 
 push: build
