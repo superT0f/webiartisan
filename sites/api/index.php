@@ -150,6 +150,12 @@ if ($module === 'users') {
     exit;
 }
 
+if ($module === 'avatars') {
+    applyRateLimit($pdo, 'public');
+    require_once __DIR__ . '/routes/avatars.php';
+    exit;
+}
+
 if ($module === 'spin') {
     applyRateLimit($pdo, 'public');
     require_once __DIR__ . '/routes/spin.php';

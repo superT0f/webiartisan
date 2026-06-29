@@ -17,6 +17,17 @@ switch ($method) {
             user_magic_link($pdo, $body);
         } elseif ($action === 'auth') {
             user_auth($pdo);
+        } elseif ($action === 'me' && $param === 'avatar') {
+            user_update_avatar($pdo, $body);
+        } else {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'Endpoint inconnu']);
+        }
+        break;
+
+    case 'PUT':
+        if ($action === 'me') {
+            user_update_profile($pdo);
         } else {
             http_response_code(404);
             echo json_encode(['success' => false, 'error' => 'Endpoint inconnu']);
@@ -130,6 +141,9 @@ function user_auth(PDO $pdo): void
         WHERE id = ?
     ")->execute([$sessionToken, $sessionExp, $user['id']]);
 
+    require_once __DIR__ . '/../lib/Gamification.php';
+    gamificationUpdateStreak($pdo, (int)$user['id']);
+
     echo json_encode([
         'success' => true,
         'token'   => $sessionToken,
@@ -140,6 +154,162 @@ function user_auth(PDO $pdo): void
 function user_me(PDO $pdo): void
 {
     $user = user_require_auth($pdo);
+    require_once __DIR__ . '/../lib/Gamification.php';
+    $profile = gamificationUserProfile($pdo, (int)$user['id']);
+    if ($profile === null) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Utilisateur introuvable']);
+        return;
+    }
+    echo json_encode(['success' => true, 'data' => $profile]);
+}
+
+function user_update_profile(PDO $pdo): void
+{
+    $user = user_require_auth($pdo);
+    $body = json_decode(file_get_contents('php://input'), true) ?? [];
+
+    $displayName = isset($body['display_name']) ? trim($body['display_name']) : null;
+    $avatarGender = $body['avatar_gender'] ?? null;
+    $title = $body['title'] ?? null;
+
+    $fields = [];
+    $values = [];
+
+    if ($displayName !== null) {
+        $fields[] = 'display_name = ?';
+        $values[] = substr($displayName, 0, 80);
+    }
+    if ($avatarGender !== null && in_array($avatarGender, ['male', 'female', 'neutral'], true)) {
+        $fields[] = 'avatar_gender = ?';
+        $values[] = $avatarGender;
+    }
+    if ($title !== null) {
+        $fields[] = 'title = ?';
+        $values[] = substr($title, 0, 80);
+    }
+
+    if ($fields) {
+        $values[] = $user['id'];
+        $pdo->prepare("UPDATE local_users SET " . implode(', ', $fields) . " WHERE id = ?")->execute($values);
+    }
+
+    require_once __DIR__ . '/../lib/Gamification.php';
+    $profile = gamificationUserProfile($pdo, (int)$user['id']);
+    if ($profile === null) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Utilisateur introuvable']);
+        return;
+    }
+    echo json_encode(['success' => true, 'data' => $profile]);
+}
+
+function getAvailableAvatar(PDO $pdo, string $avatarId, int $userLevel, array $userBadges): ?array
+{
+    $basePath = __DIR__ . '/../public/avatars';
+    foreach (glob($basePath . '/*', GLOB_ONLYDIR) as $dir) {
+        foreach (glob($dir . '/*.{png,svg,jpg,jpeg}', GLOB_BRACE) as $file) {
+            $metaFile = $file . '.json';
+            $meta = file_exists($metaFile) ? (json_decode(file_get_contents($metaFile), true) ?: []) : [];
+            $id = $meta['id'] ?? pathinfo($file, PATHINFO_FILENAME);
+            if ($id === $avatarId) {
+                $unlockLevel = $meta['unlock_level'] ?? 1;
+                $unlockBadge = $meta['unlock_badge'] ?? null;
+                if ($userLevel < $unlockLevel) return null;
+                if ($unlockBadge && !in_array($unlockBadge, $userBadges, true)) return null;
+                return [
+                    'id' => $id,
+                    'url' => '/avatars/' . basename($dir) . '/' . basename($file),
+                    'type' => $meta['type'] ?? 'custom',
+                ];
+            }
+        }
+    }
+    return null;
+}
+
+function user_update_avatar(PDO $pdo, array $body): void
+{
+    $user = user_require_auth($pdo);
+
+    if (!empty($body['avatar_id'])) {
+        $badgeKeys = array_column(
+            $pdo->query("SELECT badge_key FROM local_user_badges WHERE user_id = " . (int)$user['id'])->fetchAll(PDO::FETCH_ASSOC),
+            'badge_key'
+        );
+        $avatarStmt = $pdo->prepare("SELECT level FROM local_users WHERE id = ?");
+        $avatarStmt->execute([$user['id']]);
+        $userLevel = (int)$avatarStmt->fetchColumn();
+        $avatar = getAvailableAvatar($pdo, $body['avatar_id'], $userLevel, $badgeKeys);
+        if (!$avatar) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Avatar non disponible']);
+            return;
+        }
+        $pdo->prepare("UPDATE local_users SET avatar_type = ?, avatar_url = ? WHERE id = ?")
+            ->execute([$avatar['type'], $avatar['url'], $user['id']]);
+    } elseif (!empty($body['base64_image'])) {
+        $base64 = $body['base64_image'];
+        if (!preg_match('/^data:image\/(png|jpeg|jpg);base64,/', $base64, $matches)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Format invalide']);
+            return;
+        }
+        $data = base64_decode(preg_replace('/^data:image\/\w+;base64,/', '', $base64));
+        if (!$data || strlen($data) > 2 * 1024 * 1024) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Image trop lourde ou invalide']);
+            return;
+        }
+
+        if (!extension_loaded('gd')) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Extension GD non disponible']);
+            return;
+        }
+
+        $src = imagecreatefromstring($data);
+        if (!$src) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Image invalide']);
+            return;
+        }
+
+        $size = 256;
+        $origW = imagesx($src);
+        $origH = imagesy($src);
+        $min = min($origW, $origH);
+        $cropX = (int)(($origW - $min) / 2);
+        $cropY = (int)(($origH - $min) / 2);
+        $dst = imagecreatetruecolor($size, $size);
+        if (!$dst) {
+            imagedestroy($src);
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Impossible de créer l\'image']);
+            return;
+        }
+        imagecopyresampled($dst, $src, 0, 0, $cropX, $cropY, $size, $size, $min, $min);
+
+        $uploadDir = __DIR__ . '/../uploads/avatars/';
+        if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+        $fileName = $user['id'] . '_' . time() . '.jpg';
+        $filePath = $uploadDir . $fileName;
+        imagejpeg($dst, $filePath, 85);
+        imagedestroy($src);
+        imagedestroy($dst);
+
+        $publicUrl = '/uploads/avatars/' . $fileName;
+        $pdo->prepare("
+            UPDATE local_users
+            SET avatar_type = 'upload', avatar_url = ?
+            WHERE id = ?
+        ")->execute([$publicUrl, $user['id']]);
+    } else {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Aucun avatar fourni']);
+        return;
+    }
+
     require_once __DIR__ . '/../lib/Gamification.php';
     $profile = gamificationUserProfile($pdo, (int)$user['id']);
     if ($profile === null) {
