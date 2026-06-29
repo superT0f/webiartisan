@@ -1,5 +1,7 @@
 .PHONY: dev build push clean install
 
+VITE_APP_VERSION ?= 1.1.0
+
 dev:
 	npm run dev
 
@@ -10,7 +12,7 @@ build:
 	VITE_CITY_LAT=48.6614 \
 	VITE_CITY_LNG=2.5628 \
 	VITE_CITY_CP=77380 \
-	VITE_APP_VERSION=1.1.0 \
+	VITE_APP_VERSION=$(VITE_APP_VERSION) \
 		npm run build
 
 push: build
