@@ -140,5 +140,12 @@ function user_auth(PDO $pdo): void
 function user_me(PDO $pdo): void
 {
     $user = user_require_auth($pdo);
-    echo json_encode(['success' => true, 'data' => $user]);
+    require_once __DIR__ . '/../lib/Gamification.php';
+    $profile = gamificationUserProfile($pdo, (int)$user['id']);
+    if ($profile === null) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Utilisateur introuvable']);
+        return;
+    }
+    echo json_encode(['success' => true, 'data' => $profile]);
 }
