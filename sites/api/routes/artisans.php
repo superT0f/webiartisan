@@ -1222,18 +1222,29 @@ function artisan_validate_spin_win(PDO $pdo, string $code): void
     }
 
     if (strtotime($win['expires_at']) < time()) {
-        $pdo->prepare("UPDATE local_spin_wins SET status = 'expired' WHERE id = ?")
-            ->execute([$win['id']]);
+        $upd = $pdo->prepare("
+            UPDATE local_spin_wins
+            SET status = 'expired'
+            WHERE id = ? AND status = 'pending'
+        ");
+        $upd->execute([$win['id']]);
         http_response_code(409);
         echo json_encode(['success' => false, 'error' => 'Ce gain a expiré']);
         return;
     }
 
-    $pdo->prepare("
+    $upd = $pdo->prepare("
         UPDATE local_spin_wins
         SET status = 'claimed', claimed_at = NOW()
-        WHERE id = ?
-    ")->execute([$win['id']]);
+        WHERE id = ? AND status = 'pending' AND expires_at > NOW()
+    ");
+    $upd->execute([$win['id']]);
+
+    if ($upd->rowCount() === 0) {
+        http_response_code(409);
+        echo json_encode(['success' => false, 'error' => 'Ce gain a déjà été utilisé ou est expiré']);
+        return;
+    }
 
     echo json_encode(['success' => true, 'message' => 'Gain validé']);
 }

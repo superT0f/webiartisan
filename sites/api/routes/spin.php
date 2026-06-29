@@ -101,21 +101,6 @@ function spin_play(PDO $pdo): void
 
     $today = date('Y-m-d');
 
-    // 1 spin/jour
-    $limitStmt = $pdo->prepare("
-        SELECT count
-        FROM local_spin_daily_limits
-        WHERE user_id = ? AND city_id = ? AND spin_date = ?
-    ");
-    $limitStmt->execute([$user['id'], $city['id'], $today]);
-    $limit = $limitStmt->fetch(PDO::FETCH_ASSOC);
-
-    if ($limit && (int)$limit['count'] >= 1) {
-        http_response_code(429);
-        echo json_encode(['success' => false, 'error' => 'Vous avez déjà tourné la roue aujourd\'hui']);
-        return;
-    }
-
     // Offres actives avec stock
     $stmt = $pdo->prepare("
         SELECT o.id, o.artisan_id, o.label, o.description, o.stock_remaining
@@ -160,6 +145,26 @@ function spin_play(PDO $pdo): void
     $pdo->beginTransaction();
 
     try {
+        // Atomically enforce 1 spin/day. The unique key serializes concurrent
+        // requests; the post-update count check rejects double-spins.
+        $pdo->prepare("
+            INSERT INTO local_spin_daily_limits (user_id, city_id, spin_date, count)
+            VALUES (?, ?, ?, 1)
+            ON DUPLICATE KEY UPDATE count = count + 1
+        ")->execute([$user['id'], $city['id'], $today]);
+
+        $limitStmt = $pdo->prepare("
+            SELECT count
+            FROM local_spin_daily_limits
+            WHERE user_id = ? AND city_id = ? AND spin_date = ?
+        ");
+        $limitStmt->execute([$user['id'], $city['id'], $today]);
+        $spinCount = (int)$limitStmt->fetchColumn();
+
+        if ($spinCount > 1) {
+            throw new Exception('daily_limit_exceeded');
+        }
+
         $upd = $pdo->prepare("
             UPDATE local_spin_offers
             SET stock_remaining = stock_remaining - 1
@@ -168,7 +173,7 @@ function spin_play(PDO $pdo): void
         $upd->execute([$chosen['id']]);
 
         if ($upd->rowCount() === 0) {
-            throw new Exception('Stock épuisé');
+            throw new Exception('stock_depleted');
         }
 
         $winStmt = $pdo->prepare("
@@ -185,15 +190,14 @@ function spin_play(PDO $pdo): void
             $expiresAt,
         ]);
 
-        $pdo->prepare("
-            INSERT INTO local_spin_daily_limits (user_id, city_id, spin_date, count)
-            VALUES (?, ?, ?, 1)
-            ON DUPLICATE KEY UPDATE count = count + 1
-        ")->execute([$user['id'], $city['id'], $today]);
-
         $pdo->commit();
     } catch (Exception $e) {
         $pdo->rollBack();
+        if ($e->getMessage() === 'daily_limit_exceeded') {
+            http_response_code(429);
+            echo json_encode(['success' => false, 'error' => 'Vous avez déjà tourné la roue aujourd\'hui']);
+            return;
+        }
         http_response_code(409);
         echo json_encode(['success' => false, 'error' => 'Impossible d\'enregistrer le gain']);
         return;
