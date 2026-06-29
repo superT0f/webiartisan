@@ -293,7 +293,7 @@ export function resolveAvatarUrl(avatarUrl) {
  * @param {string|null} [networkError] - Custom user-facing message for network failures.
  * @returns {Promise<{success: boolean, data: any, status: number, error: string|undefined}>}
  */
-async function requestJson(url, options = {}, networkError = null) {
+export async function requestJson(url, options = {}, networkError = null) {
   let res
   try {
     res = await fetch(url, options)
