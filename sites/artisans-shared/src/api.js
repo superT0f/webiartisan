@@ -280,6 +280,63 @@ export async function getSpinWins(token) {
   return res.json()
 }
 
+// --- Gestion artisan spin ---------------------------------------
+
+export async function getArtisanSpinOffers(token) {
+  const res = await fetch(`${API_BASE}/artisans/me/spin-offers`, {
+    headers: { 'X-Artisan-Token': token },
+  })
+  return res.json()
+}
+
+export async function createArtisanSpinOffer(token, data) {
+  const res = await fetch(`${API_BASE}/artisans/me/spin-offers`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Artisan-Token': token,
+    },
+    body: JSON.stringify(data),
+  })
+  return res.json()
+}
+
+export async function updateArtisanSpinOffer(token, id, data) {
+  const res = await fetch(`${API_BASE}/artisans/me/spin-offers/${id}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Artisan-Token': token,
+    },
+    body: JSON.stringify(data),
+  })
+  return res.json()
+}
+
+export async function deleteArtisanSpinOffer(token, id) {
+  const res = await fetch(`${API_BASE}/artisans/me/spin-offers/${id}`, {
+    method: 'DELETE',
+    headers: { 'X-Artisan-Token': token },
+  })
+  return res.json()
+}
+
+export async function getArtisanSpinWins(token, status = '') {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : ''
+  const res = await fetch(`${API_BASE}/artisans/me/spin-wins${qs}`, {
+    headers: { 'X-Artisan-Token': token },
+  })
+  return res.json()
+}
+
+export async function validateArtisanSpinWin(token, code) {
+  const res = await fetch(`${API_BASE}/artisans/me/spin-wins/${encodeURIComponent(code)}/validate`, {
+    method: 'POST',
+    headers: { 'X-Artisan-Token': token },
+  })
+  return res.json()
+}
+
 // Codes météo WMO → description + emoji
 export function weatherInfo(code) {
   const map = {
