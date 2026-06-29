@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS local_spin_wins (
     status      ENUM('pending','claimed','expired') DEFAULT 'pending',
     spin_date   DATE NOT NULL,
     claimed_at  TIMESTAMP NULL,
-    expires_at  TIMESTAMP NOT NULL,
+    expires_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id)    REFERENCES local_users(id)    ON DELETE CASCADE,
     FOREIGN KEY (offer_id)   REFERENCES local_spin_offers(id) ON DELETE RESTRICT,

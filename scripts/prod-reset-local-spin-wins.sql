@@ -1,3 +1,5 @@
+-- Si local_spin_wins existe partiellement, la supprimer et recréer avec la bonne définition
+DROP TABLE IF EXISTS local_spin_wins;
 -- ============================================================
 -- WebIArtisan — Migration 027 : Roue consommateur (Spin Wheel)
 -- ============================================================
