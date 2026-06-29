@@ -79,6 +79,7 @@
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import QRCode from 'qrcode'
+import { useGamification } from '../composables/useGamification.js'
 import {
   requestUserMagicLink,
   authUser,
@@ -93,6 +94,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
+const { recordAction } = useGamification()
 
 const email = ref('')
 const token = ref(getUserToken() || '')
@@ -191,6 +193,7 @@ async function spin() {
   if (spinning.value || alreadySpun.value || offers.value.length < 2) return
   spinning.value = true
   result.value = null
+  let success = false
   try {
     const res = await postSpin(token.value, {})
     if (res.success) {
@@ -198,6 +201,7 @@ async function spin() {
       await loadWins()
       await nextTick()
       drawQr()
+      success = true
     } else {
       setMessage(res.error || 'Erreur lors du spin', 'error')
     }
@@ -205,6 +209,9 @@ async function spin() {
     setMessage('Erreur réseau.', 'error')
   } finally {
     spinning.value = false
+  }
+  if (success) {
+    await recordAction('spin_play')
   }
 }
 
