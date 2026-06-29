@@ -1,0 +1,23 @@
+.PHONY: dev build push clean install
+
+dev:
+	npm run dev
+
+build:
+	VITE_API_URL=https://api.prigent.tech \
+	VITE_CITY_SLUG=combs-la-ville \
+	VITE_CITY_NAME=Combs-la-Ville \
+	VITE_CITY_LAT=48.6614 \
+	VITE_CITY_LNG=2.5628 \
+	VITE_CITY_CP=77380 \
+	VITE_APP_VERSION=1.1.0 \
+		npm run build
+
+push: build
+	rsync -avz --no-owner --no-group --delete dist/ $(HOME)/mnt/gandi/vhosts/artisans-combs.prigent.tech/htdocs/
+
+clean:
+	rm -rf dist node_modules
+
+install:
+	npm install
