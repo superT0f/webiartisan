@@ -61,6 +61,8 @@ switch ($method) {
             artisan_follow_prospect($pdo, (int)$segments[3], $body);
         } elseif ($action === 'me' && $param === 'spin-offers') {
             artisan_create_spin_offer($pdo, $body);
+        } elseif ($action === 'me' && $param === 'spin-wins' && !empty($segments[3]) && ($segments[4] ?? '') === 'validate') {
+            artisan_validate_spin_win($pdo, $segments[3]);
         } else {
             http_response_code(404);
             echo json_encode(['success' => false, 'error' => 'Endpoint inconnu']);
@@ -1156,4 +1158,82 @@ function artisan_delete_spin_offer(PDO $pdo, int $id): void
         ->execute([$id, $artisan['id']]);
 
     echo json_encode(['success' => true, 'message' => 'Offre supprimée']);
+}
+
+/**
+ * GET /artisans/me/spin-wins?status=pending
+ */
+function artisan_my_spin_wins(PDO $pdo): void
+{
+    $artisan = artisan_require_auth($pdo);
+
+    $status = $_GET['status'] ?? '';
+    $allowed = ['pending', 'claimed', 'expired'];
+
+    $sql = "
+        SELECT w.id, w.code, w.status, w.spin_date, w.claimed_at, w.expires_at,
+               o.label, o.description, u.email AS user_email
+        FROM local_spin_wins w
+        JOIN local_spin_offers o ON o.id = w.offer_id
+        JOIN local_users u       ON u.id = w.user_id
+        WHERE w.artisan_id = ?
+    ";
+    $params = [$artisan['id']];
+
+    if ($status && in_array($status, $allowed, true)) {
+        $sql .= " AND w.status = ?";
+        $params[] = $status;
+    }
+
+    $sql .= " ORDER BY w.created_at DESC";
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    echo json_encode(['success' => true, 'data' => $items]);
+}
+
+/**
+ * POST /artisans/me/spin-wins/:code/validate
+ */
+function artisan_validate_spin_win(PDO $pdo, string $code): void
+{
+    $artisan = artisan_require_auth($pdo);
+
+    $stmt = $pdo->prepare("
+        SELECT id, status, expires_at
+        FROM local_spin_wins
+        WHERE code = ? AND artisan_id = ?
+    ");
+    $stmt->execute([$code, $artisan['id']]);
+    $win = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$win) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Gain non trouvé']);
+        return;
+    }
+
+    if ($win['status'] !== 'pending') {
+        http_response_code(409);
+        echo json_encode(['success' => false, 'error' => 'Ce gain a déjà été utilisé ou est expiré']);
+        return;
+    }
+
+    if (strtotime($win['expires_at']) < time()) {
+        $pdo->prepare("UPDATE local_spin_wins SET status = 'expired' WHERE id = ?")
+            ->execute([$win['id']]);
+        http_response_code(409);
+        echo json_encode(['success' => false, 'error' => 'Ce gain a expiré']);
+        return;
+    }
+
+    $pdo->prepare("
+        UPDATE local_spin_wins
+        SET status = 'claimed', claimed_at = NOW()
+        WHERE id = ?
+    ")->execute([$win['id']]);
+
+    echo json_encode(['success' => true, 'message' => 'Gain validé']);
 }
