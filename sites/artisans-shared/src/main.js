@@ -17,6 +17,7 @@ const routes = [
   { path: '/espace/admin-recettes', component: () => import('./views/AdminRecipes.vue'), meta: { title: 'Modération recettes' } },
   { path: '/flyers', component: () => import('./views/Flyer.vue'), meta: { title: 'Imprimer les flyers / plaquettes' } },
   { path: '/plaquette', redirect: '/flyers' },
+  { path: '/roue', component: () => import('./views/SpinWheel.vue'), meta: { title: 'La roue des artisans' } },
   { path: '/:pathMatch(.*)*', redirect: '/' }
 ]
 
