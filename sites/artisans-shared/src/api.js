@@ -253,25 +253,132 @@ export async function authUser(token) {
   return res.json()
 }
 
+export function resolveAvatarUrl(avatarUrl) {
+  if (!avatarUrl) return null
+  try {
+    const base = new URL(API_BASE)
+    const url = new URL(avatarUrl, API_BASE)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
+    if (url.host !== base.host) return null
+    const allowedPaths = ['/avatars/', '/uploads/avatars/']
+    if (!allowedPaths.some((p) => url.pathname.startsWith(p))) return null
+    return url.href
+  } catch {
+    return null
+  }
+}
+
+// ------------------------------------------------------------------
+// API helper convention
+// ------------------------------------------------------------------
+// The helpers below (fetchUserMe, fetchAvatars, updateUserProfile,
+// updateUserAvatar) return a normalized envelope:
+//   { success, data, status, error }
+// They do NOT throw on HTTP or network errors. Callers should always
+// check `res.success` before using `res.data`.
+//
+// `status` is the HTTP status code (0 for network/abort errors).
+// `error` is a user-facing French message or 'AbortError' when the
+// request was intentionally cancelled.
+//
+// Older helpers in this file are gradually being migrated to this
+// pattern; new helpers should follow it.
+// ------------------------------------------------------------------
+
+/**
+ * Fetch JSON from the API and return a normalized envelope.
+ *
+ * @param {string} url
+ * @param {RequestInit} [options]
+ * @param {string|null} [networkError] - Custom user-facing message for network failures.
+ * @returns {Promise<{success: boolean, data: any, status: number, error: string|undefined}>}
+ */
+async function requestJson(url, options = {}, networkError = null) {
+  let res
+  try {
+    res = await fetch(url, options)
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      return { success: false, error: 'AbortError', status: 0 }
+    }
+    return { success: false, status: 0, error: networkError || 'Erreur réseau' }
+  }
+
+  let json = {}
+  try {
+    const text = await res.text()
+    if (text) json = JSON.parse(text)
+  } catch {
+    return { success: false, status: res.status, error: 'Réponse invalide' }
+  }
+
+  return {
+    success: res.ok && json.success !== false,
+    data: json.data,
+    status: res.status,
+    error: json.error,
+  }
+}
+
 /**
  * Fetch the current consumer user profile.
  * Returns a normalized object: { success, data, status, error }.
  * The HTTP status is always exposed in `status`, even when the body is empty or invalid.
  */
 export async function fetchUserMe(token, options = {}) {
-  const res = await fetch(`${API_BASE}/users/me`, {
+  const res = await requestJson(`${API_BASE}/users/me`, {
     headers: { 'Authorization': `Bearer ${token}` },
     signal: options.signal,
-  })
-  if (res.status === 401) {
-    return { success: false, status: 401 }
+  }, 'Impossible de charger le profil.')
+  if (!res.success && res.status === 401) {
+    return { ...res, error: 'Session expirée' }
   }
-  try {
-    const json = await res.json()
-    return { ...json, status: res.status }
-  } catch (e) {
-    return { success: false, status: res.status, error: 'Invalid response' }
+  return res
+}
+
+export async function fetchAvatars(gender = 'neutral', options = {}) {
+  const res = await requestJson(`${API_BASE}/avatars?gender=${encodeURIComponent(gender)}`, {
+    signal: options.signal,
+  }, 'Impossible de charger les avatars.')
+  return res
+}
+
+export async function updateUserProfile(token, data, options = {}) {
+  const res = await requestJson(`${API_BASE}/users/me`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+    signal: options.signal,
+  }, 'Erreur mise à jour profil')
+  if (!res.success && res.status === 401) {
+    return { ...res, error: 'Session expirée' }
   }
+  if (!res.success && !res.error) {
+    return { ...res, error: 'Erreur mise à jour profil' }
+  }
+  return res
+}
+
+export async function updateUserAvatar(token, data, options = {}) {
+  const res = await requestJson(`${API_BASE}/users/me/avatar`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+    signal: options.signal,
+  }, 'Erreur mise à jour avatar')
+  if (!res.success && res.status === 401) {
+    return { ...res, error: 'Session expirée' }
+  }
+  if (!res.success && !res.error) {
+    return { ...res, error: 'Erreur mise à jour avatar' }
+  }
+  return res
 }
 
 // --- Spin wheel -------------------------------------------------

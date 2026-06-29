@@ -156,12 +156,12 @@ async function loadUser() {
     const res = await fetchUserMe(token.value)
     if (res.success) {
       user.value = res.data
-    } else {
+    } else if (res.status === 401) {
       logout()
       setMessage('Session expirée.', 'error')
+    } else {
+      setMessage(res.error || 'Impossible de charger le profil.', 'error')
     }
-  } catch (e) {
-    setMessage('Impossible de charger le profil.', 'error')
   } finally {
     loading.value = false
   }

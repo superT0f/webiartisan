@@ -21,6 +21,7 @@ const routes = [
   { path: '/plaquette', redirect: '/flyers' },
   { path: '/roue', component: () => import('./views/SpinWheel.vue'), meta: { title: 'La roue des artisans' } },
   { path: '/profil', component: () => import('./views/UserProfile.vue'), meta: { title: 'Mon profil' } },
+  { path: '/personnage', component: () => import('./views/CharacterEdit.vue'), meta: { title: 'Mon personnage' } },
   { path: '/:pathMatch(.*)*', redirect: '/' }
 ]
 

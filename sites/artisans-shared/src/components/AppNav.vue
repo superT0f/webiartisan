@@ -56,23 +56,14 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { CITY_NAME, API_BASE, getUserToken, fetchUserMe, removeUserToken, authEvents } from '../api.js'
+import { CITY_NAME, getUserToken, fetchUserMe, removeUserToken, resolveAvatarUrl, authEvents } from '../api.js'
 
 const router = useRouter()
 const scrolled   = ref(false)
 const menuOpen   = ref(false)
 const user = ref(null)
 
-const avatarUrl = computed(() => {
-  if (!user.value?.avatar_url) return null
-  try {
-    const url = new URL(user.value.avatar_url, API_BASE)
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
-    return url.href
-  } catch {
-    return null
-  }
-})
+const avatarUrl = computed(() => resolveAvatarUrl(user.value?.avatar_url))
 
 function onScroll() { scrolled.value = window.scrollY > 20 }
 function scrollTo(id) {
@@ -98,6 +89,8 @@ async function loadUser() {
     if (!isMounted) return
     if (res.success) {
       user.value = res.data
+    } else if (res.error === 'AbortError') {
+      return
     } else if (res.status === 401) {
       console.warn('User token invalid or expired')
       removeUserToken()

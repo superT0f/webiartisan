@@ -1,21 +1,16 @@
--- Si local_spin_wins existe partiellement, la supprimer et recréer avec la bonne définition
-DROP TABLE IF EXISTS local_spin_wins;
 -- ============================================================
 -- WebIArtisan — Migrations 027 & 028 : Roue consommateur + Gamification
 -- ============================================================
+-- NOTE: This file now also applies migration 028 so the consumer
+-- schema is fully up to date. The canonical migrations live in
+-- sites/api/migrations/027_spin_wheel.sql and
+-- sites/api/migrations/028_gamification.sql.
 
 SET NAMES utf8mb4;
 
 CREATE TABLE IF NOT EXISTS local_users (
     id              INT AUTO_INCREMENT PRIMARY KEY,
     email           VARCHAR(255) UNIQUE NOT NULL,
-    display_name    VARCHAR(80) NULL,
-    avatar_type     ENUM('default','upload','custom') NOT NULL DEFAULT 'default',
-    avatar_url      VARCHAR(255) NULL,
-    avatar_gender   ENUM('male','female','neutral') NOT NULL DEFAULT 'neutral',
-    level           INT NOT NULL DEFAULT 1,
-    xp              INT NOT NULL DEFAULT 0,
-    title           VARCHAR(80) NULL,
     magic_token     VARCHAR(64) DEFAULT NULL,
     magic_token_exp DATETIME DEFAULT NULL,
     session_token   VARCHAR(64) DEFAULT NULL,
@@ -76,6 +71,42 @@ CREATE TABLE IF NOT EXISTS local_spin_daily_limits (
     INDEX idx_user_date (user_id, spin_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='Limite de spins par utilisateur, ville et jour';
+
+DROP PROCEDURE IF EXISTS webiartisan_add_column_if_not_exists;
+
+DELIMITER //
+
+CREATE PROCEDURE webiartisan_add_column_if_not_exists(
+    IN p_table VARCHAR(64),
+    IN p_column VARCHAR(64),
+    IN p_definition TEXT
+)
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = p_table
+          AND COLUMN_NAME = p_column
+    ) THEN
+        SET @sql = CONCAT('ALTER TABLE `', p_table, '` ADD COLUMN `', p_column, '` ', p_definition);
+        PREPARE stmt FROM @sql;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+    END IF;
+END //
+
+DELIMITER ;
+
+CALL webiartisan_add_column_if_not_exists('local_users', 'display_name', 'VARCHAR(80) NULL AFTER email');
+CALL webiartisan_add_column_if_not_exists('local_users', 'avatar_type', "ENUM('default','upload','custom') NOT NULL DEFAULT 'default' AFTER display_name");
+CALL webiartisan_add_column_if_not_exists('local_users', 'avatar_url', 'VARCHAR(255) NULL AFTER avatar_type');
+CALL webiartisan_add_column_if_not_exists('local_users', 'avatar_gender', "ENUM('male','female','neutral') NOT NULL DEFAULT 'neutral' AFTER avatar_url");
+CALL webiartisan_add_column_if_not_exists('local_users', 'level', 'INT NOT NULL DEFAULT 1 AFTER avatar_gender');
+CALL webiartisan_add_column_if_not_exists('local_users', 'xp', 'INT NOT NULL DEFAULT 0 AFTER level');
+CALL webiartisan_add_column_if_not_exists('local_users', 'title', 'VARCHAR(80) NULL AFTER xp');
+
+DROP PROCEDURE IF EXISTS webiartisan_add_column_if_not_exists;
 
 CREATE TABLE IF NOT EXISTS local_user_actions (
     id INT AUTO_INCREMENT PRIMARY KEY,

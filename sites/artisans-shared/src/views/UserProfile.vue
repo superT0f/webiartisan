@@ -34,7 +34,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { API_BASE, getUserToken, fetchUserMe, removeUserToken } from '../api.js'
+import { getUserToken, fetchUserMe, removeUserToken, resolveAvatarUrl } from '../api.js'
 
 const router = useRouter()
 const user = ref(null)
@@ -44,16 +44,7 @@ let abortController = null
 
 const displayName = computed(() => user.value?.display_name || user.value?.email?.split('@')[0] || 'Explorateur')
 const xpPercent = computed(() => user.value ? Math.min(100, (user.value.xp / user.value.xp_needed) * 100) : 0)
-const avatarUrl = computed(() => {
-  if (!user.value?.avatar_url) return null
-  try {
-    const url = new URL(user.value.avatar_url, API_BASE)
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
-    return url.href
-  } catch {
-    return null
-  }
-})
+const avatarUrl = computed(() => resolveAvatarUrl(user.value?.avatar_url))
 
 // /personnage route is added in Task 8
 function goToCharacter() {
@@ -73,6 +64,8 @@ onMounted(async () => {
     const res = await fetchUserMe(token, { signal: abortController.signal })
     if (res.success) {
       user.value = res.data
+    } else if (res.error === 'AbortError') {
+      return
     } else if (res.status === 401) {
       removeUserToken()
       router.replace('/roue')
@@ -81,7 +74,6 @@ onMounted(async () => {
       user.value = null
     }
   } catch (e) {
-    if (e.name === 'AbortError') return
     console.warn('Failed to load user profile', e)
     error.value = 'Impossible de charger le profil.'
     user.value = null

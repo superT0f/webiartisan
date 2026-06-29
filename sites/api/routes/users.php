@@ -173,6 +173,12 @@ function user_update_profile(PDO $pdo): void
     $avatarGender = $body['avatar_gender'] ?? null;
     $title = $body['title'] ?? null;
 
+    if ($displayName === '') {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Pseudo public requis']);
+        return;
+    }
+
     $fields = [];
     $values = [];
 
@@ -190,8 +196,40 @@ function user_update_profile(PDO $pdo): void
     }
 
     if ($fields) {
-        $values[] = $user['id'];
-        $pdo->prepare("UPDATE local_users SET " . implode(', ', $fields) . " WHERE id = ?")->execute($values);
+        $pdo->beginTransaction();
+        try {
+            $currentStmt = $pdo->prepare("SELECT avatar_type, avatar_url FROM local_users WHERE id = ? FOR UPDATE");
+            $currentStmt->execute([$user['id']]);
+            $current = $currentStmt->fetch(PDO::FETCH_ASSOC);
+
+            if (
+                $current &&
+                ($current['avatar_type'] ?? '') !== 'upload' &&
+                $avatarGender !== null &&
+                in_array($avatarGender, ['male', 'female', 'neutral'], true) &&
+                $avatarGender !== 'neutral'
+            ) {
+                $currentUrl = $current['avatar_url'] ?? '';
+                if (preg_match('#^/avatars/([^/]+)/#', $currentUrl, $m)) {
+                    $oldGender = $m[1];
+                    if ($oldGender !== $avatarGender && $oldGender !== 'neutral') {
+                        $fields[] = "avatar_type = ?";
+                        $values[] = 'default';
+                        $fields[] = "avatar_url = NULL";
+                    }
+                }
+            }
+
+            $values[] = $user['id'];
+            $pdo->prepare("UPDATE local_users SET " . implode(', ', $fields) . " WHERE id = ?")->execute($values);
+
+            $pdo->commit();
+        } catch (Throwable $e) {
+            $pdo->rollBack();
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
+            return;
+        }
     }
 
     require_once __DIR__ . '/../lib/Gamification.php';
@@ -204,22 +242,45 @@ function user_update_profile(PDO $pdo): void
     echo json_encode(['success' => true, 'data' => $profile]);
 }
 
-function getAvailableAvatar(PDO $pdo, string $avatarId, int $userLevel, array $userBadges): ?array
+function getAvailableAvatar(PDO $pdo, string $avatarId, int $userLevel, array $userBadges, string $userGender = 'neutral', ?string $preferredGender = null): ?array
 {
     $basePath = __DIR__ . '/../public/avatars';
-    foreach (glob($basePath . '/*', GLOB_ONLYDIR) as $dir) {
+    $genders = [];
+    if ($preferredGender !== null && in_array($preferredGender, ['male', 'female', 'neutral'], true)) {
+        $genders[] = $preferredGender;
+        if ($preferredGender !== 'neutral') {
+            $genders[] = 'neutral';
+        }
+    } elseif ($userGender === 'neutral') {
+        $genders = ['neutral', 'male', 'female'];
+    } else {
+        $genders = [$userGender, 'neutral'];
+    }
+    $dirs = [];
+    foreach ($genders as $gender) {
+        $path = $basePath . '/' . $gender;
+        if (is_dir($path)) {
+            $dirs[] = $path;
+        }
+    }
+
+    foreach ($dirs as $dir) {
         foreach (glob($dir . '/*.{png,svg,jpg,jpeg}', GLOB_BRACE) as $file) {
             $metaFile = $file . '.json';
             $meta = file_exists($metaFile) ? (json_decode(file_get_contents($metaFile), true) ?: []) : [];
             $id = $meta['id'] ?? pathinfo($file, PATHINFO_FILENAME);
             if ($id === $avatarId) {
+                $dirName = basename($dir);
+                if ($userGender !== 'neutral' && $dirName !== 'neutral' && $dirName !== $userGender) {
+                    return null;
+                }
                 $unlockLevel = $meta['unlock_level'] ?? 1;
                 $unlockBadge = $meta['unlock_badge'] ?? null;
                 if ($userLevel < $unlockLevel) return null;
                 if ($unlockBadge && !in_array($unlockBadge, $userBadges, true)) return null;
                 return [
                     'id' => $id,
-                    'url' => '/avatars/' . basename($dir) . '/' . basename($file),
+                    'url' => '/avatars/' . $dirName . '/' . basename($file),
                     'type' => $meta['type'] ?? 'custom',
                 ];
             }
@@ -228,19 +289,37 @@ function getAvailableAvatar(PDO $pdo, string $avatarId, int $userLevel, array $u
     return null;
 }
 
+function deleteOldUploadedAvatar(?string $url): void
+{
+    if (!$url) return;
+    if (preg_match('#^/uploads/avatars/([^/]+)$#', $url, $m)) {
+        $path = __DIR__ . '/../uploads/avatars/' . $m[1];
+        if (file_exists($path)) @unlink($path);
+    }
+}
+
 function user_update_avatar(PDO $pdo, array $body): void
 {
     $user = user_require_auth($pdo);
 
+    $uploadDir = __DIR__ . '/../uploads/avatars/';
+    $oldStmt = $pdo->prepare("SELECT avatar_url FROM local_users WHERE id = ?");
+    $oldStmt->execute([$user['id']]);
+    $oldAvatarUrl = $oldStmt->fetchColumn();
+
     if (!empty($body['avatar_id'])) {
-        $badgeKeys = array_column(
-            $pdo->query("SELECT badge_key FROM local_user_badges WHERE user_id = " . (int)$user['id'])->fetchAll(PDO::FETCH_ASSOC),
-            'badge_key'
-        );
-        $avatarStmt = $pdo->prepare("SELECT level FROM local_users WHERE id = ?");
-        $avatarStmt->execute([$user['id']]);
-        $userLevel = (int)$avatarStmt->fetchColumn();
-        $avatar = getAvailableAvatar($pdo, $body['avatar_id'], $userLevel, $badgeKeys);
+        $badgeStmt = $pdo->prepare("SELECT badge_key FROM local_user_badges WHERE user_id = ?");
+        $badgeStmt->execute([$user['id']]);
+        $badgeKeys = array_column($badgeStmt->fetchAll(PDO::FETCH_ASSOC), 'badge_key');
+        $userStmt = $pdo->prepare("SELECT level, avatar_gender FROM local_users WHERE id = ?");
+        $userStmt->execute([$user['id']]);
+        $userRow = $userStmt->fetch(PDO::FETCH_ASSOC);
+        $userLevel = (int)($userRow['level'] ?? 0);
+        $userGender = in_array($userRow['avatar_gender'] ?? '', ['male', 'female', 'neutral'], true)
+            ? $userRow['avatar_gender']
+            : 'neutral';
+        $preferredGender = $body['avatar_gender'] ?? null;
+        $avatar = getAvailableAvatar($pdo, $body['avatar_id'], $userLevel, $badgeKeys, $userGender, $preferredGender);
         if (!$avatar) {
             http_response_code(403);
             echo json_encode(['success' => false, 'error' => 'Avatar non disponible']);
@@ -248,6 +327,8 @@ function user_update_avatar(PDO $pdo, array $body): void
         }
         $pdo->prepare("UPDATE local_users SET avatar_type = ?, avatar_url = ? WHERE id = ?")
             ->execute([$avatar['type'], $avatar['url'], $user['id']]);
+
+        deleteOldUploadedAvatar($oldAvatarUrl);
     } elseif (!empty($body['base64_image'])) {
         $base64 = $body['base64_image'];
         if (!preg_match('/^data:image\/(png|jpeg|jpg);base64,/', $base64, $matches)) {
@@ -255,48 +336,79 @@ function user_update_avatar(PDO $pdo, array $body): void
             echo json_encode(['success' => false, 'error' => 'Format invalide']);
             return;
         }
-        $data = base64_decode(preg_replace('/^data:image\/\w+;base64,/', '', $base64));
+
+        $base64Payload = preg_replace('/^data:image\/\w+;base64,/', '', $base64);
+        $decodedSizeEstimate = (int) (strlen($base64Payload) * 3 / 4);
+        if ($decodedSizeEstimate > 2 * 1024 * 1024) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Image trop lourde']);
+            return;
+        }
+
+        $data = base64_decode($base64Payload);
         if (!$data || strlen($data) > 2 * 1024 * 1024) {
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => 'Image trop lourde ou invalide']);
             return;
         }
 
-        if (!extension_loaded('gd')) {
-            http_response_code(500);
-            echo json_encode(['success' => false, 'error' => 'Extension GD non disponible']);
-            return;
-        }
-
-        $src = imagecreatefromstring($data);
-        if (!$src) {
+        $imageInfo = getimagesizefromstring($data);
+        if (!$imageInfo || !in_array($imageInfo[2], [IMAGETYPE_PNG, IMAGETYPE_JPEG], true)) {
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => 'Image invalide']);
             return;
         }
+        $isPng = $imageInfo[2] === IMAGETYPE_PNG;
 
-        $size = 256;
-        $origW = imagesx($src);
-        $origH = imagesy($src);
-        $min = min($origW, $origH);
-        $cropX = (int)(($origW - $min) / 2);
-        $cropY = (int)(($origH - $min) / 2);
-        $dst = imagecreatetruecolor($size, $size);
-        if (!$dst) {
-            imagedestroy($src);
-            http_response_code(500);
-            echo json_encode(['success' => false, 'error' => 'Impossible de créer l\'image']);
-            return;
-        }
-        imagecopyresampled($dst, $src, 0, 0, $cropX, $cropY, $size, $size, $min, $min);
-
-        $uploadDir = __DIR__ . '/../uploads/avatars/';
         if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
-        $fileName = $user['id'] . '_' . time() . '.jpg';
-        $filePath = $uploadDir . $fileName;
-        imagejpeg($dst, $filePath, 85);
-        imagedestroy($src);
-        imagedestroy($dst);
+
+        if (extension_loaded('gd')) {
+            $src = imagecreatefromstring($data);
+            if (!$src) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Image invalide']);
+                return;
+            }
+
+            $size = 256;
+            $origW = imagesx($src);
+            $origH = imagesy($src);
+            $min = min($origW, $origH);
+            $cropX = (int)(($origW - $min) / 2);
+            $cropY = (int)(($origH - $min) / 2);
+            $dst = imagecreatetruecolor($size, $size);
+            if (!$dst) {
+                imagedestroy($src);
+                http_response_code(500);
+                echo json_encode(['success' => false, 'error' => 'Impossible de créer l\'image']);
+                return;
+            }
+
+            if ($isPng) {
+                imagealphablending($dst, false);
+                imagesavealpha($dst, true);
+                $transparent = imagecolorallocatealpha($dst, 0, 0, 0, 127);
+                imagefill($dst, 0, 0, $transparent);
+            }
+
+            imagecopyresampled($dst, $src, 0, 0, $cropX, $cropY, $size, $size, $min, $min);
+
+            $ext = $isPng ? 'png' : 'jpg';
+            $fileName = $user['id'] . '_' . time() . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
+            $filePath = $uploadDir . $fileName;
+            if ($isPng) {
+                imagepng($dst, $filePath, 6);
+            } else {
+                imagejpeg($dst, $filePath, 85);
+            }
+            imagedestroy($src);
+            imagedestroy($dst);
+        } else {
+            $ext = $isPng ? 'png' : 'jpg';
+            $fileName = $user['id'] . '_' . time() . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
+            $filePath = $uploadDir . $fileName;
+            file_put_contents($filePath, $data);
+        }
 
         $publicUrl = '/uploads/avatars/' . $fileName;
         $pdo->prepare("
@@ -304,6 +416,8 @@ function user_update_avatar(PDO $pdo, array $body): void
             SET avatar_type = 'upload', avatar_url = ?
             WHERE id = ?
         ")->execute([$publicUrl, $user['id']]);
+
+        deleteOldUploadedAvatar($oldAvatarUrl);
     } else {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Aucun avatar fourni']);
