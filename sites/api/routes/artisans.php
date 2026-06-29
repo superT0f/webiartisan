@@ -26,6 +26,10 @@ switch ($method) {
             artisan_my_prospects($pdo);
         } elseif ($action === 'me' && $param === 'admin-recipes') {
             artisan_admin_recipes($pdo);
+        } elseif ($action === 'me' && $param === 'spin-offers') {
+            artisan_my_spin_offers($pdo);
+        } elseif ($action === 'me' && $param === 'spin-wins') {
+            artisan_my_spin_wins($pdo);
         } elseif ($action === 'me') {
             artisan_me($pdo);
         } elseif (is_numeric($action) && !$param) {
@@ -55,6 +59,8 @@ switch ($method) {
             artisan_add_review($pdo, (int)$action, $body);
         } elseif ($action === 'me' && $param === 'prospects' && is_numeric($segments[3] ?? '')) {
             artisan_follow_prospect($pdo, (int)$segments[3], $body);
+        } elseif ($action === 'me' && $param === 'spin-offers') {
+            artisan_create_spin_offer($pdo, $body);
         } else {
             http_response_code(404);
             echo json_encode(['success' => false, 'error' => 'Endpoint inconnu']);
@@ -64,6 +70,8 @@ switch ($method) {
     case 'DELETE':
         if ($action === 'me' && $param === 'prospects' && is_numeric($segments[3] ?? '')) {
             artisan_unfollow_prospect($pdo, (int)$segments[3]);
+        } elseif ($action === 'me' && $param === 'spin-offers' && is_numeric($segments[3] ?? '')) {
+            artisan_delete_spin_offer($pdo, (int)$segments[3]);
         } else {
             http_response_code(404);
             echo json_encode(['success' => false, 'error' => 'Endpoint inconnu']);
@@ -74,6 +82,8 @@ switch ($method) {
         $body = json_decode(file_get_contents('php://input'), true) ?? [];
         if ($action === 'me' && $param === 'admin-recipes' && is_numeric($segments[3] ?? '')) {
             artisan_archive_recipe($pdo, (int)$segments[3]);
+        } elseif ($action === 'me' && $param === 'spin-offers' && is_numeric($segments[3] ?? '')) {
+            artisan_update_spin_offer($pdo, (int)$segments[3], $body);
         } elseif ($action === 'me') {
             artisan_update_me($pdo, $body);
         } elseif (is_numeric($action)) {
@@ -1020,4 +1030,130 @@ function artisan_archive_recipe(PDO $pdo, int $recipeId): void
         ->execute([$recipeId]);
 
     echo json_encode(['success' => true, 'message' => 'Recette archivée']);
+}
+
+
+/**
+ * GET /artisans/me/spin-offers
+ */
+function artisan_my_spin_offers(PDO $pdo): void
+{
+    $artisan = artisan_require_auth($pdo);
+
+    $stmt = $pdo->prepare("
+        SELECT id, label, description, stock_total, stock_remaining,
+               is_active, created_at, updated_at
+        FROM local_spin_offers
+        WHERE artisan_id = ?
+        ORDER BY created_at DESC
+    ");
+    $stmt->execute([$artisan['id']]);
+    $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($items as &$item) {
+        $item['stock_total']     = (int)$item['stock_total'];
+        $item['stock_remaining'] = (int)$item['stock_remaining'];
+        $item['is_active']       = (bool)$item['is_active'];
+    }
+
+    echo json_encode(['success' => true, 'data' => $items]);
+}
+
+/**
+ * POST /artisans/me/spin-offers
+ */
+function artisan_create_spin_offer(PDO $pdo, array $body): void
+{
+    $artisan = artisan_require_auth($pdo);
+
+    $label       = trim($body['label'] ?? '');
+    $description = trim($body['description'] ?? '');
+    $stockTotal  = (int)($body['stock_total'] ?? 0);
+
+    if (!$label || $stockTotal < 1) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Libellé et stock initial requis']);
+        return;
+    }
+
+    $stmt = $pdo->prepare("
+        INSERT INTO local_spin_offers
+            (artisan_id, label, description, stock_total, stock_remaining)
+        VALUES (?, ?, ?, ?, ?)
+    ");
+    $stmt->execute([$artisan['id'], $label, $description, $stockTotal, $stockTotal]);
+
+    $id = (int)$pdo->lastInsertId();
+
+    echo json_encode([
+        'success' => true,
+        'data'    => [
+            'id'              => $id,
+            'label'           => $label,
+            'stock_remaining' => $stockTotal,
+        ],
+    ]);
+}
+
+/**
+ * PUT /artisans/me/spin-offers/:id
+ */
+function artisan_update_spin_offer(PDO $pdo, int $id, array $body): void
+{
+    $artisan = artisan_require_auth($pdo);
+
+    $allowed = ['label', 'description', 'is_active'];
+    $updates = [];
+    $params  = [];
+
+    foreach ($allowed as $field) {
+        if (array_key_exists($field, $body)) {
+            $updates[] = "{$field} = ?";
+            $params[]  = $body[$field];
+        }
+    }
+
+    if (isset($body['stock_total'])) {
+        $newTotal = (int)$body['stock_total'];
+        if ($newTotal < 1) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Stock total invalide']);
+            return;
+        }
+        $updates[] = "stock_total = ?";
+        $params[]  = $newTotal;
+        $updates[] = "stock_remaining = GREATEST(? - (stock_total - stock_remaining), 0)";
+        $params[]  = $newTotal;
+    }
+
+    if (empty($updates)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Aucun champ à mettre à jour']);
+        return;
+    }
+
+    $params[] = $id;
+    $params[] = $artisan['id'];
+
+    $stmt = $pdo->prepare("
+        UPDATE local_spin_offers
+        SET " . implode(', ', $updates) . "
+        WHERE id = ? AND artisan_id = ?
+    ");
+    $stmt->execute($params);
+
+    echo json_encode(['success' => true, 'message' => 'Offre mise à jour']);
+}
+
+/**
+ * DELETE /artisans/me/spin-offers/:id
+ */
+function artisan_delete_spin_offer(PDO $pdo, int $id): void
+{
+    $artisan = artisan_require_auth($pdo);
+
+    $pdo->prepare("DELETE FROM local_spin_offers WHERE id = ? AND artisan_id = ?")
+        ->execute([$id, $artisan['id']]);
+
+    echo json_encode(['success' => true, 'message' => 'Offre supprimée']);
 }
