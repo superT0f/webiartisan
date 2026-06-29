@@ -4,6 +4,7 @@ export const CITY_NAME  = import.meta.env.VITE_CITY_NAME  || 'Livry'
 export const CITY_LAT   = parseFloat(import.meta.env.VITE_CITY_LAT   || '49.1081')
 export const CITY_LNG   = parseFloat(import.meta.env.VITE_CITY_LNG   || '-0.7658')
 export const CITY_CP    = import.meta.env.VITE_CITY_CP    || '14240'
+export const APP_VERSION = import.meta.env.VITE_APP_VERSION || '1.0.0'
 
 export async function fetchArtisans(params = {}) {
   const qs = new URLSearchParams({ city: CITY_SLUG, ...params }).toString()
