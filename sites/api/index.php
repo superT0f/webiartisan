@@ -180,7 +180,7 @@ if ($module && file_exists($routeFile)) {
     echo json_encode([
         'success' => true,
         'service' => 'WebIArtisan API',
-        'version' => '1.0.0',
+        'version' => '1.1.0',
         'time'    => date('c'),
     ]);
 } else {
