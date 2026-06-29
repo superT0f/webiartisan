@@ -213,6 +213,73 @@ export async function archiveRecipe(token, recipeId) {
   return res.json()
 }
 
+// --- Authentification consommateur ------------------------------
+
+const USER_TOKEN_KEY = 'spin_user_token'
+
+export function getUserToken() {
+  return localStorage.getItem(USER_TOKEN_KEY)
+}
+
+export function setUserToken(token) {
+  localStorage.setItem(USER_TOKEN_KEY, token)
+}
+
+export function removeUserToken() {
+  localStorage.removeItem(USER_TOKEN_KEY)
+}
+
+export async function requestUserMagicLink(email) {
+  const res = await fetch(`${API_BASE}/users/magic-link`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  })
+  return res.json()
+}
+
+export async function authUser(token) {
+  const res = await fetch(`${API_BASE}/users/auth?token=${encodeURIComponent(token)}`, {
+    method: 'POST',
+  })
+  return res.json()
+}
+
+export async function fetchUserMe(token) {
+  const res = await fetch(`${API_BASE}/users/me`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  })
+  return res.json()
+}
+
+// --- Spin wheel -------------------------------------------------
+
+export async function getSpinOffers() {
+  const res = await fetch(`${API_BASE}/spin/offers?city=${CITY_SLUG}`)
+  if (!res.ok) throw new Error('Erreur chargement offres')
+  return res.json()
+}
+
+export async function postSpin(token, payload = {}) {
+  const res = await fetch(`${API_BASE}/spin`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ city_slug: CITY_SLUG, ...payload }),
+  })
+  return res.json()
+}
+
+export async function getSpinWins(token) {
+  const res = await fetch(`${API_BASE}/spin/wins`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error('Erreur chargement gains')
+  return res.json()
+}
+
 // Codes météo WMO → description + emoji
 export function weatherInfo(code) {
   const map = {
