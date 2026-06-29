@@ -144,6 +144,12 @@ if ($module === 'recipes') {
     exit;
 }
 
+if ($module === 'users') {
+    applyRateLimit($pdo, 'login');
+    require_once __DIR__ . '/routes/users.php';
+    exit;
+}
+
 // Inject auth + tenant context for protected routes
 $authUser = null;
 if (in_array($module, $protectedRoutes)) {
