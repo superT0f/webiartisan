@@ -1,4 +1,4 @@
-const API_BASE  = import.meta.env.VITE_API_URL   || 'https://api.prigent.tech'
+export const API_BASE  = import.meta.env.VITE_API_URL   || 'https://api.prigent.tech'
 export const CITY_SLUG  = import.meta.env.VITE_CITY_SLUG  || 'livry'
 export const CITY_NAME  = import.meta.env.VITE_CITY_NAME  || 'Livry'
 export const CITY_LAT   = parseFloat(import.meta.env.VITE_CITY_LAT   || '49.1081')
@@ -218,16 +218,23 @@ export async function archiveRecipe(token, recipeId) {
 
 const USER_TOKEN_KEY = 'spin_user_token'
 
+export const authEvents = new EventTarget()
+export function notifyAuthChanged() {
+  authEvents.dispatchEvent(new Event('change'))
+}
+
 export function getUserToken() {
   return localStorage.getItem(USER_TOKEN_KEY)
 }
 
 export function setUserToken(token) {
   localStorage.setItem(USER_TOKEN_KEY, token)
+  notifyAuthChanged()
 }
 
 export function removeUserToken() {
   localStorage.removeItem(USER_TOKEN_KEY)
+  notifyAuthChanged()
 }
 
 export async function requestUserMagicLink(email) {
@@ -246,11 +253,25 @@ export async function authUser(token) {
   return res.json()
 }
 
-export async function fetchUserMe(token) {
+/**
+ * Fetch the current consumer user profile.
+ * Returns a normalized object: { success, data, status, error }.
+ * The HTTP status is always exposed in `status`, even when the body is empty or invalid.
+ */
+export async function fetchUserMe(token, options = {}) {
   const res = await fetch(`${API_BASE}/users/me`, {
     headers: { 'Authorization': `Bearer ${token}` },
+    signal: options.signal,
   })
-  return res.json()
+  if (res.status === 401) {
+    return { success: false, status: 401 }
+  }
+  try {
+    const json = await res.json()
+    return { ...json, status: res.status }
+  } catch (e) {
+    return { success: false, status: res.status, error: 'Invalid response' }
+  }
 }
 
 // --- Spin wheel -------------------------------------------------

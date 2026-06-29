@@ -19,6 +19,12 @@
         <RouterLink to="/inscrire" class="btn btn-primary btn-sm">
           <span>+ Inscrire mon entreprise</span>
         </RouterLink>
+
+        <button v-if="user" type="button" class="nav-profile" :aria-label="`Mon profil, niveau ${user.level}`" @click="goToProfile">
+          <img v-if="avatarUrl" :src="avatarUrl" class="nav-avatar" alt="" />
+          <span v-else class="nav-avatar-placeholder">🙂</span>
+          <span class="nav-level">Lv.{{ user.level }}</span>
+        </button>
       </div>
 
       <button class="nav-burger" @click="menuOpen = !menuOpen" :aria-label="menuOpen ? 'Fermer' : 'Menu'">
@@ -38,6 +44,7 @@
         <a href="/#meteo" class="nav-mobile-link">🌤️ Météo locale</a>
         <a href="/#services-locaux" class="nav-mobile-link">🏙️ Services locaux</a>
         <RouterLink to="/espace" class="nav-mobile-link">🔐 Mon espace</RouterLink>
+        <RouterLink v-if="user" to="/profil" class="nav-mobile-link">👤 Mon profil (Lv.{{ user.level }})</RouterLink>
         <RouterLink to="/inscrire" class="btn btn-primary" style="margin: 12px 20px;">
           + Inscrire mon entreprise
         </RouterLink>
@@ -47,11 +54,25 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
-import { CITY_NAME } from '../api.js'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { CITY_NAME, API_BASE, getUserToken, fetchUserMe, removeUserToken, authEvents } from '../api.js'
 
+const router = useRouter()
 const scrolled   = ref(false)
 const menuOpen   = ref(false)
+const user = ref(null)
+
+const avatarUrl = computed(() => {
+  if (!user.value?.avatar_url) return null
+  try {
+    const url = new URL(user.value.avatar_url, API_BASE)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
+    return url.href
+  } catch {
+    return null
+  }
+})
 
 function onScroll() { scrolled.value = window.scrollY > 20 }
 function scrollTo(id) {
@@ -59,8 +80,55 @@ function scrollTo(id) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
 }
 
-onMounted(() => window.addEventListener('scroll', onScroll))
-onUnmounted(() => window.removeEventListener('scroll', onScroll))
+let isMounted = true
+let abortController = null
+
+async function loadUser() {
+  const token = getUserToken()
+  if (!token) {
+    user.value = null
+    return
+  }
+
+  abortController?.abort()
+  abortController = new AbortController()
+
+  try {
+    const res = await fetchUserMe(token, { signal: abortController.signal })
+    if (!isMounted) return
+    if (res.success) {
+      user.value = res.data
+    } else if (res.status === 401) {
+      console.warn('User token invalid or expired')
+      removeUserToken()
+      user.value = null
+    } else {
+      console.warn('Failed to load user profile', res.error || res)
+      user.value = null
+    }
+  } catch (e) {
+    if (!isMounted || e.name === 'AbortError') return
+    console.warn('Failed to load user profile', e)
+    user.value = null
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('scroll', onScroll)
+  authEvents.addEventListener('change', loadUser)
+  loadUser()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', onScroll)
+  authEvents.removeEventListener('change', loadUser)
+  isMounted = false
+  abortController?.abort()
+})
+
+function goToProfile() {
+  router.push('/profil')
+}
 </script>
 
 <style scoped>
@@ -107,6 +175,47 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
   transition: color 0.2s;
 }
 .nav-link:hover { color: var(--c-green); }
+
+.nav-profile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  border-radius: 999px;
+}
+.nav-profile:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--c-green);
+}
+.nav-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--c-green);
+}
+.nav-avatar-placeholder {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 2px solid var(--c-green);
+  font-size: 1rem;
+  background: var(--c-cream-2);
+}
+.nav-level {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--c-green);
+}
 
 /* Burger */
 .nav-burger {
