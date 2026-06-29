@@ -56,7 +56,6 @@ function spin_offers_list(PDO $pdo): void
         WHERE c.slug = ?
           AND o.is_active = 1
           AND o.stock_remaining > 0
-          AND a.status = 'active'
         ORDER BY o.created_at ASC
     ");
     $stmt->execute([$citySlug]);
@@ -109,7 +108,6 @@ function spin_play(PDO $pdo): void
         WHERE a.city_id = ?
           AND o.is_active = 1
           AND o.stock_remaining > 0
-          AND a.status = 'active'
         ORDER BY o.stock_remaining DESC, o.created_at ASC
     ");
     $stmt->execute([$city['id']]);
