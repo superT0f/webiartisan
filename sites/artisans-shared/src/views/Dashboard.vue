@@ -38,6 +38,22 @@
         <button class="btn btn-outline" @click="logout">Se déconnecter</button>
       </div>
 
+      <section class="dashboard-section card">
+        <div class="section-title">
+          <h2>Roue des artisans</h2>
+        </div>
+        <div class="prospect-list">
+          <RouterLink to="/espace/spin-offers" class="prospect-mini">
+            <div><strong>Mes offres</strong><span class="text-muted small">Créer et gérer les lots</span></div>
+            <span class="badge badge-green">Gérer</span>
+          </RouterLink>
+          <RouterLink to="/espace/spin-wins" class="prospect-mini">
+            <div><strong>Valider un gain</strong><span class="text-muted small">Saisir un code gagnant</span></div>
+            <span class="badge badge-green">Valider</span>
+          </RouterLink>
+        </div>
+      </section>
+
       <div v-if="loading" class="skeleton" style="height: 200px; border-radius: 12px;"></div>
 
       <div v-if="loadingProspects" class="skeleton" style="height: 120px; border-radius: 12px; margin-top: 24px;"></div>
