@@ -13,8 +13,8 @@ const XP_ACTIONS = [
     'share'             => ['xp' => 15, 'cooldown' => 'daily',  'limit' => 3],
     'review'            => ['xp' => 20, 'cooldown' => 'once_per_resource', 'limit' => null],
     'recipe_suggest'    => ['xp' => 10, 'cooldown' => 'once_per_resource', 'limit' => null],
-    'daily_visit'       => ['xp' => 0,  'cooldown' => 'daily',  'limit' => 1],
-    'streak_3days'      => ['xp' => 30, 'cooldown' => 'daily',  'limit' => 1],
+    'daily_visit'       => ['xp' => 0,  'cooldown' => 'daily',  'limit' => 1, 'internal' => true],
+    'streak_3days'      => ['xp' => 30, 'cooldown' => 'daily',  'limit' => 1, 'internal' => true],
 ];
 
 const LEVEL_TITLES = [
@@ -34,6 +34,8 @@ const BADGES = [
     'faithful'      => ['name' => 'Fidèle',          'condition' => '7 jours de connexion.',       'target' => 7, 'action' => 'daily_visit'],
 ];
 
+const STREAK_MILESTONE_DAYS = 3;
+
 function gamificationUserProfile(PDO $pdo, int $userId): ?array
 {
     $stmt = $pdo->prepare("
@@ -52,6 +54,14 @@ function gamificationUserProfile(PDO $pdo, int $userId): ?array
     $badgeStmt->execute([$userId]);
     $badges = $badgeStmt->fetchAll(PDO::FETCH_ASSOC);
 
+    $streakStmt = $pdo->prepare("
+        SELECT current_streak, last_visit_date
+        FROM local_user_streaks
+        WHERE user_id = ?
+    ");
+    $streakStmt->execute([$userId]);
+    $streak = $streakStmt->fetch(PDO::FETCH_ASSOC);
+
     $xpNeeded = ((int)$user['level']) * 100;
 
     return [
@@ -66,55 +76,29 @@ function gamificationUserProfile(PDO $pdo, int $userId): ?array
         'xp_needed' => $xpNeeded,
         'title' => $user['title'] ?? LEVEL_TITLES[1],
         'badges' => array_map(fn($b) => ['key' => $b['badge_key'], 'name' => BADGES[$b['badge_key']]['name'] ?? $b['badge_key'], 'unlocked_at' => $b['unlocked_at']], $badges),
+        'current_streak' => $streak ? (int)$streak['current_streak'] : 0,
+        'last_visit_date' => $streak ? $streak['last_visit_date'] : null,
     ];
 }
 
-function gamificationRecordAction(PDO $pdo, int $userId, string $actionKey, ?string $resourceKey = null, ?array $metadata = null): ?array
+function gamificationRecordAction(PDO $pdo, int $userId, string $actionKey, ?string $resourceKey = null, ?array $metadata = null, bool $inTransaction = false, bool $allowInternal = false): ?array
 {
     if (!isset(XP_ACTIONS[$actionKey])) {
         return null;
     }
 
+    if ($inTransaction && !$pdo->inTransaction()) {
+        throw new RuntimeException('gamificationRecordAction called with inTransaction=true but no active transaction');
+    }
+
     $config = XP_ACTIONS[$actionKey];
-    $now = new DateTimeImmutable();
     $resourceKey = $resourceKey ?? '';
 
-    if ($config['cooldown'] !== 'none') {
-        $stmt = $pdo->prepare("
-            SELECT last_at FROM local_user_cooldowns
-            WHERE user_id = ? AND action_key = ? AND resource_key = ?
-        ");
-        $stmt->execute([$userId, $actionKey, $resourceKey]);
-        $last = $stmt->fetchColumn();
-
-        if ($last) {
-            $lastAt = new DateTimeImmutable($last);
-            $canAfter = match ($config['cooldown']) {
-                'hourly' => $lastAt->modify('+1 hour'),
-                'daily' => $lastAt->modify('+1 day')->setTime(0, 0),
-                'once_per_resource' => false,
-                default => $lastAt,
-            };
-
-            if ($canAfter === false || $now < $canAfter) {
-                return null;
-            }
-        }
+    if (!empty($config['internal']) && !$allowInternal) {
+        return null;
     }
 
-    if ($config['limit'] !== null && $config['cooldown'] === 'daily') {
-        $countStmt = $pdo->prepare("
-            SELECT COUNT(*) FROM local_user_actions
-            WHERE user_id = ? AND action_key = ? AND DATE(created_at) = CURDATE()
-        ");
-        $countStmt->execute([$userId, $actionKey]);
-        if ((int)$countStmt->fetchColumn() >= $config['limit']) {
-            return null;
-        }
-    }
-
-    $pdo->beginTransaction();
-    try {
+    $doRecord = function () use ($pdo, $userId, $actionKey, $config, $resourceKey, $metadata): array {
         $pdo->prepare("
             INSERT INTO local_user_cooldowns (user_id, action_key, period, resource_key, last_at)
             VALUES (?, ?, ?, ?, NOW())
@@ -124,7 +108,7 @@ function gamificationRecordAction(PDO $pdo, int $userId, string $actionKey, ?str
         $pdo->prepare("
             INSERT INTO local_user_actions (user_id, action_key, xp_amount, metadata, created_at)
             VALUES (?, ?, ?, ?, NOW())
-        ")->execute([$userId, $actionKey, $config['xp'], $metadata ? json_encode($metadata) : null]);
+        ")->execute([$userId, $actionKey, $config['xp'], $metadata !== null ? json_encode($metadata, JSON_THROW_ON_ERROR) : null]);
 
         $pdo->prepare("
             UPDATE local_users SET xp = xp + ? WHERE id = ?
@@ -133,13 +117,67 @@ function gamificationRecordAction(PDO $pdo, int $userId, string $actionKey, ?str
         $leveledUp = gamificationCheckLevelUp($pdo, $userId);
         $newBadges = gamificationCheckBadges($pdo, $userId, $actionKey);
 
-        $pdo->commit();
-
         return [
             'xp_gained' => $config['xp'],
             'level_up' => $leveledUp,
             'new_badges' => $newBadges,
         ];
+    };
+
+    $run = function () use ($pdo, $userId, $actionKey, $config, $resourceKey, $doRecord): ?array {
+        // Lock user row first to serialize per-user gamification writes
+        $pdo->prepare("SELECT 1 FROM local_users WHERE id = ? FOR UPDATE")->execute([$userId]);
+
+        $now = new DateTimeImmutable();
+
+        // Cooldown check
+        if ($config['cooldown'] !== 'none') {
+            $stmt = $pdo->prepare("
+                SELECT last_at FROM local_user_cooldowns
+                WHERE user_id = ? AND action_key = ? AND resource_key = ?
+            ");
+            $stmt->execute([$userId, $actionKey, $resourceKey]);
+            $last = $stmt->fetchColumn();
+
+            if ($last) {
+                $lastAt = new DateTimeImmutable($last);
+                $canAfter = match ($config['cooldown']) {
+                    'hourly' => $lastAt->modify('+1 hour'),
+                    'daily' => $lastAt->modify('+1 day')->setTime(0, 0),
+                    'once_per_resource' => false,
+                    default => $lastAt,
+                };
+
+                if ($canAfter === false || $now < $canAfter) {
+                    return null;
+                }
+            }
+        }
+
+        // Limit check
+        if ($config['limit'] !== null && $config['cooldown'] === 'daily') {
+            $countStmt = $pdo->prepare("
+                SELECT COUNT(*) FROM local_user_actions
+                WHERE user_id = ? AND action_key = ? AND DATE(created_at) = CURDATE()
+            ");
+            $countStmt->execute([$userId, $actionKey]);
+            if ((int)$countStmt->fetchColumn() >= $config['limit']) {
+                return null;
+            }
+        }
+
+        return $doRecord();
+    };
+
+    if ($inTransaction) {
+        return $run();
+    }
+
+    $pdo->beginTransaction();
+    try {
+        $result = $run();
+        $pdo->commit();
+        return $result;
     } catch (Throwable $e) {
         $pdo->rollBack();
         error_log('[GAMIFICATION] ' . $e->getMessage());
@@ -153,7 +191,7 @@ function gamificationCheckLevelUp(PDO $pdo, int $userId): bool
     $stmt->execute([$userId]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    $level = (int)$user['level'];
+    $level = max(1, (int)$user['level']);
     $xp = (int)$user['xp'];
     $leveledUp = false;
 
@@ -217,38 +255,59 @@ function gamificationCheckBadges(PDO $pdo, int $userId, string $actionKey): arra
 
 function gamificationUpdateStreak(PDO $pdo, int $userId): void
 {
-    $today = date('Y-m-d');
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare("SELECT 1 FROM local_users WHERE id = ? FOR UPDATE")->execute([$userId]);
 
-    $checkStmt = $pdo->prepare("
-        SELECT last_visit_date FROM local_user_streaks WHERE user_id = ?
-    ");
-    $checkStmt->execute([$userId]);
-    $lastDate = $checkStmt->fetchColumn();
+        $todayStmt = $pdo->query("SELECT CURDATE()");
+        $today = $todayStmt->fetchColumn();
 
-    $isNewDay = $lastDate !== $today;
+        $prevStmt = $pdo->prepare("
+            SELECT current_streak, last_visit_date
+            FROM local_user_streaks
+            WHERE user_id = ?
+            FOR UPDATE
+        ");
+        $prevStmt->execute([$userId]);
+        $row = $prevStmt->fetch(PDO::FETCH_ASSOC);
 
-    $stmt = $pdo->prepare("
-        INSERT INTO local_user_streaks (user_id, current_streak, last_visit_date)
-        VALUES (?, 1, ?)
-        ON DUPLICATE KEY UPDATE
-            current_streak = CASE
-                WHEN last_visit_date = DATE_SUB(?, INTERVAL 1 DAY) THEN current_streak + 1
-                WHEN last_visit_date = ? THEN current_streak
-                ELSE 1
-            END,
-            last_visit_date = ?
-    ");
-    $stmt->execute([$userId, $today, $today, $today, $today]);
+        $prevStreak = $row ? (int)$row['current_streak'] : 0;
+        $lastDate = $row ? $row['last_visit_date'] : null;
+        $yesterday = DateTimeImmutable::createFromFormat('Y-m-d', $today)->modify('-1 day')->format('Y-m-d');
 
-    if ($isNewDay) {
-        gamificationRecordAction($pdo, $userId, 'daily_visit');
-    }
+        if ($lastDate === $today) {
+            $newStreak = $prevStreak;
+            $isNewDay = false;
+        } elseif ($lastDate === $yesterday) {
+            $newStreak = $prevStreak + 1;
+            $isNewDay = true;
+        } else {
+            $newStreak = 1;
+            $isNewDay = true;
+        }
 
-    $streakStmt = $pdo->prepare("SELECT current_streak FROM local_user_streaks WHERE user_id = ?");
-    $streakStmt->execute([$userId]);
-    $streak = (int)$streakStmt->fetchColumn();
+        $upsertStmt = $pdo->prepare("
+            INSERT INTO local_user_streaks (user_id, current_streak, last_visit_date)
+            VALUES (?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                current_streak = VALUES(current_streak),
+                last_visit_date = VALUES(last_visit_date)
+        ");
+        $upsertStmt->execute([$userId, $newStreak, $today]);
 
-    if ($streak >= 3) {
-        gamificationRecordAction($pdo, $userId, 'streak_3days');
+        if ($isNewDay) {
+            gamificationRecordAction($pdo, $userId, 'daily_visit', null, null, true, true);
+        }
+
+        if ($newStreak >= STREAK_MILESTONE_DAYS && $prevStreak < STREAK_MILESTONE_DAYS) {
+            gamificationRecordAction($pdo, $userId, 'streak_3days', null, null, true, true);
+        }
+
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        error_log('[GAMIFICATION-STREAK] ' . $e->getMessage());
     }
 }

@@ -8,10 +8,15 @@
  *              /api/artisans/register
  */
 
-// Debug mode (remove in production)
+$appEnv = $_ENV['APP_ENV'] ?? 'production';
+$isDev = $appEnv === 'development' || $appEnv === 'dev';
+
 error_reporting(E_ALL);
-ini_set('display_errors', 1);
+ini_set('display_errors', $isDev ? 1 : 0);
 ini_set('log_errors', 1);
+
+// Ensure consistent timezone for streaks and cooldowns
+date_default_timezone_set('Europe/Paris');
 
 // Load unified Logger - handle both local and production paths
 $adminLoggerPath = __DIR__ . '/../admin/lib/Logger.php';
@@ -163,7 +168,7 @@ if ($module === 'spin') {
 }
 
 if ($module === 'actions') {
-    applyRateLimit($pdo, 'public');
+    applyRateLimit($pdo, 'login');
     require_once __DIR__ . '/routes/actions.php';
     exit;
 }

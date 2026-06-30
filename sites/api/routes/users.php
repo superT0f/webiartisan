@@ -141,8 +141,12 @@ function user_auth(PDO $pdo): void
         WHERE id = ?
     ")->execute([$sessionToken, $sessionExp, $user['id']]);
 
-    require_once __DIR__ . '/../lib/Gamification.php';
-    gamificationUpdateStreak($pdo, (int)$user['id']);
+    try {
+        require_once __DIR__ . '/../lib/Gamification.php';
+        gamificationUpdateStreak($pdo, (int)$user['id']);
+    } catch (Throwable $e) {
+        error_log('[AUTH-STREAK] ' . $e->getMessage());
+    }
 
     echo json_encode([
         'success' => true,

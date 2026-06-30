@@ -21,9 +21,35 @@ $actionKey = $body['action'] ?? '';
 $resourceKey = $body['resource_key'] ?? null;
 $metadata = $body['metadata'] ?? null;
 
+if ($metadata !== null) {
+    if (!is_array($metadata)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Métadonnées invalides']);
+        exit;
+    }
+    try {
+        $metadataJson = json_encode($metadata, JSON_THROW_ON_ERROR);
+    } catch (Throwable $e) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Métadonnées invalides']);
+        exit;
+    }
+    if (strlen($metadataJson) > 4096) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Métadonnées trop volumineuses']);
+        exit;
+    }
+}
+
 if (!$actionKey || !isset(XP_ACTIONS[$actionKey])) {
     http_response_code(400);
     echo json_encode(['success' => false, 'error' => 'Action inconnue']);
+    exit;
+}
+
+if (!empty(XP_ACTIONS[$actionKey]['internal'])) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Action réservée']);
     exit;
 }
 

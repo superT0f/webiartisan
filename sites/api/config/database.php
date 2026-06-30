@@ -37,5 +37,6 @@ function getDatabase(): PDO {
 
     $pdo = new PDO($dsn, $user, $pass, $options);
     $pdo->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
+    $pdo->exec("SET time_zone = 'Europe/Paris'");
     return $pdo;
 }
