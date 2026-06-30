@@ -221,11 +221,14 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { fetchArtisan, postReview, contactArtisan, CITY_NAME } from '../api.js'
+import { useGamification } from '../composables/useGamification.js'
 import RecipeMiniCard from '../components/RecipeMiniCard.vue'
 import ArtisanNearbyMap from '../components/ArtisanNearbyMap.vue'
 
 const route = useRoute()
 const id    = parseInt(route.params.id)
+
+const { recordAction } = useGamification()
 
 const artisan = ref(null)
 const loading = ref(true)
@@ -278,6 +281,14 @@ onMounted(async () => {
     artisan.value = res.data
   } catch { error.value = true }
   finally { loading.value = false }
+
+  if (!error.value && artisan.value) {
+    try {
+      await recordAction('artisan_view', `artisan:${id}`)
+    } catch (e) {
+      // Gamification failure should not break the artisan page
+    }
+  }
 })
 </script>
 
