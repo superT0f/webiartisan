@@ -1,3 +1,6 @@
 # Uploads utilisateurs
 uploads/avatars/*
 !uploads/avatars/.gitkeep
+
+# Lien/local de déploiement Gandi
+production

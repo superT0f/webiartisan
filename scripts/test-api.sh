@@ -214,7 +214,7 @@ fi
 
 if [[ "$MYSQL_AVAILABLE" -eq 1 ]]; then
   (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
-    -e "REPLACE INTO local_users (id, email, session_token, session_exp) VALUES ($TEST_USER_ID, 'profile-user@example.com', '$PROFILE_USER_TOKEN', DATE_ADD(NOW(), INTERVAL 1 DAY));" >/dev/null 2>&1)
+    -e "REPLACE INTO local_users (id, email, session_token, session_exp) VALUES ($TEST_USER_ID, 'profile-user@example.com', '$PROFILE_USER_TOKEN', DATE_ADD(NOW(), INTERVAL 1 DAY));" >/dev/null)
 fi
 
 echo "--- Test /avatars ---"
@@ -240,6 +240,8 @@ echo "✅ /avatars handles neutral and invalid gender"
 if [[ "$MYSQL_AVAILABLE" -eq 0 ]]; then
   echo "⚠️  Skipping user profile/avatar tests (Docker/MySQL unavailable)"
 else
+  reset_rate_limit 'login'
+
   mkdir -p "$AVATAR_DIR"
   if [[ -f "$AVATAR_DIR/default.png" ]]; then
     cp "$AVATAR_DIR/default.png" "$AVATAR_DIR/locked-test.png"
@@ -307,6 +309,8 @@ else
   fi
   echo "✅ POST /users/me/avatar rejects locked avatar"
 
+  reset_rate_limit 'login'
+
   echo "--- Test POST /users/me/avatar gender restriction ---"
   if [[ -f "$MALE_AVATAR_DIR/test-gender.png" ]]; then
     curl_json_status -X PUT -H "Authorization: Bearer $PROFILE_USER_TOKEN" -H "Content-Type: application/json" \
@@ -362,13 +366,17 @@ else
   echo ""
   echo "== Gamification =="
 
+  reset_rate_limit 'login'
+
   # Ensure a clean gamification state for this test user
   (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
-    -e "UPDATE local_users SET xp=0, level=1 WHERE id=$TEST_USER_ID; DELETE FROM local_user_actions WHERE user_id = $TEST_USER_ID; DELETE FROM local_user_cooldowns WHERE user_id = $TEST_USER_ID; DELETE FROM local_user_badges WHERE user_id = $TEST_USER_ID; DELETE FROM local_user_streaks WHERE user_id = $TEST_USER_ID;" >/dev/null 2>&1)
+    -e "UPDATE local_users SET xp=0, level=1 WHERE id=$TEST_USER_ID; DELETE FROM local_user_actions WHERE user_id = $TEST_USER_ID; DELETE FROM local_user_cooldowns WHERE user_id = $TEST_USER_ID; DELETE FROM local_user_badges WHERE user_id = $TEST_USER_ID; DELETE FROM local_user_streaks WHERE user_id = $TEST_USER_ID;" >/dev/null)
 
-  # Prepare a magic-link token to exercise consumer auth (which updates the streak)
+  # Prepare a magic-link token to exercise consumer auth (which updates the streak).
+  # Align the MySQL session timezone with the API (Europe/Paris) so the 1-hour expiry
+  # is evaluated consistently by PHP/PDO.
   (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
-    -e "UPDATE local_users SET magic_token='test-magic-token-$TEST_USER_ID', magic_token_exp=DATE_ADD(NOW(), INTERVAL 1 HOUR) WHERE id=$TEST_USER_ID;") >/dev/null 2>&1
+    -e "SET time_zone = 'Europe/Paris'; UPDATE local_users SET magic_token='test-magic-token-$TEST_USER_ID', magic_token_exp=DATE_ADD(NOW(), INTERVAL 1 HOUR) WHERE id=$TEST_USER_ID;" >/dev/null)
 
   curl_json_status -X POST "${BASE_URL}/users/auth?token=test-magic-token-$TEST_USER_ID" \
     -H "Content-Type: application/json"
