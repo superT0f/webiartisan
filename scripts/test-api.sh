@@ -26,6 +26,21 @@ assert_json() {
   python3 -c "import sys,json; d=json.loads(sys.argv[1]); assert $expr, sys.argv[2]" "$json" "$msg" 2>/dev/null || fail "$msg"
 }
 
+# Globals populated by curl_json_status
+JSON_BODY=""
+LAST_HTTP_CODE=""
+
+curl_json_status() {
+  local tmp
+  tmp=$(mktemp)
+  local code rc
+  code=$(curl -sS --max-time 10 --connect-timeout 5 -o "$tmp" -w "%{http_code}" "$@") || rc=$?
+  [[ ${rc:-0} -ne 0 ]] && code=000
+  JSON_BODY=$(cat "$tmp" 2>/dev/null || true)
+  rm -f "$tmp"
+  LAST_HTTP_CODE=$code
+}
+
 reset_rate_limit() {
   local endpoint="$1"
   if [[ "$MYSQL_AVAILABLE" -eq 1 ]]; then
@@ -162,13 +177,11 @@ fi
 echo ""
 echo "== User profile / avatar =="
 
-trap cleanup_profile_tests EXIT INT TERM
-
-TEST_USER_ID=$((200000 + $(od -An -N4 -tu4 /dev/urandom | tr -d ' ') % 800000))
+TEST_USER_ID=999999
 if command -v openssl >/dev/null 2>&1; then
-  USER_TOKEN="profile-$(openssl rand -hex 16)"
+  PROFILE_USER_TOKEN="profile-$(openssl rand -hex 16)"
 else
-  USER_TOKEN="profile-$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
+  PROFILE_USER_TOKEN="profile-$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
 fi
 AVATAR_DIR="$SCRIPT_DIR/../sites/api/public/avatars/neutral"
 MALE_AVATAR_DIR="$SCRIPT_DIR/../sites/api/public/avatars/male"
@@ -176,29 +189,57 @@ UPLOAD_DIR="$SCRIPT_DIR/../sites/api/uploads/avatars"
 
 # Ensure the test consumer user exists independently of the spin-wheel tests.
 MYSQL_AVAILABLE=0
+
+cleanup_profile_tests() {
+  if [[ "$MYSQL_AVAILABLE" -eq 1 ]]; then
+    (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
+      -e "DELETE FROM local_user_actions WHERE user_id = $TEST_USER_ID; DELETE FROM local_user_cooldowns WHERE user_id = $TEST_USER_ID; DELETE FROM local_user_badges WHERE user_id = $TEST_USER_ID; DELETE FROM local_user_streaks WHERE user_id = $TEST_USER_ID; DELETE FROM local_users WHERE id = $TEST_USER_ID;") >/dev/null
+  fi
+
+  rm -f "$AVATAR_DIR/locked-test.png" "$AVATAR_DIR/locked-test.png.json"
+  rm -f "$MALE_AVATAR_DIR/test-gender.png" "$MALE_AVATAR_DIR/test-gender.png.json"
+  if [[ -n "$TEST_USER_ID" && -n "$UPLOAD_DIR" ]]; then
+    rm -f "$UPLOAD_DIR/${TEST_USER_ID}_"*
+  fi
+}
+
+trap cleanup_profile_tests EXIT INT TERM
+
 if command -v docker >/dev/null 2>&1 && docker compose ps | grep -q mysql; then
   if (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
-    -e "REPLACE INTO local_users (id, email, session_token, session_exp) VALUES ($TEST_USER_ID, 'profile-user@example.com', '$USER_TOKEN', DATE_ADD(NOW(), INTERVAL 1 DAY));" >/dev/null 2>&1); then
+    -e "SELECT 1;" >/dev/null 2>&1); then
     MYSQL_AVAILABLE=1
   fi
 fi
 
-cleanup_profile_tests() {
-  if [[ "$MYSQL_AVAILABLE" -eq 0 ]]; then
-    return
-  fi
+if [[ "$MYSQL_AVAILABLE" -eq 1 ]]; then
   (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
-    -e "UPDATE local_users SET avatar_gender='neutral' WHERE id = $TEST_USER_ID; DELETE FROM local_user_actions WHERE user_id = $TEST_USER_ID; DELETE FROM local_user_cooldowns WHERE user_id = $TEST_USER_ID; DELETE FROM local_user_badges WHERE user_id = $TEST_USER_ID; DELETE FROM local_user_streaks WHERE user_id = $TEST_USER_ID; DELETE FROM local_users WHERE id = $TEST_USER_ID;" >/dev/null 2>&1 || true)
-  rm -f "$AVATAR_DIR/locked-test.png" "$AVATAR_DIR/locked-test.png.json"
-  rm -f "$MALE_AVATAR_DIR/test-gender.png" "$MALE_AVATAR_DIR/test-gender.png.json"
-  rm -f "$UPLOAD_DIR/${TEST_USER_ID}_"*
-}
+    -e "REPLACE INTO local_users (id, email, session_token, session_exp) VALUES ($TEST_USER_ID, 'profile-user@example.com', '$PROFILE_USER_TOKEN', DATE_ADD(NOW(), INTERVAL 1 DAY));" >/dev/null 2>&1)
+fi
+
+echo "--- Test /avatars ---"
+curl_json_status "${BASE_URL}/avatars?gender=male"
+check "$LAST_HTTP_CODE" "GET /avatars male" "200"
+if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+  assert_json "$JSON_BODY" "d.get('success')" "avatars endpoint should succeed"
+  assert_json "$JSON_BODY" "isinstance(d.get('data'), list)" "avatars data should be a list"
+  assert_json "$JSON_BODY" "len(d.get('data',[])) > 0" "avatars list should not be empty"
+fi
+echo "✅ /avatars returns avatars"
+
+echo "--- Test /avatars neutral and invalid gender ---"
+curl_json_status "${BASE_URL}/avatars?gender=neutral"
+check "$LAST_HTTP_CODE" "GET /avatars neutral gender" "200"
+if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+  assert_json "$JSON_BODY" "d.get('success')" "neutral avatars endpoint should succeed"
+fi
+curl_json_status "${BASE_URL}/avatars?gender=invalid"
+check "$LAST_HTTP_CODE" "GET /avatars invalid gender" "200"
+echo "✅ /avatars handles neutral and invalid gender"
 
 if [[ "$MYSQL_AVAILABLE" -eq 0 ]]; then
   echo "⚠️  Skipping user profile/avatar tests (Docker/MySQL unavailable)"
 else
-  reset_rate_limit 'login'
-
   mkdir -p "$AVATAR_DIR"
   if [[ -f "$AVATAR_DIR/default.png" ]]; then
     cp "$AVATAR_DIR/default.png" "$AVATAR_DIR/locked-test.png"
@@ -220,71 +261,176 @@ else
   fi
 
   echo "--- Test PUT /users/me ---"
-  PROFILE_UPDATE=$(curl -s -X PUT -H "Authorization: Bearer $USER_TOKEN" -H "Content-Type: application/json" \
-    -d '{"display_name":"Test User","avatar_gender":"female"}' "$BASE_URL/users/me" || true)
-  assert_json "$PROFILE_UPDATE" "d.get('success')" "profile update should succeed"
-  assert_json "$PROFILE_UPDATE" "d.get('data',{}).get('display_name') == 'Test User'" "display_name should be updated"
+  curl_json_status -X PUT -H "Authorization: Bearer $PROFILE_USER_TOKEN" -H "Content-Type: application/json" \
+    -d '{"display_name":"Test User","avatar_gender":"female"}' "$BASE_URL/users/me"
+  check "$LAST_HTTP_CODE" "PUT /users/me profile update" "200"
+  if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+    assert_json "$JSON_BODY" "d.get('success')" "profile update should succeed"
+    assert_json "$JSON_BODY" "d.get('data',{}).get('display_name') == 'Test User'" "display_name should be updated"
+  fi
   echo "✅ PUT /users/me"
 
   echo "--- Test POST /users/me/avatar (library) ---"
-  AVATAR_UPDATE=$(curl -s -X POST -H "Authorization: Bearer $USER_TOKEN" -H "Content-Type: application/json" \
-    -d '{"avatar_id":"default","avatar_url":"/avatars/neutral/default.png"}' "$BASE_URL/users/me/avatar" || true)
-  assert_json "$AVATAR_UPDATE" "d.get('success')" "avatar selection should succeed"
-  assert_json "$AVATAR_UPDATE" "d.get('data',{}).get('avatar_url') == '/avatars/neutral/default.png'" "avatar_url should be updated"
+  curl_json_status -X POST -H "Authorization: Bearer $PROFILE_USER_TOKEN" -H "Content-Type: application/json" \
+    -d '{"avatar_id":"default","avatar_url":"/avatars/neutral/default.png"}' "$BASE_URL/users/me/avatar"
+  check "$LAST_HTTP_CODE" "POST /users/me/avatar (library)" "200"
+  if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+    assert_json "$JSON_BODY" "d.get('success')" "avatar selection should succeed"
+    assert_json "$JSON_BODY" "d.get('data',{}).get('avatar_url') == '/avatars/neutral/default.png'" "avatar_url should be updated"
+  fi
   echo "✅ POST /users/me/avatar (library)"
 
   echo "--- Test PUT /users/me with empty display_name ---"
-  EMPTY_NAME=$(curl -s -X PUT -H "Authorization: Bearer $USER_TOKEN" -H "Content-Type: application/json" \
-    -d '{"display_name":""}' "$BASE_URL/users/me" || true)
-  assert_json "$EMPTY_NAME" "not d.get('success')" "empty display_name should be rejected"
+  curl_json_status -X PUT -H "Authorization: Bearer $PROFILE_USER_TOKEN" -H "Content-Type: application/json" \
+    -d '{"display_name":""}' "$BASE_URL/users/me"
+  check "$LAST_HTTP_CODE" "PUT /users/me empty display_name" "400"
+  if [[ "$LAST_HTTP_CODE" == "400" ]]; then
+    assert_json "$JSON_BODY" "d.get('success') is False" "empty display_name should be rejected"
+  fi
   echo "✅ PUT /users/me rejects empty display_name"
 
   echo "--- Test POST /users/me/avatar with non-image data ---"
-  NON_IMAGE=$(curl -s -X POST -H "Authorization: Bearer $USER_TOKEN" -H "Content-Type: application/json" \
-    -d '{"base64_image":"data:text/plain;base64,SGVsbG8gV29ybGQ="}' "$BASE_URL/users/me/avatar" || true)
-  assert_json "$NON_IMAGE" "not d.get('success')" "non-image upload should be rejected"
+  curl_json_status -X POST -H "Authorization: Bearer $PROFILE_USER_TOKEN" -H "Content-Type: application/json" \
+    -d '{"base64_image":"data:text/plain;base64,SGVsbG8gV29ybGQ="}' "$BASE_URL/users/me/avatar"
+  check "$LAST_HTTP_CODE" "POST /users/me/avatar non-image data" "400"
+  if [[ "$LAST_HTTP_CODE" == "400" ]]; then
+    assert_json "$JSON_BODY" "d.get('success') is False" "non-image upload should be rejected"
+  fi
   echo "✅ POST /users/me/avatar rejects non-image upload"
 
   echo "--- Test POST /users/me/avatar with locked avatar ---"
-  LOCKED_AVATAR=$(curl -s -X POST -H "Authorization: Bearer $USER_TOKEN" -H "Content-Type: application/json" \
-    -d '{"avatar_id":"locked-test"}' "$BASE_URL/users/me/avatar" || true)
-  assert_json "$LOCKED_AVATAR" "not d.get('success')" "locked avatar should be rejected"
+  curl_json_status -X POST -H "Authorization: Bearer $PROFILE_USER_TOKEN" -H "Content-Type: application/json" \
+    -d '{"avatar_id":"locked-test"}' "$BASE_URL/users/me/avatar"
+  check "$LAST_HTTP_CODE" "POST /users/me/avatar locked avatar" "403"
+  if [[ "$LAST_HTTP_CODE" == "403" ]]; then
+    assert_json "$JSON_BODY" "d.get('success') is False" "locked avatar should be rejected"
+  fi
   echo "✅ POST /users/me/avatar rejects locked avatar"
-
-  reset_rate_limit 'login'
 
   echo "--- Test POST /users/me/avatar gender restriction ---"
   if [[ -f "$MALE_AVATAR_DIR/test-gender.png" ]]; then
-    curl -s -X PUT -H "Authorization: Bearer $USER_TOKEN" -H "Content-Type: application/json" \
-      -d '{"avatar_gender":"female"}' "$BASE_URL/users/me" >/dev/null || true
-    GENDER_REJECT=$(curl -s -X POST -H "Authorization: Bearer $USER_TOKEN" -H "Content-Type: application/json" \
-      -d '{"avatar_id":"test-gender"}' "$BASE_URL/users/me/avatar" || true)
-    assert_json "$GENDER_REJECT" "not d.get('success')" "male-only avatar should be rejected for female user"
+    curl_json_status -X PUT -H "Authorization: Bearer $PROFILE_USER_TOKEN" -H "Content-Type: application/json" \
+      -d '{"avatar_gender":"female"}' "$BASE_URL/users/me"
+    check "$LAST_HTTP_CODE" "PUT /users/me set gender female" "200"
 
-    curl -s -X PUT -H "Authorization: Bearer $USER_TOKEN" -H "Content-Type: application/json" \
-      -d '{"avatar_gender":"male"}' "$BASE_URL/users/me" >/dev/null || true
-    GENDER_ACCEPT=$(curl -s -X POST -H "Authorization: Bearer $USER_TOKEN" -H "Content-Type: application/json" \
-      -d '{"avatar_id":"test-gender"}' "$BASE_URL/users/me/avatar" || true)
-    assert_json "$GENDER_ACCEPT" "d.get('success')" "male-only avatar should succeed for male user"
+    curl_json_status -X POST -H "Authorization: Bearer $PROFILE_USER_TOKEN" -H "Content-Type: application/json" \
+      -d '{"avatar_id":"test-gender"}' "$BASE_URL/users/me/avatar"
+    check "$LAST_HTTP_CODE" "POST /users/me/avatar gender restriction" "403"
+    if [[ "$LAST_HTTP_CODE" == "403" ]]; then
+      assert_json "$JSON_BODY" "d.get('success') is False" "male-only avatar should be rejected for female user"
+    fi
+
+    curl_json_status -X PUT -H "Authorization: Bearer $PROFILE_USER_TOKEN" -H "Content-Type: application/json" \
+      -d '{"avatar_gender":"male"}' "$BASE_URL/users/me"
+    check "$LAST_HTTP_CODE" "PUT /users/me set gender male" "200"
+
+    curl_json_status -X POST -H "Authorization: Bearer $PROFILE_USER_TOKEN" -H "Content-Type: application/json" \
+      -d '{"avatar_id":"test-gender"}' "$BASE_URL/users/me/avatar"
+    check "$LAST_HTTP_CODE" "POST /users/me/avatar gender accept" "200"
+    if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+      assert_json "$JSON_BODY" "d.get('success')" "male-only avatar should succeed for male user"
+    fi
     echo "✅ POST /users/me/avatar enforces gender restrictions"
   else
     echo "⚠️  Skipping gender-restriction test: fixture missing"
   fi
 
+  # Reset gender so default-avatar URL assertions are deterministic
+  curl_json_status -X PUT -H "Authorization: Bearer $PROFILE_USER_TOKEN" -H "Content-Type: application/json" \
+    -d '{"avatar_gender":"neutral"}' "$BASE_URL/users/me"
+  check "$LAST_HTTP_CODE" "PUT /users/me reset gender neutral" "200"
+
   echo "--- Test POST /users/me/avatar ignores malicious avatar_url ---"
-  MALICIOUS_AVATAR=$(curl -s -X POST -H "Authorization: Bearer $USER_TOKEN" -H "Content-Type: application/json" \
-    -d '{"avatar_id":"default","avatar_url":"/avatars/neutral/malicious.png"}' "$BASE_URL/users/me/avatar" || true)
-  assert_json "$MALICIOUS_AVATAR" "d.get('success')" "malicious avatar_url should be ignored"
-  assert_json "$MALICIOUS_AVATAR" "d.get('data',{}).get('avatar_url') == '/avatars/neutral/default.png'" "server should return metadata avatar_url"
+  curl_json_status -X POST -H "Authorization: Bearer $PROFILE_USER_TOKEN" -H "Content-Type: application/json" \
+    -d '{"avatar_id":"default","avatar_url":"/avatars/neutral/malicious.png"}' "$BASE_URL/users/me/avatar"
+  check "$LAST_HTTP_CODE" "POST /users/me/avatar ignores malicious avatar_url" "200"
+  if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+    assert_json "$JSON_BODY" "d.get('success')" "malicious avatar_url should be ignored"
+    assert_json "$JSON_BODY" "d.get('data',{}).get('avatar_url') == '/avatars/neutral/default.png'" "server should return metadata avatar_url"
+  fi
   echo "✅ POST /users/me/avatar ignores malicious avatar_url"
 
   echo "--- Test POST /users/me/avatar (custom upload) ---"
-  CUSTOM_UPLOAD=$(curl -s -X POST -H "Authorization: Bearer $USER_TOKEN" -H "Content-Type: application/json" \
-    -d '{"base64_image":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="}' "$BASE_URL/users/me/avatar" || true)
-  assert_json "$CUSTOM_UPLOAD" "d.get('success')" "custom upload should succeed"
+  curl_json_status -X POST -H "Authorization: Bearer $PROFILE_USER_TOKEN" -H "Content-Type: application/json" \
+    -d '{"base64_image":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="}' "$BASE_URL/users/me/avatar"
+  check "$LAST_HTTP_CODE" "POST /users/me/avatar custom upload" "200"
+  if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+    assert_json "$JSON_BODY" "d.get('success')" "custom upload should succeed"
+  fi
   echo "✅ POST /users/me/avatar accepts custom upload"
 
-  cleanup_profile_tests
+  echo ""
+  echo "== Gamification =="
+
+  # Ensure a clean gamification state for this test user
+  (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
+    -e "UPDATE local_users SET xp=0, level=1 WHERE id=$TEST_USER_ID; DELETE FROM local_user_actions WHERE user_id = $TEST_USER_ID; DELETE FROM local_user_cooldowns WHERE user_id = $TEST_USER_ID; DELETE FROM local_user_badges WHERE user_id = $TEST_USER_ID; DELETE FROM local_user_streaks WHERE user_id = $TEST_USER_ID;" >/dev/null 2>&1)
+
+  # Prepare a magic-link token to exercise consumer auth (which updates the streak)
+  (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
+    -e "UPDATE local_users SET magic_token='test-magic-token-$TEST_USER_ID', magic_token_exp=DATE_ADD(NOW(), INTERVAL 1 HOUR) WHERE id=$TEST_USER_ID;") >/dev/null 2>&1
+
+  curl_json_status -X POST "${BASE_URL}/users/auth?token=test-magic-token-$TEST_USER_ID" \
+    -H "Content-Type: application/json"
+  check "$LAST_HTTP_CODE" "POST /users/auth" "200"
+  if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+    assert_json "$JSON_BODY" "d.get('success')" "consumer auth should succeed"
+  fi
+  SESSION_TOKEN=$(echo "$JSON_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))" || true)
+
+  if [[ -n "$SESSION_TOKEN" ]]; then
+    echo "--- Test /users/me gamification ---"
+    curl_json_status -H "Authorization: Bearer $SESSION_TOKEN" "${BASE_URL}/users/me"
+    check "$LAST_HTTP_CODE" "GET /users/me" "200"
+    if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+      assert_json "$JSON_BODY" "'level' in d.get('data',{}) and d.get('data',{}).get('level') == 1" "user level should be 1"
+      assert_json "$JSON_BODY" "'xp' in d.get('data',{}) and isinstance(d.get('data',{}).get('xp'), int)" "user xp should be an integer"
+      assert_json "$JSON_BODY" "'current_streak' in d.get('data',{}) and d.get('data',{}).get('current_streak') >= 1" "user streak should be at least 1 after auth"
+    fi
+    echo "✅ /users/me returns gamification profile"
+
+    echo "--- Test /actions artisan_view ---"
+    curl_json_status -X POST -H "Authorization: Bearer $SESSION_TOKEN" -H "Content-Type: application/json" \
+      -d '{"action":"artisan_view","resource_key":"artisan:1"}' "${BASE_URL}/actions"
+    check "$LAST_HTTP_CODE" "POST /actions artisan_view" "200"
+    if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+      assert_json "$JSON_BODY" "d.get('success')" "action should succeed"
+      assert_json "$JSON_BODY" "d.get('data',{}).get('xp_gained') == 5" "artisan_view should give 5 XP"
+    fi
+    echo "✅ /actions artisan_view awards 5 XP"
+
+    echo "--- Test cooldown ---"
+    curl_json_status -X POST -H "Authorization: Bearer $SESSION_TOKEN" -H "Content-Type: application/json" \
+      -d '{"action":"artisan_view","resource_key":"artisan:1"}' "${BASE_URL}/actions"
+    check "$LAST_HTTP_CODE" "POST /actions artisan_view duplicate" "200"
+    if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+      assert_json "$JSON_BODY" "d.get('success')" "cooldown response should still report success"
+      assert_json "$JSON_BODY" "d.get('data',{}).get('xp_gained') == 0" "duplicate action should give 0 XP"
+    fi
+    echo "✅ duplicate artisan_view is on cooldown"
+
+    echo "--- Test internal action rejection ---"
+    curl_json_status -X POST -H "Authorization: Bearer $SESSION_TOKEN" -H "Content-Type: application/json" \
+      -d '{"action":"daily_visit"}' "${BASE_URL}/actions"
+    check "$LAST_HTTP_CODE" "POST /actions internal action" "400"
+    if [[ "$LAST_HTTP_CODE" == "400" ]]; then
+      assert_json "$JSON_BODY" "d.get('success') is False" "internal action should be rejected"
+    fi
+    echo "✅ /actions rejects internal actions"
+
+    echo "--- Test /actions rejects unknown actions ---"
+    curl_json_status -X POST -H "Authorization: Bearer $SESSION_TOKEN" -H "Content-Type: application/json" \
+      -d '{"action":"nonexistent_action"}' "${BASE_URL}/actions"
+    check "$LAST_HTTP_CODE" "POST /actions unknown action" "400"
+    if [[ "$LAST_HTTP_CODE" == "400" ]]; then
+      assert_json "$JSON_BODY" "d.get('success') is False" "unknown action should be rejected"
+    fi
+    echo "✅ /actions rejects unknown actions"
+  else
+    fail "consumer auth did not return a session token"
+  fi
+
+  # cleanup_profile_tests is invoked by the EXIT trap
 fi
 
 if [[ "$FAILED" -ne 0 ]]; then
