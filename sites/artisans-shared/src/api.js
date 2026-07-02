@@ -612,6 +612,37 @@ export async function fetchMyServices(token) {
 }
 
 
+// --- Gamification --------------------------------------------------
+
+export async function fetchGamificationEvents() {
+  const res = await fetch(`${API_BASE}/gamification/events`)
+  if (!res.ok) throw new Error('Erreur chargement événements XP')
+  return res.json()
+}
+
+export async function fetchUserProfile(userId) {
+  const res = await fetch(`${API_BASE}/gamification/${userId}/xp`, {
+    headers: { ...userHeaders() },
+  })
+  if (!res.ok) throw new Error('Erreur chargement profil')
+  return res.json()
+}
+
+export async function recordXpEvent(action, resourceKey = null, metadata = null) {
+  const res = await fetch(`${API_BASE}/gamification/xp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...userHeaders() },
+    body: JSON.stringify({ action, resource_key: resourceKey, metadata }),
+  })
+  return res.json()
+}
+
+export async function fetchCityLeaderboard(cityId) {
+  const res = await fetch(`${API_BASE}/gamification/leaderboards/city/${cityId}`)
+  if (!res.ok) throw new Error('Erreur chargement classement')
+  return res.json()
+}
+
 // --- Mini-jeux -----------------------------------------------------
 
 export async function fetchGameTypes() {
