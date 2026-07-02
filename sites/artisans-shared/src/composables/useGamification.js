@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { API_BASE, getUserToken, requestJson } from '../api.js'
+import { getUserToken, recordXpEvent } from '../api.js'
 
 const toasts = ref([])
 const toastTimers = []
@@ -14,11 +14,10 @@ function generateToastId() {
 
 export function useGamification() {
   /**
-   * Records a gamified action via the /actions endpoint.
+   * Records a gamified action via the /gamification/xp endpoint.
    *
-   * Returns a normalized { success, data, status, error } envelope from
-   * requestJson. Callers should check `result.success` before using
-   * `result.data`.
+   * Returns the normalized envelope from recordXpEvent. Callers should
+   * check `result.success` before using `result.data`.
    *
    * @param {string} action
    * @param {string|null} [resourceKey]
@@ -29,18 +28,7 @@ export function useGamification() {
     const token = getUserToken()
     if (!token) return { success: false, status: 0, error: 'Non authentifié' }
 
-    const result = await requestJson(
-      `${API_BASE}/actions`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ action, resource_key: resourceKey, metadata }),
-      },
-      'Erreur lors de l\'enregistrement de l\'action'
-    )
+    const result = await recordXpEvent(action, resourceKey, metadata)
 
     if (result.success && result.data && result.data.xp_gained > 0) {
       showToast(`+${result.data.xp_gained} XP`)
