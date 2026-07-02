@@ -1,9 +1,6 @@
 import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import App from './App.vue'
-import GamesHub from './views/GamesHub.vue'
-import GamePlay from './views/GamePlay.vue'
-import GamesConfig from './views/artisan/GamesConfig.vue'
 import './style.css'
 
 const routes = [
@@ -13,7 +10,7 @@ const routes = [
   { path: '/inscrire', component: () => import('./views/Register.vue'), meta: { title: 'Inscrire mon entreprise' } },
   { path: '/espace', component: () => import('./views/Dashboard.vue'), meta: { title: 'Mon espace artisan' } },
   { path: '/artisan/services', component: () => import('./views/artisan/ServicesConfig.vue'), props: true, meta: { title: 'Mes services' } },
-  { path: '/artisan/jeux', component: GamesConfig, props: true, meta: { title: 'Mes mini-jeux' } },
+  { path: '/artisan/jeux', component: () => import('./views/artisan/GamesConfig.vue'), meta: { title: 'Mes mini-jeux' } },
   { path: '/prospection', component: () => import('./views/Prospects.vue'), meta: { title: 'Prospection locale' } },
   { path: '/prospect/:id', component: () => import('./views/ProspectDetail.vue'), meta: { title: 'Fiche prospect' } },
   { path: '/recettes', component: () => import('./views/Recipes.vue'), meta: { title: 'Recettes locales' } },
@@ -26,8 +23,8 @@ const routes = [
   { path: '/flyers', component: () => import('./views/Flyer.vue'), meta: { title: 'Imprimer les flyers / plaquettes' } },
   { path: '/plaquette', redirect: '/flyers' },
   { path: '/roue', component: () => import('./views/SpinWheel.vue'), meta: { title: 'La roue des artisans' } },
-  { path: '/jeux', name: 'GamesHub', component: GamesHub, meta: { title: 'Jeux et bons plans' } },
-  { path: '/jeu/:id', name: 'GamePlay', component: GamePlay, meta: { title: 'Jouer' } },
+  { path: '/jeux', name: 'GamesHub', component: () => import('./views/GamesHub.vue'), meta: { title: 'Jeux et bons plans' } },
+  { path: '/jeu/:id', name: 'GamePlay', component: () => import('./views/GamePlay.vue'), meta: { title: 'Jouer' } },
   { path: '/profil', component: () => import('./views/UserProfile.vue'), meta: { title: 'Mon profil' } },
   { path: '/personnage', component: () => import('./views/CharacterEdit.vue'), meta: { title: 'Mon personnage' } },
   { path: '/:pathMatch(.*)*', redirect: '/' }

@@ -63,6 +63,14 @@
             <div><strong>Gérer mes services</strong><span class="text-muted small">Catalogue et services personnalisés</span></div>
             <span class="badge badge-green">Gérer</span>
           </RouterLink>
+        </div>
+      </section>
+
+      <section class="dashboard-section card">
+        <div class="section-title">
+          <h2>Mini-jeux</h2>
+        </div>
+        <div class="prospect-list">
           <RouterLink to="/artisan/jeux" class="prospect-mini">
             <div><strong>Mes mini-jeux</strong><span class="text-muted small">Créer et gérer mes jeux interactifs</span></div>
             <span class="badge badge-green">Gérer</span>
