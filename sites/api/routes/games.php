@@ -133,8 +133,7 @@ function games_get(PDO $pdo, int $id): void
 
     // User play state
     $userId = null;
-    $token = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
-    $token = str_replace('Bearer ', '', $token);
+    $token = user_get_session_token();
     if ($token) {
         $usr = $pdo->prepare("SELECT id FROM local_users WHERE session_token = ? AND session_exp > NOW() LIMIT 1");
         $usr->execute([$token]);

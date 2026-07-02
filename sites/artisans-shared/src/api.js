@@ -504,11 +504,6 @@ export function todayIndex() {
 
 // --- Témoignages ---------------------------------------------------
 
-function userHeaders() {
-  const token = getUserToken()
-  return token ? { Authorization: `Bearer ${token}` } : {}
-}
-
 export async function fetchTestimonials(filters = {}) {
   const qs = new URLSearchParams({ city: CITY_SLUG, ...filters }).toString()
   const res = await fetch(`${API_BASE}/testimonials?${qs}`)
