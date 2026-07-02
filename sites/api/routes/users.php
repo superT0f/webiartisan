@@ -129,6 +129,7 @@ HTML;
     if (!$sent) {
         error_log("[USER-MAGIC-LINK] Échec envoi email à {$email}");
     }
+    $redactedLink = preg_replace('/token=[^&]+/', 'token=REDACTED', $link);
     error_log(sprintf(
         "[USER-MAGIC-LINK] email=%s user_id=%s rememberMe=%s redirect=%s origin=%s from=%s sent=%s link=%s",
         $email,
@@ -138,7 +139,7 @@ HTML;
         $_SERVER['HTTP_ORIGIN'] ?? 'none',
         $fromEmail,
         $sent ? '1' : '0',
-        $link
+        $redactedLink
     ));
 
     echo json_encode([
