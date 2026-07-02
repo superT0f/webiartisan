@@ -542,6 +542,66 @@ else
   echo "⚠️  Skipping authenticated testimonial tests (no consumer session)"
 fi
 
+echo ""
+echo "== Mini-games =="
+
+# Create/activate a mini-games test artisan
+curl -s "${BASE_URL}/artisans/register" -X POST -H 'Content-Type: application/json' \
+  -d '{"company_name":"Games Artisan","city_slug":"livry","category_slug":"boulangerie","email":"games-artisan@example.com","phone":"02 00 00 00 30","password":"gamespass123"}' >/dev/null || true
+
+if command -v docker >/dev/null 2>&1 && docker compose ps | grep -q mysql; then
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
+    -e "UPDATE local_artisans SET status='active' WHERE email='games-artisan@example.com';" >/dev/null 2>&1 || true)
+fi
+
+GAMES_ARTISAN_TOKEN=$(curl -s -X POST "${BASE_URL}/artisans/login" -H 'Content-Type: application/json' \
+  -d '{"email":"games-artisan@example.com","password":"gamespass123"}' | python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))" || true)
+
+# Public endpoints
+curl_json_status "${BASE_URL}/games/types"
+check "$LAST_HTTP_CODE" "GET /games/types" "200"
+if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+  assert_json "$JSON_BODY" "d.get('success')" "game types should succeed"
+fi
+
+curl_json_status "${BASE_URL}/games?city=livry"
+check "$LAST_HTTP_CODE" "GET /games?city=livry" "200"
+if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+  assert_json "$JSON_BODY" "d.get('success')" "game list should succeed"
+fi
+
+# Authenticated artisan CRUD
+if [[ -n "$GAMES_ARTISAN_TOKEN" ]]; then
+  curl_json_status -X POST "${BASE_URL}/artisans/me/games" \
+    -H "Content-Type: application/json" \
+    -H "X-Artisan-Token: $GAMES_ARTISAN_TOKEN" \
+    -d '{"game_type_key":"coupon","title":"-10% de réduction","description":"Un coupon de bienvenue","config":{"reveal_text":"Découvrez votre réduction !"}}'
+  check "$LAST_HTTP_CODE" "POST /artisans/me/games" "200"
+  if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+    assert_json "$JSON_BODY" "d.get('success')" "create game should succeed"
+  fi
+
+  GAME_ID=$(echo "$JSON_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('data',{}).get('id',''))" || true)
+
+  if [[ -n "$GAME_ID" ]]; then
+    curl_json_status "${BASE_URL}/games/${GAME_ID}"
+    check "$LAST_HTTP_CODE" "GET /games/:id" "200"
+    if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+      assert_json "$JSON_BODY" "d.get('success')" "get game should succeed"
+    fi
+
+    curl_json_status -H "X-Artisan-Token: $GAMES_ARTISAN_TOKEN" "${BASE_URL}/artisans/me/games"
+    check "$LAST_HTTP_CODE" "GET /artisans/me/games" "200"
+    if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+      assert_json "$JSON_BODY" "d.get('success')" "artisan game list should succeed"
+    fi
+
+    # Cleanup
+    curl -s -o /dev/null -w "%{http_code}" -X DELETE "${BASE_URL}/artisans/me/games/${GAME_ID}" -H "X-Artisan-Token: $GAMES_ARTISAN_TOKEN" >/dev/null || true
+  fi
+fi
+
 if [[ "$FAILED" -ne 0 ]]; then
   echo "❌ Some API tests failed."
   exit 1
