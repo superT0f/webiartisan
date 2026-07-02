@@ -19,6 +19,7 @@
 
     <template v-else>
       <div v-if="error" class="error-banner">{{ error }}</div>
+      <div v-if="success" class="success-banner">{{ success }}</div>
 
       <section class="dashboard-section card">
         <FreemiumLimitBanner
@@ -110,6 +111,7 @@ const games = ref([])
 const optionsInput = ref('')
 const saving = ref(false)
 const error = ref('')
+const success = ref('')
 const newGame = ref({
   game_type_key: 'coupon',
   title: '',
@@ -139,6 +141,7 @@ async function load() {
 async function createGame() {
   if (activeCount.value >= 2) return
   error.value = ''
+  success.value = ''
   saving.value = true
   try {
     const config = { ...newGame.value.config }
@@ -157,6 +160,7 @@ async function createGame() {
     }
     newGame.value = { game_type_key: 'coupon', title: '', description: '', config: {} }
     optionsInput.value = ''
+    success.value = 'Jeu créé.'
     await load()
   } catch (e) {
     console.error('Erreur création jeu', e)
@@ -167,7 +171,12 @@ async function createGame() {
 }
 
 async function toggleActive(g) {
+  if (!g.is_active && activeCount.value >= 2) {
+    error.value = 'Limite de 2 jeux actifs atteinte.'
+    return
+  }
   error.value = ''
+  success.value = ''
   saving.value = true
   try {
     const res = await updateArtisanGame(artisanToken.value, g.id, { is_active: !g.is_active })
@@ -175,6 +184,7 @@ async function toggleActive(g) {
       error.value = res.error || 'Erreur lors de la mise à jour.'
       return
     }
+    success.value = 'Jeu mis à jour.'
     await load()
   } catch (e) {
     console.error('Erreur mise à jour jeu', e)
@@ -187,6 +197,7 @@ async function toggleActive(g) {
 async function deleteGame(id) {
   if (!confirm('Supprimer ce jeu ?')) return
   error.value = ''
+  success.value = ''
   saving.value = true
   try {
     const res = await deleteArtisanGame(artisanToken.value, id)
@@ -194,6 +205,7 @@ async function deleteGame(id) {
       error.value = res.error || 'Erreur lors de la suppression.'
       return
     }
+    success.value = 'Jeu supprimé.'
     await load()
   } catch (e) {
     console.error('Erreur suppression jeu', e)
@@ -235,6 +247,13 @@ onMounted(load)
 .error-banner {
   background: #ffebee;
   color: #b71c1c;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+.success-banner {
+  background: #e8f5e9;
+  color: #1b5e20;
   padding: 0.75rem 1rem;
   border-radius: 8px;
   margin-bottom: 24px;

@@ -13,16 +13,22 @@
     </div>
 
     <template v-else>
-      <FreemiumLimitBanner
-        v-if="premiumGames.length"
-        message="Passez premium pour débloquer la roue, les quiz, le bingo et les rébus."
-      />
+      <div v-if="!freeGames.length && !premiumGames.length" class="games-hub__state">
+        <p>Aucun jeu disponible pour le moment.</p>
+      </div>
 
-      <h2>Jeux gratuits</h2>
-      <GameCardGrid :games="freeGames" />
+      <template v-else>
+        <FreemiumLimitBanner
+          v-if="premiumGames.length"
+          message="Passez premium pour débloquer la roue, les quiz, le bingo et les rébus."
+        />
 
-      <h2>Jeux premium</h2>
-      <GameCardGrid :games="premiumGames" />
+        <h2>Jeux gratuits</h2>
+        <GameCardGrid :games="freeGames" />
+
+        <h2>Jeux premium</h2>
+        <GameCardGrid :games="premiumGames" />
+      </template>
     </template>
   </main>
 </template>
