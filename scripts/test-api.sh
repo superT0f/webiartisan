@@ -441,6 +441,107 @@ else
   # cleanup_profile_tests is invoked by the EXIT trap
 fi
 
+echo ""
+echo "== Testimonials & Services =="
+
+# Public catalog
+curl_json_status "${BASE_URL}/service-catalog"
+check "$LAST_HTTP_CODE" "GET /service-catalog" "200"
+if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+  assert_json "$JSON_BODY" "d.get('success')" "service catalog should succeed"
+fi
+
+# Public testimonials list (empty OK)
+curl_json_status "${BASE_URL}/testimonials?city=livry"
+check "$LAST_HTTP_CODE" "GET /testimonials?city=livry" "200"
+if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+  assert_json "$JSON_BODY" "d.get('success')" "testimonials list should succeed"
+fi
+
+# Public templates
+curl_json_status "${BASE_URL}/testimonials/templates"
+check "$LAST_HTTP_CODE" "GET /testimonials/templates" "200"
+if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+  assert_json "$JSON_BODY" "d.get('success')" "testimonial templates should succeed"
+fi
+
+# Authenticated testimonial flow
+TESTIMONIALS_USER_ID=999998
+TESTIMONIALS_MAGIC_TOKEN="testimonials-magic-token-$TESTIMONIALS_USER_ID"
+
+# Detect MySQL (docker or direct client on the mapped host port)
+TESTIMONIALS_MYSQL_AVAILABLE=0
+if command -v docker >/dev/null 2>&1 && docker compose ps 2>/dev/null | grep -q mysql; then
+  TESTIMONIALS_MYSQL_AVAILABLE=1
+  testimonials_mysql() {
+    (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
+      --init-command="SET time_zone = '+02:00';" -e "$1")
+  }
+elif command -v mysql >/dev/null 2>&1 && \
+     mysql -h 127.0.0.1 -P 3307 -u webiartisan -pwebiartisan_dev webiartisan \
+       --init-command="SET time_zone = '+02:00';" -e "SELECT 1;" >/dev/null 2>&1; then
+  TESTIMONIALS_MYSQL_AVAILABLE=1
+  testimonials_mysql() {
+    mysql -h 127.0.0.1 -P 3307 -u webiartisan -pwebiartisan_dev webiartisan \
+      --init-command="SET time_zone = '+02:00';" -e "$1"
+  }
+fi
+
+cleanup_testimonials() {
+  if [[ "${TESTIMONIALS_MYSQL_AVAILABLE:-0}" -eq 1 ]]; then
+    testimonials_mysql "
+      DELETE FROM local_testimonial_reports WHERE testimonial_id IN (
+        SELECT id FROM local_testimonials WHERE user_id = $TESTIMONIALS_USER_ID
+      );
+      DELETE FROM local_testimonial_media WHERE testimonial_id IN (
+        SELECT id FROM local_testimonials WHERE user_id = $TESTIMONIALS_USER_ID
+      );
+      DELETE FROM local_testimonials WHERE user_id = $TESTIMONIALS_USER_ID;
+      DELETE FROM local_users WHERE id = $TESTIMONIALS_USER_ID;
+    " >/dev/null 2>&1 || true
+  fi
+}
+
+# Combine with the existing profile cleanup trap
+combined_cleanup() {
+  cleanup_profile_tests
+  cleanup_testimonials
+}
+trap combined_cleanup EXIT INT TERM
+
+TESTIMONIALS_SESSION_TOKEN=""
+if [[ "$TESTIMONIALS_MYSQL_AVAILABLE" -eq 1 ]]; then
+  echo "--- Authenticated testimonials ---"
+  testimonials_mysql "
+    REPLACE INTO local_users (id, email, magic_token, magic_token_exp)
+    VALUES ($TESTIMONIALS_USER_ID, 'testimonials-user@example.com', '$TESTIMONIALS_MAGIC_TOKEN', DATE_ADD(NOW(), INTERVAL 1 HOUR));
+  " >/dev/null 2>&1
+
+  curl_json_status -X POST "${BASE_URL}/users/auth?token=$TESTIMONIALS_MAGIC_TOKEN" -H "Content-Type: application/json"
+  TESTIMONIALS_SESSION_TOKEN=$(echo "$JSON_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))" || true)
+fi
+
+if [[ -n "$TESTIMONIALS_SESSION_TOKEN" ]]; then
+  curl_json_status -X POST -H "Authorization: Bearer $TESTIMONIALS_SESSION_TOKEN" -H "Content-Type: application/json" \
+    -d '{"artisan_id":1,"content":"Great service from the test suite!"}' "${BASE_URL}/testimonials"
+  check "$LAST_HTTP_CODE" "POST /testimonials" "200"
+  if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+    assert_json "$JSON_BODY" "d.get('success')" "posting testimonial should succeed"
+  fi
+
+  TESTIMONIAL_ID=$(echo "$JSON_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('data',{}).get('id',''))" || true)
+  if [[ -n "$TESTIMONIAL_ID" ]]; then
+    curl_json_status -X POST -H "Authorization: Bearer $TESTIMONIALS_SESSION_TOKEN" -H "Content-Type: application/json" \
+      "${BASE_URL}/testimonials/${TESTIMONIAL_ID}/helpful"
+    check "$LAST_HTTP_CODE" "POST /testimonials/:id/helpful" "200"
+    if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+      assert_json "$JSON_BODY" "d.get('success')" "marking helpful should succeed"
+    fi
+  fi
+else
+  echo "⚠️  Skipping authenticated testimonial tests (no consumer session)"
+fi
+
 if [[ "$FAILED" -ne 0 ]]; then
   echo "❌ Some API tests failed."
   exit 1
