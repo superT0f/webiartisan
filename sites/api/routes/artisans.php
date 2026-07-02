@@ -57,6 +57,8 @@ switch ($method) {
             artisan_contact($pdo, (int)$action, $body);
         } elseif (is_numeric($action) && $param === 'review') {
             artisan_add_review($pdo, (int)$action, $body);
+        } elseif ($action === 'me' && $param === 'services') {
+            artisan_create_service($pdo, $body);
         } elseif ($action === 'me' && $param === 'prospects' && is_numeric($segments[3] ?? '')) {
             artisan_follow_prospect($pdo, (int)$segments[3], $body);
         } elseif ($action === 'me' && $param === 'spin-offers') {
@@ -74,6 +76,8 @@ switch ($method) {
             artisan_unfollow_prospect($pdo, (int)$segments[3]);
         } elseif ($action === 'me' && $param === 'spin-offers' && is_numeric($segments[3] ?? '')) {
             artisan_delete_spin_offer($pdo, (int)$segments[3]);
+        } elseif ($action === 'me' && $param === 'services' && is_numeric($segments[3] ?? '')) {
+            artisan_delete_service($pdo, (int)$segments[3]);
         } else {
             http_response_code(404);
             echo json_encode(['success' => false, 'error' => 'Endpoint inconnu']);
@@ -84,6 +88,8 @@ switch ($method) {
         $body = json_decode(file_get_contents('php://input'), true) ?? [];
         if ($action === 'me' && $param === 'admin-recipes' && is_numeric($segments[3] ?? '')) {
             artisan_archive_recipe($pdo, (int)$segments[3]);
+        } elseif ($action === 'me' && $param === 'services' && is_numeric($segments[3] ?? '')) {
+            artisan_update_service($pdo, (int)$segments[3], $body);
         } elseif ($action === 'me' && $param === 'spin-offers' && is_numeric($segments[3] ?? '')) {
             artisan_update_spin_offer($pdo, (int)$segments[3], $body);
         } elseif ($action === 'me') {
@@ -314,15 +320,36 @@ function artisan_nearby(PDO $pdo, float $lat, float $lng, int $cityId, int $arti
 function artisan_services(PDO $pdo, int $id): void
 {
     $stmt = $pdo->prepare("
-        SELECT id, name, description, price_range, duration, sort_order
-        FROM local_services
-        WHERE artisan_id = ?
-        ORDER BY sort_order ASC, name ASC
+        SELECT
+            s.id,
+            s.name,
+            s.description,
+            s.price_range,
+            s.duration,
+            s.is_custom,
+            s.is_active,
+            s.sort_order,
+            s.service_catalog_id,
+            sc.`key` AS catalog_key,
+            sc.label_fr AS catalog_label,
+            sc.icon AS catalog_icon
+        FROM local_services s
+        LEFT JOIN local_service_catalog sc ON sc.id = s.service_catalog_id
+        WHERE s.artisan_id = ? AND s.is_active = 1
+        ORDER BY s.sort_order ASC, s.id ASC
     ");
     $stmt->execute([$id]);
-    $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    echo json_encode(['success' => true, 'data' => $services]);
+    foreach ($items as &$item) {
+        $item['id'] = (int)$item['id'];
+        $item['service_catalog_id'] = $item['service_catalog_id'] !== null ? (int)$item['service_catalog_id'] : null;
+        $item['is_custom'] = (bool)$item['is_custom'];
+        $item['is_active'] = (bool)$item['is_active'];
+        $item['sort_order'] = (int)$item['sort_order'];
+    }
+
+    echo json_encode(['success' => true, 'data' => $items]);
 }
 
 /**
@@ -1247,4 +1274,98 @@ function artisan_validate_spin_win(PDO $pdo, string $code): void
     }
 
     echo json_encode(['success' => true, 'message' => 'Gain validé']);
+}
+
+/**
+ * POST /artisans/me/services
+ */
+function artisan_create_service(PDO $pdo, array $body): void
+{
+    $artisan = artisan_require_auth($pdo);
+    $artisanId = (int)$artisan['id'];
+
+    $catalogId = !empty($body['service_catalog_id']) ? (int)$body['service_catalog_id'] : null;
+    $name = trim($body['name'] ?? '');
+    $description = trim($body['description'] ?? '');
+    $priceRange = trim($body['price_range'] ?? '');
+    $duration = trim($body['duration'] ?? '');
+    $isCustom = !empty($body['is_custom']);
+
+    if (!$name) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Nom du service requis']);
+        return;
+    }
+
+    // Enforce free-tier limit (5 active services)
+    $countStmt = $pdo->prepare("SELECT COUNT(*) FROM local_services WHERE artisan_id = ? AND is_active = 1");
+    $countStmt->execute([$artisanId]);
+    if ((int)$countStmt->fetchColumn() >= 5) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Limite de 5 services atteinte']);
+        return;
+    }
+
+    $pdo->prepare("
+        INSERT INTO local_services
+            (artisan_id, service_catalog_id, name, description, price_range, duration, is_custom, is_active, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1, 99)
+    ")->execute([$artisanId, $catalogId, $name, $description, $priceRange, $duration, $isCustom ? 1 : 0]);
+
+    echo json_encode(['success' => true, 'data' => ['id' => (int)$pdo->lastInsertId()]]);
+}
+
+/**
+ * PUT /artisans/me/services/:id
+ */
+function artisan_update_service(PDO $pdo, int $serviceId, array $body): void
+{
+    $artisan = artisan_require_auth($pdo);
+    $artisanId = (int)$artisan['id'];
+
+    $allowed = ['name', 'description', 'price_range', 'duration', 'is_active', 'sort_order'];
+    $sets = [];
+    $params = [];
+    foreach ($allowed as $col) {
+        if (array_key_exists($col, $body)) {
+            $sets[] = "$col = ?";
+            $params[] = $body[$col];
+        }
+    }
+    if (empty($sets)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Aucune donnée à mettre à jour']);
+        return;
+    }
+    $params[] = $serviceId;
+    $params[] = $artisanId;
+
+    $sql = "UPDATE local_services SET " . implode(', ', $sets) . " WHERE id = ? AND artisan_id = ?";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+
+    if ($stmt->rowCount() === 0) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Service non trouvé']);
+        return;
+    }
+    echo json_encode(['success' => true, 'message' => 'Service mis à jour']);
+}
+
+/**
+ * DELETE /artisans/me/services/:id
+ */
+function artisan_delete_service(PDO $pdo, int $serviceId): void
+{
+    $artisan = artisan_require_auth($pdo);
+    $artisanId = (int)$artisan['id'];
+
+    $stmt = $pdo->prepare("DELETE FROM local_services WHERE id = ? AND artisan_id = ?");
+    $stmt->execute([$serviceId, $artisanId]);
+    if ($stmt->rowCount() === 0) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Service non trouvé']);
+        return;
+    }
+    echo json_encode(['success' => true, 'message' => 'Service supprimé']);
 }
