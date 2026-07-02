@@ -496,3 +496,109 @@ export function todayIndex() {
   // 0=Lundi, 6=Dimanche (comme la BDD)
   return (new Date().getDay() + 6) % 7
 }
+
+// --- Authentification consommateur (témoignages) ------------------
+
+export async function authenticateUser(token) {
+  const res = await fetch(`${API_BASE}/users/auth?token=${encodeURIComponent(token)}`)
+  return res.json()
+}
+
+function userHeaders() {
+  const token = localStorage.getItem('user_session_token')
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+// --- Témoignages ---------------------------------------------------
+
+export async function fetchTestimonials(filters = {}) {
+  const qs = new URLSearchParams({ city: CITY_SLUG, ...filters }).toString()
+  const res = await fetch(`${API_BASE}/testimonials?${qs}`)
+  if (!res.ok) throw new Error('Erreur chargement témoignages')
+  return res.json()
+}
+
+export async function fetchTestimonial(id) {
+  const res = await fetch(`${API_BASE}/testimonials/${id}`)
+  if (!res.ok) throw new Error('Témoignage non trouvé')
+  return res.json()
+}
+
+export async function createTestimonial(data) {
+  const res = await fetch(`${API_BASE}/testimonials`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...userHeaders() },
+    body: JSON.stringify({ city_slug: CITY_SLUG, ...data }),
+  })
+  return res.json()
+}
+
+export async function reportTestimonial(id, reason, details = '') {
+  const res = await fetch(`${API_BASE}/testimonials/${id}/report`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...userHeaders() },
+    body: JSON.stringify({ reason, details }),
+  })
+  return res.json()
+}
+
+export async function markTestimonialHelpful(id) {
+  const res = await fetch(`${API_BASE}/testimonials/${id}/helpful`, {
+    method: 'POST',
+    headers: { ...userHeaders() },
+  })
+  return res.json()
+}
+
+export async function fetchTestimonialTemplates(serviceKey = null) {
+  const qs = serviceKey ? `?service=${encodeURIComponent(serviceKey)}` : ''
+  const res = await fetch(`${API_BASE}/testimonials/templates${qs}`)
+  if (!res.ok) throw new Error('Erreur chargement modèles')
+  return res.json()
+}
+
+// --- Services artisan ----------------------------------------------
+
+export async function fetchServiceCatalog() {
+  const res = await fetch(`${API_BASE}/service-catalog`)
+  if (!res.ok) throw new Error('Erreur chargement catalogue')
+  return res.json()
+}
+
+export async function fetchArtisanServices(artisanId) {
+  const res = await fetch(`${API_BASE}/artisans/${artisanId}/services`)
+  if (!res.ok) throw new Error('Erreur chargement services')
+  return res.json()
+}
+
+export async function createArtisanService(token, data) {
+  const res = await fetch(`${API_BASE}/artisans/me/services`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Artisan-Token': token,
+    },
+    body: JSON.stringify(data),
+  })
+  return res.json()
+}
+
+export async function updateArtisanService(token, serviceId, data) {
+  const res = await fetch(`${API_BASE}/artisans/me/services/${serviceId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Artisan-Token': token,
+    },
+    body: JSON.stringify(data),
+  })
+  return res.json()
+}
+
+export async function deleteArtisanService(token, serviceId) {
+  const res = await fetch(`${API_BASE}/artisans/me/services/${serviceId}`, {
+    method: 'DELETE',
+    headers: { 'X-Artisan-Token': token },
+  })
+  return res.json()
+}
