@@ -237,6 +237,11 @@ export function removeUserToken() {
   notifyAuthChanged()
 }
 
+function userHeaders() {
+  const token = getUserToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 export async function requestUserMagicLink(email) {
   const res = await fetch(`${API_BASE}/users/magic-link`, {
     method: 'POST',
@@ -608,5 +613,78 @@ export async function fetchMyServices(token) {
     headers: { 'X-Artisan-Token': token },
   })
   if (!res.ok) throw new Error('Erreur chargement de mes services')
+  return res.json()
+}
+
+
+// --- Mini-jeux -----------------------------------------------------
+
+export async function fetchGameTypes() {
+  const res = await fetch(`${API_BASE}/games/types`)
+  if (!res.ok) throw new Error('Erreur chargement types de jeux')
+  return res.json()
+}
+
+export async function fetchGames(filters = {}) {
+  const qs = new URLSearchParams({ city: CITY_SLUG, ...filters }).toString()
+  const res = await fetch(`${API_BASE}/games?${qs}`)
+  if (!res.ok) throw new Error('Erreur chargement jeux')
+  return res.json()
+}
+
+export async function fetchGame(id) {
+  const res = await fetch(`${API_BASE}/games/${id}`, {
+    headers: { ...userHeaders() },
+  })
+  if (!res.ok) throw new Error('Jeu non trouvé')
+  return res.json()
+}
+
+export async function playGame(id, data = {}) {
+  const res = await fetch(`${API_BASE}/games/${id}/play`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...userHeaders() },
+    body: JSON.stringify(data),
+  })
+  return res.json()
+}
+
+export async function fetchMyGames(token) {
+  const res = await fetch(`${API_BASE}/artisans/me/games`, {
+    headers: { 'X-Artisan-Token': token },
+  })
+  if (!res.ok) throw new Error('Erreur chargement de mes jeux')
+  return res.json()
+}
+
+export async function createArtisanGame(token, data) {
+  const res = await fetch(`${API_BASE}/artisans/me/games`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Artisan-Token': token,
+    },
+    body: JSON.stringify(data),
+  })
+  return res.json()
+}
+
+export async function updateArtisanGame(token, gameId, data) {
+  const res = await fetch(`${API_BASE}/artisans/me/games/${gameId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Artisan-Token': token,
+    },
+    body: JSON.stringify(data),
+  })
+  return res.json()
+}
+
+export async function deleteArtisanGame(token, gameId) {
+  const res = await fetch(`${API_BASE}/artisans/me/games/${gameId}`, {
+    method: 'DELETE',
+    headers: { 'X-Artisan-Token': token },
+  })
   return res.json()
 }
