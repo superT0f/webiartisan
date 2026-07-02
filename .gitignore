@@ -25,3 +25,6 @@ sites/api/production
 
 # Local archives
 archives/
+
+# Superpowers docs (specs/plans are local working files)
+docs/superpowers/

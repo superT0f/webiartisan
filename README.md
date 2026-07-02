@@ -84,7 +84,15 @@ L’application est accessible sur `http://localhost` et l’API sur `http://loc
 make test-api
 ```
 
-Le script `scripts/test-api.sh` vérifie les endpoints publics, l’authentification artisan, la roue, les profils utilisateurs, la gamification, les témoignages et les mini-jeux.
+Le script `scripts/test-api.sh` vérifie les endpoints publics, l’authentification artisan, l’authentification consommateur, la roue, les profils utilisateurs, la gamification, les témoignages et les mini-jeux.
+
+## Authentification consommateur (magic link)
+
+Les visiteurs peuvent s’authentifier sans mot de passe via un lien magique envoyé par email :
+
+- La case **"Rester connecté"** est cochée par défaut et crée un cookie `user_token` valable 365 jours.
+- Le lien magique redirige automatiquement vers la page d’origine (`/roue`, `/jeu/:id`, etc.).
+- Les artisans connectés à leur espace peuvent cliquer sur **"Jouer aux mini-jeux"** pour obtenir un compte visiteur lié et participer aux jeux comme un habitant.
 
 ## Déploiement production (Gandi)
 
