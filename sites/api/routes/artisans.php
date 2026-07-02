@@ -557,9 +557,11 @@ function artisan_login(PDO $pdo, array $body): void
         return;
     }
 
+    $rememberMe = !empty($body['rememberMe']);
+
     // Générer un token simple (JWT serait mieux — à améliorer)
     $token = bin2hex(random_bytes(32));
-    $exp   = date('Y-m-d H:i:s', strtotime('+30 days'));
+    $exp   = date('Y-m-d H:i:s', $rememberMe ? strtotime('+365 days') : strtotime('+30 days'));
 
     $pdo->prepare("UPDATE local_artisans SET auth_token = ?, auth_token_exp = ? WHERE id = ?")
         ->execute([$token, $exp, $artisan['id']]);
@@ -581,6 +583,8 @@ function artisan_login(PDO $pdo, array $body): void
 function artisan_magic_link(PDO $pdo, array $body): void
 {
     $email = strtolower(trim($body['email'] ?? ''));
+    $rememberMe = !empty($body['rememberMe']);
+
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Email invalide']);
@@ -593,18 +597,28 @@ function artisan_magic_link(PDO $pdo, array $body): void
 
     // Toujours répondre OK pour ne pas exposer les emails
     if (!$artisan || $artisan['status'] !== 'active') {
+        error_log(sprintf(
+            "[MAGIC-LINK] email=%s found=%s status=%s rememberMe=%s reason=no_active_artisan",
+            $email,
+            $artisan ? 'yes' : 'no',
+            $artisan['status'] ?? 'n/a',
+            $rememberMe ? '1' : '0'
+        ));
         echo json_encode(['success' => true, 'message' => 'Si votre email est valide, vous recevrez un lien de connexion.']);
         return;
     }
 
     $token = bin2hex(random_bytes(32));
-    $exp   = date('Y-m-d H:i:s', strtotime('+1 hour'));
+    $exp   = date('Y-m-d H:i:s', $rememberMe ? strtotime('+365 days') : strtotime('+1 hour'));
 
     $pdo->prepare("UPDATE local_artisans SET auth_token = ?, auth_token_exp = ? WHERE id = ?")
         ->execute([$token, $exp, $artisan['id']]);
 
     $portalUrl = artisan_portal_url();
     $link      = rtrim($portalUrl, '/') . '/espace?token=' . urlencode($token);
+
+    $config    = getAppConfig();
+    $fromEmail = $config['mail_from'] ?? 'noreply@webiartisan.prigent.tech';
 
     $subject = 'Votre lien de connexion WebIArtisan';
     $html    = <<<HTML
@@ -622,12 +636,20 @@ function artisan_magic_link(PDO $pdo, array $body): void
 HTML;
 
     $sent = send_html_email($email, $subject, $html, null, 'WebIArtisan');
-    if (!$sent) {
-        error_log("[MAGIC-LINK] Échec envoi email à {$email}");
-    }
 
-    // Toujours logger en dev / secours
-    error_log("[MAGIC-LINK] {$link}");
+    error_log(sprintf(
+        "[MAGIC-LINK] email=%s artisan_id=%s status=%s rememberMe=%s exp=%s origin=%s portalUrl=%s from=%s sent=%s link=%s",
+        $email,
+        $artisan['id'],
+        $artisan['status'],
+        $rememberMe ? '1' : '0',
+        $exp,
+        $_SERVER['HTTP_ORIGIN'] ?? 'none',
+        $portalUrl,
+        $fromEmail,
+        $sent ? '1' : '0',
+        $link
+    ));
 
     echo json_encode(['success' => true, 'message' => 'Lien de connexion envoyé par email.']);
 }

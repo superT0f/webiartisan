@@ -17,6 +17,10 @@
             required
             :disabled="sending"
           />
+          <label class="form-checkbox">
+            <input v-model="rememberMe" type="checkbox" :disabled="sending" />
+            Rester connecté sur cet appareil
+          </label>
           <button type="submit" class="btn btn-primary" :disabled="sending || !email">
             {{ sending ? 'Envoi…' : 'Recevoir mon lien' }}
           </button>
@@ -157,14 +161,14 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { requestMagicLink, fetchMe, updateMe, getMyProspects } from '../api.js'
+import { requestMagicLink, fetchMe, updateMe, getMyProspects, getArtisanToken, setArtisanToken, removeArtisanToken } from '../api.js'
 
 const route = useRoute()
 const router = useRouter()
 
-const STORAGE_KEY = 'artisan_token'
-const token = ref(localStorage.getItem(STORAGE_KEY) || '')
+const token = ref(getArtisanToken())
 const email = ref('')
+const rememberMe = ref(true)
 const artisan = ref(null)
 const form = reactive({
   company_name: '',
@@ -190,7 +194,7 @@ function setMessage(text, type = 'info') {
 // Connexion via ?token=xxx dans l'URL
 if (route.query.token) {
   token.value = route.query.token
-  localStorage.setItem(STORAGE_KEY, route.query.token)
+  setArtisanToken(route.query.token, rememberMe.value)
   router.replace('/espace')
 }
 
@@ -198,7 +202,7 @@ async function sendMagicLink() {
   sending.value = true
   message.value = ''
   try {
-    const res = await requestMagicLink(email.value)
+    const res = await requestMagicLink(email.value, rememberMe.value)
     setMessage(res.message || 'Si votre email est valide, vous recevrez un lien de connexion.', 'success')
   } catch (e) {
     setMessage('Erreur lors de l\'envoi. Veuillez réessayer.', 'error')
@@ -274,7 +278,7 @@ async function saveProfile() {
 function logout() {
   token.value = ''
   artisan.value = null
-  localStorage.removeItem(STORAGE_KEY)
+  removeArtisanToken()
   message.value = ''
 }
 
@@ -337,6 +341,21 @@ onMounted(() => {
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--c-text-2);
+}
+
+.form-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.form-checkbox input {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
 }
 
 .auth-message {

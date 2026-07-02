@@ -34,5 +34,24 @@ function send_html_email(
 
     $extraParams = '-f' . $fromEmail;
 
-    return mail($to, $encodedSubject, $htmlBody, implode("\r\n", $headers), $extraParams);
+    $logCtx = sprintf(
+        "[MAILER] to=%s from=%s subject=%s headers=%s extra=%s",
+        $to,
+        $encodedFrom,
+        $encodedSubject,
+        str_replace("\r\n", ' | ', implode("\r\n", $headers)),
+        $extraParams
+    );
+    error_log($logCtx);
+
+    $result = @mail($to, $encodedSubject, $htmlBody, implode("\r\n", $headers), $extraParams);
+
+    $lastError = error_get_last();
+    error_log(sprintf(
+        "[MAILER] result=%s error=%s",
+        $result ? 'OK' : 'FAIL',
+        $lastError ? ($lastError['message'] ?? 'unknown') : 'none'
+    ));
+
+    return $result;
 }

@@ -84,11 +84,49 @@ export async function contactArtisan(artisanId, data) {
 
 // --- Authentification artisan ------------------------------------
 
-export async function requestMagicLink(email) {
+const ARTISAN_TOKEN_KEY = 'artisan_token'
+const ARTISAN_TOKEN_COOKIE = 'artisan_token'
+
+function setCookie(name, value, days) {
+  const date = new Date()
+  date.setTime(date.getTime() + days * 24 * 60 * 60 * 1000)
+  const secure = location.protocol === 'https:' ? '; Secure' : ''
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${date.toUTCString()}; path=/; SameSite=Strict${secure}`
+}
+
+function getCookie(name) {
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'))
+  return match ? decodeURIComponent(match[2]) : null
+}
+
+function deleteCookie(name) {
+  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Strict`
+}
+
+export function getArtisanToken() {
+  return localStorage.getItem(ARTISAN_TOKEN_KEY) || getCookie(ARTISAN_TOKEN_COOKIE) || ''
+}
+
+export function setArtisanToken(token, remember = false) {
+  if (remember) {
+    setCookie(ARTISAN_TOKEN_COOKIE, token, 365)
+    localStorage.removeItem(ARTISAN_TOKEN_KEY)
+  } else {
+    localStorage.setItem(ARTISAN_TOKEN_KEY, token)
+    deleteCookie(ARTISAN_TOKEN_COOKIE)
+  }
+}
+
+export function removeArtisanToken() {
+  localStorage.removeItem(ARTISAN_TOKEN_KEY)
+  deleteCookie(ARTISAN_TOKEN_COOKIE)
+}
+
+export async function requestMagicLink(email, rememberMe = true) {
   const res = await fetch(`${API_BASE}/artisans/magic-link`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, rememberMe }),
   })
   return res.json()
 }
