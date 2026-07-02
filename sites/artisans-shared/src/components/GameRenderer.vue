@@ -16,7 +16,7 @@ import PollGame from './games/PollGame.vue'
 import VoteBattleGame from './games/VoteBattleGame.vue'
 
 const props = defineProps({
-  instanceId: { type: Number, required: true },
+  instanceId: { type: [String, Number], required: true },
   gameType: { type: String, required: true },
   config: { type: Object, default: () => ({}) },
 })

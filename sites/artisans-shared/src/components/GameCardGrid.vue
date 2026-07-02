@@ -1,7 +1,8 @@
 <template>
-  <div class="game-card-grid">
+  <div v-if="games.length" class="game-card-grid">
     <GameCard v-for="g in games" :key="g.id" :game="g" />
   </div>
+  <p v-else>Aucun jeu disponible.</p>
 </template>
 
 <script setup>

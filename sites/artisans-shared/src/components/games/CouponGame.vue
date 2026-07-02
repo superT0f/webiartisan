@@ -13,7 +13,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { playGame } from '../../api.js'
 
 const props = defineProps({ instanceId: { type: Number, required: true }, config: Object })
@@ -22,6 +22,12 @@ const emit = defineEmits(['played'])
 const result = ref(null)
 const loading = ref(false)
 const errorMessage = ref('')
+
+watch(() => props.instanceId, () => {
+  result.value = null
+  loading.value = false
+  errorMessage.value = ''
+})
 
 async function play() {
   errorMessage.value = ''

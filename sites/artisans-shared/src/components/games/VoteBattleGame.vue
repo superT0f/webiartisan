@@ -3,8 +3,8 @@
     <h4>{{ config.question }}</h4>
     <div v-if="!result" class="vote-game__options">
       <button
-        v-for="opt in config.options"
-        :key="opt"
+        v-for="(opt, idx) in config.options"
+        :key="idx"
         type="button"
         :disabled="loading"
         @click="vote(opt)"
@@ -18,7 +18,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { playGame } from '../../api.js'
 
 const props = defineProps({ instanceId: { type: Number, required: true }, config: Object })
@@ -27,6 +27,12 @@ const emit = defineEmits(['played'])
 const result = ref(null)
 const loading = ref(false)
 const errorMessage = ref('')
+
+watch(() => props.instanceId, () => {
+  result.value = null
+  loading.value = false
+  errorMessage.value = ''
+})
 
 async function vote(option) {
   errorMessage.value = ''
