@@ -145,11 +145,12 @@ if [[ -n "$SPIN_ARTISAN_TOKEN" ]]; then
   check "$code" "Artisan spin offers list" "200"
 
   # Create user and session directly in DB. Use REPLACE so re-runs reset
-  # daily limits and previous wins through ON DELETE CASCADE.
+  # the user row; also explicitly clear spin limits/wins in case the FK
+  # does not cascade (defensive against repeated runs the same day).
   if command -v docker >/dev/null 2>&1 && docker compose ps | grep -q mysql; then
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
-      -e "REPLACE INTO local_users (id, email, session_token, session_exp) VALUES (99999, 'spin-user@example.com', 'test-session-token-12345', DATE_ADD(NOW(), INTERVAL 1 DAY));" >/dev/null 2>&1 || true)
+      -e "DELETE FROM local_spin_daily_limits WHERE user_id = 99999; DELETE FROM local_spin_wins WHERE user_id = 99999; REPLACE INTO local_users (id, email, session_token, session_exp) VALUES (99999, 'spin-user@example.com', 'test-session-token-12345', DATE_ADD(NOW(), INTERVAL 1 DAY));" >/dev/null 2>&1 || true)
   fi
 
   code=$(curl -s -o /dev/null -w "%{http_code}" "${BASE_URL}/spin/offers?city=livry")
