@@ -25,13 +25,13 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { fetchGame } from '../api.js'
+import { fetchGame, getUserToken } from '../api.js'
 import GameRenderer from '../components/GameRenderer.vue'
 import BetaBanner from '../components/BetaBanner.vue'
 
 const route = useRoute()
 const game = ref(null)
-const userToken = ref(localStorage.getItem('user_session_token'))
+const userToken = ref(getUserToken())
 
 async function load() {
   const res = await fetchGame(route.params.id)

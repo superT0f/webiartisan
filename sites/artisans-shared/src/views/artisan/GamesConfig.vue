@@ -76,7 +76,7 @@ async function load() {
 
 async function createGame() {
   const config = { ...newGame.value.config }
-  if (newGame.game_type_key === 'poll' || newGame.game_type_key === 'vote') {
+  if (newGame.value.game_type_key === 'poll' || newGame.value.game_type_key === 'vote') {
     config.options = optionsInput.value.split(',').map(s => s.trim()).filter(Boolean)
   }
   await createArtisanGame(props.token, {
