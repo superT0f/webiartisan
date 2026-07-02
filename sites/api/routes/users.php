@@ -90,6 +90,7 @@ function user_magic_link(PDO $pdo, array $body): void
     ")->execute([$token, $exp, $userId]);
 
     $allowedOrigins = [
+        'http://localhost:8080',
         'http://localhost:5173',
         'http://localhost:1313',
         'https://app.prigent.tech',
@@ -109,6 +110,8 @@ function user_magic_link(PDO $pdo, array $body): void
         . 'token=' . urlencode($token)
         . ($rememberMe ? '&rememberMe=1' : '');
 
+    $safeLink = htmlspecialchars($link, ENT_QUOTES, 'UTF-8');
+
     $subject = 'Votre lien pour tourner la roue des artisans';
     $html = <<<HTML
 <!DOCTYPE html>
@@ -116,7 +119,7 @@ function user_magic_link(PDO $pdo, array $body): void
   <h2 style="color: #1a1a2e;">Bonjour,</h2>
   <p>Voici votre lien sécurisé pour tourner la roue des artisans de Livry :</p>
   <div style="text-align: center; margin: 24px 0;">
-    <a href="{$link}" style="display: inline-block; background: #1a1a2e; color: #fff; padding: 14px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">Tourner la roue</a>
+    <a href="{$safeLink}" style="display: inline-block; background: #1a1a2e; color: #fff; padding: 14px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">Tourner la roue</a>
   </div>
   <p style="color: #888; font-size: 13px;">Ce lien est valable 1 heure. Si vous ne l'avez pas demandé, ignorez cet email.</p>
 </body></html>
