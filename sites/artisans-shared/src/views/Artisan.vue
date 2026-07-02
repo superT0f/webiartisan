@@ -213,6 +213,7 @@ import {
   fetchTestimonials,
   markTestimonialHelpful,
   reportTestimonial,
+  fetchGames,
   CITY_NAME,
 } from '../api.js'
 import { useGamification } from '../composables/useGamification.js'
@@ -221,7 +222,6 @@ import ArtisanNearbyMap from '../components/ArtisanNearbyMap.vue'
 import TestimonialCard from '../components/TestimonialCard.vue'
 import TestimonialComposer from '../components/TestimonialComposer.vue'
 import GameCard from '../components/GameCard.vue'
-import { fetchGames } from '../api.js'
 
 const route = useRoute()
 let artisanId = parseInt(route.params.id)
@@ -283,7 +283,7 @@ async function loadGames() {
   if (!artisanId) return
   try {
     const res = await fetchGames({ artisan_id: artisanId })
-    artisanGames.value = res.data || []
+    artisanGames.value = (res.data || []).filter(g => g.is_active)
   } catch (e) {
     console.error('Erreur chargement jeux', e)
     artisanGames.value = []

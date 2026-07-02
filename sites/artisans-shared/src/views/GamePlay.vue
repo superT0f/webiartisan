@@ -127,7 +127,9 @@ function onPlayed(data) {
   console.log('played', data)
 }
 
-onMounted(load)
+onMounted(() => {
+  if (!route.query.token) load()
+})
 </script>
 
 <style scoped>
