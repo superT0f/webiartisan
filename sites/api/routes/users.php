@@ -105,7 +105,7 @@ function user_magic_link(PDO $pdo, array $body): void
         $base = $origin;
     }
     $link = rtrim($base, '/') . $rawRedirect
-        . (strpos($rawRedirect, '?') !== false ? '&' : '?')
+        . (strpos($redirect, '?') !== false ? '&' : '?')
         . 'token=' . urlencode($token)
         . ($rememberMe ? '&rememberMe=1' : '');
 
