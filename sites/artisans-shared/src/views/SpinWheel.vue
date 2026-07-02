@@ -17,6 +17,10 @@
             required
             :disabled="sending"
           />
+          <label class="form-checkbox">
+            <input v-model="rememberMe" type="checkbox" :disabled="sending" />
+            Rester connecté sur cet appareil
+          </label>
           <button type="submit" class="btn btn-primary" :disabled="sending || !email">
             {{ sending ? 'Envoi…' : 'Recevoir mon lien' }}
           </button>
@@ -95,6 +99,7 @@ const route = useRoute()
 const router = useRouter()
 
 const email = ref('')
+const rememberMe = ref(true)
 const token = ref(getUserToken() || '')
 const user = ref(null)
 const offers = ref([])
@@ -127,7 +132,7 @@ function setMessage(text, type = 'info') {
 if (route.query.token) {
   authUser(route.query.token).then(res => {
     if (res.success && res.token) {
-      setUserToken(res.token)
+      setUserToken(res.token, rememberMe.value)
       token.value = res.token
       router.replace('/roue')
     } else {
@@ -140,7 +145,7 @@ async function sendMagicLink() {
   sending.value = true
   message.value = ''
   try {
-    const res = await requestUserMagicLink(email.value)
+    const res = await requestUserMagicLink(email.value, rememberMe.value, '/roue')
     setMessage(res.message || 'Si votre email est valide, vous recevrez un lien.', 'success')
   } catch (e) {
     setMessage('Erreur lors de l\'envoi.', 'error')
@@ -271,6 +276,18 @@ onMounted(() => {
 .narrow { max-width: 720px; }
 .auth-card, .result-card, .wins-card { padding: 28px; margin-top: 24px; }
 .auth-form { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
+.form-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.form-checkbox input {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
 .wheel-wrap { text-align: center; margin: 32px 0; }
 .wheel-container { position: relative; display: inline-block; margin-bottom: 24px; }
 .wheel-container.spinning canvas {
