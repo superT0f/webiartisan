@@ -50,6 +50,7 @@
             <nav class="artisan-tabs" aria-label="Sections artisan">
               <button type="button" :class="{ active: activeTab === 'services' }" @click="activeTab = 'services'">Services</button>
               <button type="button" :class="{ active: activeTab === 'testimonials' }" @click="activeTab = 'testimonials'">Avis</button>
+              <button type="button" :class="{ active: activeTab === 'games' }" @click="activeTab = 'games'">Jeux actifs</button>
               <button type="button" :class="{ active: activeTab === 'about' }" @click="activeTab = 'about'">À propos</button>
             </nav>
 
@@ -86,6 +87,15 @@
                 />
               </div>
               <p v-else class="text-muted">Pas encore d'avis. Soyez le premier !</p>
+            </section>
+
+            <!-- Jeux actifs -->
+            <section v-if="activeTab === 'games'" class="info-card artisan-section">
+              <h2>Jeux actifs</h2>
+              <div v-if="artisanGames.length" class="artisan-games">
+                <GameCard v-for="g in artisanGames" :key="g.id" :game="g" />
+              </div>
+              <p v-else class="text-muted">Aucun jeu actif pour le moment.</p>
             </section>
 
             <!-- À propos -->
@@ -210,6 +220,8 @@ import RecipeMiniCard from '../components/RecipeMiniCard.vue'
 import ArtisanNearbyMap from '../components/ArtisanNearbyMap.vue'
 import TestimonialCard from '../components/TestimonialCard.vue'
 import TestimonialComposer from '../components/TestimonialComposer.vue'
+import GameCard from '../components/GameCard.vue'
+import { fetchGames } from '../api.js'
 
 const route = useRoute()
 let artisanId = parseInt(route.params.id)
@@ -222,6 +234,7 @@ const error   = ref(false)
 
 const services = ref([])
 const testimonials = ref([])
+const artisanGames = ref([])
 const activeTab = ref('services')
 
 const catalogMap = computed(() => {
@@ -266,6 +279,17 @@ async function loadTestimonials() {
   }
 }
 
+async function loadGames() {
+  if (!artisanId) return
+  try {
+    const res = await fetchGames({ artisan_id: artisanId })
+    artisanGames.value = res.data || []
+  } catch (e) {
+    console.error('Erreur chargement jeux', e)
+    artisanGames.value = []
+  }
+}
+
 async function loadArtisan() {
   loading.value = true
   error.value = false
@@ -274,6 +298,7 @@ async function loadArtisan() {
     artisan.value = res.data
     await loadServices()
     await loadTestimonials()
+    await loadGames()
   } catch {
     error.value = true
   } finally {
