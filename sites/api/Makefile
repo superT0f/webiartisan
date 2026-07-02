@@ -35,6 +35,7 @@ push:
 	@test -d $(PROD_LINK)/ || (echo "❌ Gandi not mounted at /mnt/gandi" && exit 1)
 	rsync -avz --no-owner --no-group \
 		--exclude='.env' \
+		--exclude='.env.*' \
 		--exclude='.git/' \
 		--exclude='.gitignore' \
 		--exclude='php_errors.log' \
@@ -47,6 +48,10 @@ push:
 		--exclude='tests/' \
 		--exclude='*.md' \
 		--exclude='composer.lock' \
+		--exclude='*.backup.*' \
+		--exclude='test_*.php' \
+		--exclude='test-*.php' \
+		--exclude='verify-setup.sh' \
 		./ $(PROD_LINK)/ \
 		&& echo "✅ API pushed to Gandi" \
 		|| echo "❌ Failed to push"
@@ -56,6 +61,7 @@ status:
 	@test -L $(PROD_LINK) || (echo "❌ Symlink $(PROD_LINK) missing" && exit 1)
 	rsync -avn --no-owner --no-group \
 		--exclude='.env' \
+		--exclude='.env.*' \
 		--exclude='.git/' \
 		--exclude='.gitignore' \
 		--exclude='php_errors.log' \
@@ -67,4 +73,8 @@ status:
 		--exclude='tests/' \
 		--exclude='*.md' \
 		--exclude='composer.lock' \
+		--exclude='*.backup.*' \
+		--exclude='test_*.php' \
+		--exclude='test-*.php' \
+		--exclude='verify-setup.sh' \
 		./ $(PROD_LINK)/
