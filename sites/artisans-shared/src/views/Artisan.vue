@@ -47,77 +47,53 @@
           <!-- Colonne principale -->
           <div class="artisan-main">
 
-            <!-- À propos -->
-            <div class="info-card" v-if="artisan.description">
-              <h2>À propos</h2>
-              <p>{{ artisan.description }}</p>
-            </div>
+            <nav class="artisan-tabs" aria-label="Sections artisan">
+              <button type="button" :class="{ active: activeTab === 'services' }" @click="activeTab = 'services'">Services</button>
+              <button type="button" :class="{ active: activeTab === 'testimonials' }" @click="activeTab = 'testimonials'">Avis</button>
+              <button type="button" :class="{ active: activeTab === 'about' }" @click="activeTab = 'about'">À propos</button>
+            </nav>
 
             <!-- Services -->
-            <div class="info-card" v-if="artisan.services?.length">
+            <section v-if="activeTab === 'services'" class="info-card artisan-section">
               <h2>Services proposés</h2>
-              <div class="services-list">
-                <div v-for="svc in artisan.services" :key="svc.id" class="service-item">
+              <div v-if="services.length" class="services-list">
+                <div v-for="s in services" :key="s.id" class="service-item">
                   <div class="service-item-main">
-                    <h3>{{ svc.name }}</h3>
-                    <p v-if="svc.description">{{ svc.description }}</p>
+                    <h3>{{ s.catalog_icon || s.icon }} {{ s.name }}</h3>
+                    <p v-if="s.description">{{ s.description }}</p>
                   </div>
                   <div class="service-item-meta">
-                    <span v-if="svc.price_range" class="price-tag">{{ svc.price_range }}</span>
-                    <span v-if="svc.duration"    class="duration-tag">⏱ {{ svc.duration }}</span>
+                    <span v-if="s.price_range" class="price-tag">{{ s.price_range }}</span>
+                    <span v-if="s.duration" class="duration-tag">⏱ {{ s.duration }}</span>
                   </div>
                 </div>
               </div>
-            </div>
+              <p v-else class="text-muted">Aucun service renseigné.</p>
+            </section>
 
             <!-- Avis -->
-            <div class="info-card">
-              <div class="reviews-header">
-                <h2>Avis clients</h2>
-                <button class="btn btn-outline btn-sm" @click="showReviewForm = !showReviewForm">
-                  {{ showReviewForm ? 'Annuler' : '+ Laisser un avis' }}
-                </button>
+            <section v-if="activeTab === 'testimonials'" class="info-card artisan-section">
+              <h2>Avis et témoignages</h2>
+              <TestimonialComposer :artisan-id="artisanId" :services="services" @posted="loadTestimonials" />
+              <div v-if="testimonials.length" class="testimonials-list">
+                <TestimonialCard
+                  v-for="t in testimonials"
+                  :key="t.id"
+                  :testimonial="t"
+                  :catalog-map="catalogMap"
+                  @helpful="markHelpful"
+                  @report="openReport"
+                />
               </div>
+              <p v-else class="text-muted">Pas encore d'avis. Soyez le premier !</p>
+            </section>
 
-              <!-- Formulaire avis -->
-              <Transition name="slide-up">
-                <form v-if="showReviewForm" class="review-form" @submit.prevent="submitReview">
-                  <div class="grid-2">
-                    <div class="form-group">
-                      <label class="form-label">Votre nom *</label>
-                      <input v-model="reviewForm.reviewer_name" class="form-input" required placeholder="Jean Dupont" />
-                    </div>
-                    <div class="form-group">
-                      <label class="form-label">Email (non publié)</label>
-                      <input v-model="reviewForm.reviewer_email" class="form-input" type="email" placeholder="vous@email.fr" />
-                    </div>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Note *</label>
-                    <div class="star-picker">
-                      <button type="button" v-for="n in 5" :key="n" class="star-btn" :class="{ active: reviewForm.rating >= n }" @click="reviewForm.rating = n">★</button>
-                    </div>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Commentaire</label>
-                    <textarea v-model="reviewForm.comment" class="form-textarea" placeholder="Décrivez votre expérience…"></textarea>
-                  </div>
-                  <div v-if="reviewMsg" class="alert" :class="reviewSuccess ? 'alert-success' : 'alert-error'">{{ reviewMsg }}</div>
-                  <button type="submit" class="btn btn-primary" :disabled="reviewSending">
-                    {{ reviewSending ? 'Envoi…' : 'Envoyer mon avis' }}
-                  </button>
-                </form>
-              </Transition>
-
-              <!-- Liste avis -->
-              <div v-if="artisan.rating_count === 0 && !showReviewForm" class="no-reviews">
-                <div style="font-size:2rem;">💬</div>
-                <p>Pas encore d'avis. Soyez le premier !</p>
-              </div>
-              <div v-else class="reviews-list">
-                <!-- (Les avis seraient chargés depuis /artisans/:id/reviews) -->
-              </div>
-            </div>
+            <!-- À propos -->
+            <section v-if="activeTab === 'about'" class="info-card artisan-section">
+              <h2>À propos</h2>
+              <p v-if="artisan.description">{{ artisan.description }}</p>
+              <p v-else class="text-muted">Aucune description renseignée.</p>
+            </section>
           </div>
 
           <!-- Sidebar contact -->
@@ -218,15 +194,25 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { fetchArtisan, postReview, contactArtisan, CITY_NAME } from '../api.js'
+import {
+  fetchArtisan,
+  contactArtisan,
+  fetchArtisanServices,
+  fetchTestimonials,
+  markTestimonialHelpful,
+  reportTestimonial,
+  CITY_NAME,
+} from '../api.js'
 import { useGamification } from '../composables/useGamification.js'
 import RecipeMiniCard from '../components/RecipeMiniCard.vue'
 import ArtisanNearbyMap from '../components/ArtisanNearbyMap.vue'
+import TestimonialCard from '../components/TestimonialCard.vue'
+import TestimonialComposer from '../components/TestimonialComposer.vue'
 
 const route = useRoute()
-const id    = parseInt(route.params.id)
+let artisanId = parseInt(route.params.id)
 
 const { recordAction } = useGamification()
 
@@ -234,12 +220,22 @@ const artisan = ref(null)
 const loading = ref(true)
 const error   = ref(false)
 
-// Reviews
-const showReviewForm = ref(false)
-const reviewForm = ref({ reviewer_name: '', reviewer_email: '', rating: 5, comment: '' })
-const reviewSending = ref(false)
-const reviewMsg     = ref('')
-const reviewSuccess = ref(false)
+const services = ref([])
+const testimonials = ref([])
+const activeTab = ref('services')
+
+const catalogMap = computed(() => {
+  const map = {}
+  for (const s of services.value) {
+    if (s.catalog_key) {
+      map[s.catalog_key] = {
+        label: s.catalog_label || s.name,
+        icon: s.catalog_icon || s.icon,
+      }
+    }
+  }
+  return map
+})
 
 // Contact
 const showContactForm = ref(false)
@@ -248,21 +244,62 @@ const contactSending = ref(false)
 const contactMsg   = ref('')
 const contactSuccess = ref(false)
 
-async function submitReview() {
-  reviewSending.value = true; reviewMsg.value = ''
+async function loadServices() {
+  if (!artisanId) return
   try {
-    const res = await postReview(id, reviewForm.value)
-    reviewSuccess.value = res.success
-    reviewMsg.value = res.message || (res.success ? 'Avis envoyé !' : 'Erreur')
-    if (res.success) { showReviewForm.value = false; reviewForm.value = { reviewer_name: '', reviewer_email: '', rating: 5, comment: '' } }
-  } catch { reviewMsg.value = 'Erreur réseau' }
-  finally { reviewSending.value = false }
+    const res = await fetchArtisanServices(artisanId)
+    services.value = res.data || []
+  } catch (e) {
+    console.error('Erreur chargement services', e)
+    services.value = []
+  }
 }
+
+async function loadTestimonials() {
+  if (!artisanId) return
+  try {
+    const res = await fetchTestimonials({ artisan_id: artisanId, limit: 50 })
+    testimonials.value = res.data || []
+  } catch (e) {
+    console.error('Erreur chargement témoignages', e)
+    testimonials.value = []
+  }
+}
+
+async function loadArtisan() {
+  loading.value = true
+  error.value = false
+  try {
+    const res = await fetchArtisan(artisanId)
+    artisan.value = res.data
+    await loadServices()
+    await loadTestimonials()
+  } catch {
+    error.value = true
+  } finally {
+    loading.value = false
+  }
+
+  if (!error.value && artisan.value) {
+    try {
+      await recordAction('artisan_view', `artisan:${artisanId}`)
+    } catch (e) {
+      // Gamification failure should not break the artisan page
+    }
+  }
+}
+
+watch(() => route.params.id, async (newId) => {
+  const newIdNum = parseInt(newId)
+  if (!newIdNum || newIdNum === artisanId) return
+  artisanId = newIdNum
+  await loadArtisan()
+})
 
 async function submitContact() {
   contactSending.value = true; contactMsg.value = ''
   try {
-    const res = await contactArtisan(id, contactForm.value)
+    const res = await contactArtisan(artisanId, contactForm.value)
     contactSuccess.value = res.success
     contactMsg.value = res.message || (res.success ? 'Message envoyé !' : 'Erreur')
     if (res.success) { showContactForm.value = false; contactForm.value = { name: '', email: '', message: '' } }
@@ -270,26 +307,32 @@ async function submitContact() {
   finally { contactSending.value = false }
 }
 
+async function markHelpful(id) {
+  try {
+    await markTestimonialHelpful(id)
+    await loadTestimonials()
+  } catch (e) {
+    console.error('Erreur mark helpful', e)
+  }
+}
+
+async function openReport(id) {
+  const reason = prompt('Pourquoi signalez-vous ce témoignage ?')
+  if (!reason) return
+  try {
+    await reportTestimonial(id, reason)
+    await loadTestimonials()
+  } catch (e) {
+    console.error('Erreur signalement', e)
+  }
+}
+
 function formatDate(dt) {
   if (!dt) return '—'
   return new Date(dt).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
 }
 
-onMounted(async () => {
-  try {
-    const res = await fetchArtisan(id)
-    artisan.value = res.data
-  } catch { error.value = true }
-  finally { loading.value = false }
-
-  if (!error.value && artisan.value) {
-    try {
-      await recordAction('artisan_view', `artisan:${id}`)
-    } catch (e) {
-      // Gamification failure should not break the artisan page
-    }
-  }
-})
+onMounted(loadArtisan)
 </script>
 
 <style scoped>
@@ -331,6 +374,37 @@ onMounted(async () => {
 .artisan-layout { display: grid; grid-template-columns: 1fr 320px; gap: 32px; align-items: start; }
 .artisan-main  { display: flex; flex-direction: column; gap: 24px; }
 .artisan-sidebar { display: flex; flex-direction: column; gap: 20px; }
+
+.artisan-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 2px solid var(--c-border);
+  padding-bottom: 8px;
+}
+.artisan-tabs button {
+  padding: 10px 18px;
+  border-radius: var(--r-md);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--c-text-2);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.artisan-tabs button:hover { color: var(--c-green); }
+.artisan-tabs button.active {
+  background: var(--c-white);
+  border-color: var(--c-border);
+  color: var(--c-green);
+}
+
+.artisan-section h2 { margin-bottom: 16px; }
+.testimonials-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
 
 .info-card {
   background: var(--c-white);
