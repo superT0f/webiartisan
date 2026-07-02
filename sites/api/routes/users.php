@@ -63,6 +63,7 @@ function user_magic_link(PDO $pdo, array $body): void
     if (!is_string($rawRedirect)) {
         $rawRedirect = '/roue';
     }
+    $rawRedirect = trim($rawRedirect);
     $redirect = trim(urldecode($rawRedirect));
     if ($redirect === '' || $redirect[0] !== '/' || preg_match('#^//#', $redirect) || strpbrk($redirect, "\r\n#") !== false || strpos($redirect, '..') !== false) {
         $redirect = '/roue';
@@ -134,12 +135,12 @@ HTML;
     }
     $redactedLink = preg_replace('/token=[^&]+/', 'token=REDACTED', $link);
     error_log(sprintf(
-        "[USER-MAGIC-LINK] email=%s user_id=%s rememberMe=%s redirect=%s origin=%s from=%s sent=%s link=%s",
+        "[USER-MAGIC-LINK] email=%s user_id=%s rememberMe=%s redirect=%s base=%s from=%s sent=%s link=%s",
         $email,
         $userId,
         $rememberMe ? '1' : '0',
         $rawRedirect,
-        $_SERVER['HTTP_ORIGIN'] ?? 'none',
+        $base,
         $fromEmail,
         $sent ? '1' : '0',
         $redactedLink
