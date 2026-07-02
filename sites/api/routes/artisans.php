@@ -73,6 +73,8 @@ switch ($method) {
             artisan_create_game($pdo, $body);
         } elseif ($action === 'me' && $param === 'spin-wins' && !empty($segments[3]) && ($segments[4] ?? '') === 'validate') {
             artisan_validate_spin_win($pdo, $segments[3]);
+        } elseif ($action === 'me' && $param === 'consumer-token') {
+            artisan_consumer_token($pdo);
         } else {
             http_response_code(404);
             echo json_encode(['success' => false, 'error' => 'Endpoint inconnu']);
@@ -652,6 +654,48 @@ HTML;
     ));
 
     echo json_encode(['success' => true, 'message' => 'Lien de connexion envoyé par email.']);
+}
+
+/**
+ * POST /artisans/me/consumer-token — Récupère ou crée un compte visiteur lié à l'artisan.
+ */
+function artisan_consumer_token(PDO $pdo): void
+{
+    $artisan = artisan_require_auth($pdo);
+
+    $stmt = $pdo->prepare("SELECT email, company_name FROM local_artisans WHERE id = ?");
+    $stmt->execute([$artisan['id']]);
+    $artisanData = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$artisanData) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Artisan non trouvé']);
+        return;
+    }
+
+    $email = strtolower($artisanData['email']);
+
+    $userStmt = $pdo->prepare("SELECT id FROM local_users WHERE email = ?");
+    $userStmt->execute([$email]);
+    $userId = $userStmt->fetchColumn();
+
+    if (!$userId) {
+        $insert = $pdo->prepare("INSERT INTO local_users (email, display_name) VALUES (?, ?)");
+        $insert->execute([$email, $artisanData['company_name']]);
+        $userId = (int)$pdo->lastInsertId();
+    }
+
+    $sessionToken = bin2hex(random_bytes(32));
+    $sessionExp = date('Y-m-d H:i:s', strtotime('+365 days'));
+
+    $pdo->prepare("UPDATE local_users SET session_token = ?, session_exp = ? WHERE id = ?")
+        ->execute([$sessionToken, $sessionExp, $userId]);
+
+    echo json_encode([
+        'success' => true,
+        'token'   => $sessionToken,
+        'data'    => ['id' => (int)$userId, 'email' => $email],
+    ]);
 }
 
 /**
