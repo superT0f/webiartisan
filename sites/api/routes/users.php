@@ -63,7 +63,7 @@ function user_magic_link(PDO $pdo, array $body): void
     if (!is_string($redirect)) {
         $redirect = '/roue';
     } else {
-        $redirect = trim($redirect);
+        $redirect = trim(urldecode($redirect));
         if ($redirect === '' || $redirect[0] !== '/' || preg_match('#^//#', $redirect) || strpbrk($redirect, "\r\n#") !== false || strpos($redirect, '..') !== false) {
             $redirect = '/roue';
         }
@@ -89,13 +89,20 @@ function user_magic_link(PDO $pdo, array $body): void
         WHERE id = ?
     ")->execute([$token, $exp, $userId]);
 
+    $allowedOrigins = [
+        'http://localhost:5173',
+        'http://localhost:1313',
+        'https://app.prigent.tech',
+        'https://web.prigent.tech',
+        'https://artisans-combs.prigent.tech',
+        'https://artisans-vert-saint-denis.prigent.tech',
+        'https://artisans-livry.prigent.tech',
+    ];
+
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
     $base = 'https://artisans-livry.prigent.tech';
-    if ($origin && filter_var($origin, FILTER_VALIDATE_URL)) {
-        $parsed = parse_url($origin);
-        if (in_array($parsed['scheme'] ?? '', ['http', 'https'], true)) {
-            $base = $origin;
-        }
+    if ($origin && in_array($origin, $allowedOrigins, true)) {
+        $base = $origin;
     }
     $link = rtrim($base, '/') . $redirect
         . (strpos($redirect, '?') !== false ? '&' : '?')
