@@ -59,8 +59,8 @@ function user_magic_link(PDO $pdo, array $body): void
 
     $rememberMe = !empty($body['rememberMe']);
 
-    $redirect = $body['redirect'] ?? '/roue';
-    if (!is_string($redirect) || $redirect === '' || $redirect[0] !== '/') {
+    $redirect = trim($body['redirect'] ?? '/roue');
+    if (!is_string($redirect) || $redirect === '' || $redirect[0] !== '/' || preg_match('#^//#', $redirect) || strpbrk($redirect, "\r\n#") !== false) {
         $redirect = '/roue';
     }
 
@@ -85,10 +85,17 @@ function user_magic_link(PDO $pdo, array $body): void
     ")->execute([$token, $exp, $userId]);
 
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-    $base = ($origin && filter_var($origin, FILTER_VALIDATE_URL))
-        ? $origin
-        : 'https://artisans-livry.prigent.tech';
-    $link = rtrim($base, '/') . $redirect . (strpos($redirect, '?') !== false ? '&' : '?') . 'token=' . urlencode($token);
+    $base = 'https://artisans-livry.prigent.tech';
+    if ($origin && filter_var($origin, FILTER_VALIDATE_URL)) {
+        $parsed = parse_url($origin);
+        if (in_array($parsed['scheme'] ?? '', ['http', 'https'], true)) {
+            $base = $origin;
+        }
+    }
+    $link = rtrim($base, '/') . $redirect
+        . (strpos($redirect, '?') !== false ? '&' : '?')
+        . 'token=' . urlencode($token)
+        . ($rememberMe ? '&rememberMe=1' : '');
 
     $subject = 'Votre lien pour tourner la roue des artisans';
     $html = <<<HTML
