@@ -5,6 +5,8 @@
 
 require_once __DIR__ . '/UserAuth.php';
 
+const FREE_TIER_MAX_ACTIVE_GAMES = 2;
+
 function games_can_artisan_create(PDO $pdo, int $artisanId): bool
 {
     $stmt = $pdo->prepare("
@@ -12,7 +14,7 @@ function games_can_artisan_create(PDO $pdo, int $artisanId): bool
         WHERE artisan_id = ? AND is_active = 1
     ");
     $stmt->execute([$artisanId]);
-    return (int)$stmt->fetchColumn() < 2;
+    return (int)$stmt->fetchColumn() < FREE_TIER_MAX_ACTIVE_GAMES;
 }
 
 function games_count_user_plays(PDO $pdo, int $instanceId, int $userId): int
@@ -40,7 +42,7 @@ function games_last_play_at(PDO $pdo, int $instanceId, int $userId): ?string
 function games_resolve_reward(PDO $pdo, int $instanceId): ?array
 {
     $stmt = $pdo->prepare("
-        SELECT id, label, reward_type, reward_value, probability, stock, claimed_count
+        SELECT id, label, reward_type, reward_value, stock, claimed_count
         FROM local_game_rewards
         WHERE game_instance_id = ? AND (stock IS NULL OR stock > claimed_count)
         ORDER BY id ASC
@@ -70,9 +72,9 @@ function games_record_play(PDO $pdo, int $instanceId, int $userId, array $result
 
 function games_instance_is_playable(array $instance): bool
 {
-    if (!$instance['is_active']) return false;
+    if (!isset($instance['is_active']) || !$instance['is_active']) return false;
     $now = time();
-    if ($instance['starts_at'] && strtotime($instance['starts_at']) > $now) return false;
-    if ($instance['ends_at'] && strtotime($instance['ends_at']) < $now) return false;
+    if (isset($instance['starts_at']) && $instance['starts_at'] && strtotime($instance['starts_at']) > $now) return false;
+    if (isset($instance['ends_at']) && $instance['ends_at'] && strtotime($instance['ends_at']) < $now) return false;
     return true;
 }

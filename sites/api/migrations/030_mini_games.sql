@@ -4,6 +4,56 @@
 
 SET NAMES utf8mb4;
 
+-- MySQL 8.0 does not support ALTER TABLE ... ADD CONSTRAINT IF NOT EXISTS
+-- or DROP INDEX IF EXISTS, so we use small helper procedures to make these
+-- idempotent.
+DROP PROCEDURE IF EXISTS webiartisan_add_check_if_not_exists;
+DROP PROCEDURE IF EXISTS webiartisan_drop_index_if_exists;
+
+DELIMITER //
+
+CREATE PROCEDURE webiartisan_add_check_if_not_exists(
+    IN p_table VARCHAR(64),
+    IN p_constraint VARCHAR(64),
+    IN p_clause TEXT
+)
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.TABLE_CONSTRAINTS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = p_table
+          AND CONSTRAINT_NAME = p_constraint
+          AND CONSTRAINT_TYPE = 'CHECK'
+    ) THEN
+        SET @sql = CONCAT('ALTER TABLE `', p_table, '` ADD CONSTRAINT `', p_constraint, '` CHECK (', p_clause, ')');
+        PREPARE stmt FROM @sql;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+    END IF;
+END //
+
+CREATE PROCEDURE webiartisan_drop_index_if_exists(
+    IN p_table VARCHAR(64),
+    IN p_index VARCHAR(64)
+)
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = p_table
+          AND INDEX_NAME = p_index
+    ) THEN
+        SET @sql = CONCAT('ALTER TABLE `', p_table, '` DROP INDEX `', p_index, '`');
+        PREPARE stmt FROM @sql;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+    END IF;
+END //
+
+DELIMITER ;
+
 CREATE TABLE IF NOT EXISTS local_game_types (
     id              INT AUTO_INCREMENT PRIMARY KEY,
     `key`           VARCHAR(50) UNIQUE NOT NULL COMMENT 'coupon, poll, vote, wheel, quiz, bingo, rebus',
@@ -15,9 +65,11 @@ CREATE TABLE IF NOT EXISTS local_game_types (
     engine_component VARCHAR(50) NOT NULL,
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_key (`key`),
     INDEX idx_active (is_active)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Types de mini-jeux disponibles par ville';
+ALTER TABLE local_game_types COMMENT = 'Types de mini-jeux disponibles par ville';
+CALL webiartisan_drop_index_if_exists('local_game_types', 'idx_key');
 
 CREATE TABLE IF NOT EXISTS local_game_instances (
     id                  INT AUTO_INCREMENT PRIMARY KEY,
@@ -41,7 +93,9 @@ CREATE TABLE IF NOT EXISTS local_game_instances (
     INDEX idx_artisan (artisan_id),
     INDEX idx_type (game_type_id),
     INDEX idx_dates (starts_at, ends_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Instances de mini-jeux configurées par artisan pour une ville';
+ALTER TABLE local_game_instances COMMENT = 'Instances de mini-jeux configurées par artisan pour une ville';
 
 CREATE TABLE IF NOT EXISTS local_game_rewards (
     id              INT AUTO_INCREMENT PRIMARY KEY,
@@ -52,9 +106,14 @@ CREATE TABLE IF NOT EXISTS local_game_rewards (
     probability     DECIMAL(5,4) NULL COMMENT 'for probabilistic games',
     stock           INT NULL,
     claimed_count   INT NOT NULL DEFAULT 0,
+    CONSTRAINT chk_probability CHECK (probability IS NULL OR (probability >= 0 AND probability <= 1)),
     FOREIGN KEY (game_instance_id) REFERENCES local_game_instances(id) ON DELETE CASCADE,
     INDEX idx_instance (game_instance_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Récompenses attachées à une instance de mini-jeu';
+ALTER TABLE local_game_rewards COMMENT = 'Récompenses attachées à une instance de mini-jeu';
+
+CALL webiartisan_add_check_if_not_exists('local_game_rewards', 'chk_probability', 'probability IS NULL OR (probability >= 0 AND probability <= 1)');
 
 CREATE TABLE IF NOT EXISTS local_game_plays (
     id              INT AUTO_INCREMENT PRIMARY KEY,
@@ -67,7 +126,12 @@ CREATE TABLE IF NOT EXISTS local_game_plays (
     FOREIGN KEY (user_id) REFERENCES local_users(id) ON DELETE CASCADE,
     INDEX idx_instance_user (game_instance_id, user_id),
     INDEX idx_user_created (user_id, created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Participations des utilisateurs aux mini-jeux';
+ALTER TABLE local_game_plays COMMENT = 'Participations des utilisateurs aux mini-jeux';
+
+DROP PROCEDURE IF EXISTS webiartisan_add_check_if_not_exists;
+DROP PROCEDURE IF EXISTS webiartisan_drop_index_if_exists;
 
 -- Seed game types
 INSERT INTO local_game_types (`key`, label_fr, description, is_premium, default_config, engine_component) VALUES
