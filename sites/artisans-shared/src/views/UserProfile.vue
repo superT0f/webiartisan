@@ -23,7 +23,9 @@
 
         <h2>Badges</h2>
         <div class="badges-list">
-          <span v-for="b in user?.badges" :key="b.key" class="badge">{{ b.name }}</span>
+          <span v-for="b in user?.badges" :key="b.key" class="badge">
+            {{ badgeIcons[b.key] || '🏅' }} {{ b.name }}
+          </span>
           <p v-if="!user?.badges?.length">Aucun badge pour l’instant. Continuez à explorer !</p>
         </div>
       </template>
@@ -45,6 +47,17 @@ let abortController = null
 const displayName = computed(() => user.value?.display_name || user.value?.email?.split('@')[0] || 'Explorateur')
 const xpPercent = computed(() => user.value ? Math.min(100, (user.value.xp / user.value.xp_needed) * 100) : 0)
 const avatarUrl = computed(() => resolveAvatarUrl(user.value?.avatar_url))
+
+const badgeIcons = {
+  first_visit: '🏠',
+  curieux: '👀',
+  ambassadeur: '📣',
+  joueur: '🎮',
+  vainqueur: '🏆',
+  chanceux: '🍀',
+  generous: '🔗',
+  faithful: '🔥',
+}
 
 // /personnage route is added in Task 8
 function goToCharacter() {
