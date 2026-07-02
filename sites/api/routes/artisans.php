@@ -16,6 +16,7 @@
  */
 
 require_once __DIR__ . '/../lib/Mailer.php';
+require_once __DIR__ . '/../lib/Games.php';
 
 switch ($method) {
 
@@ -30,6 +31,8 @@ switch ($method) {
             artisan_my_spin_offers($pdo);
         } elseif ($action === 'me' && $param === 'spin-wins') {
             artisan_my_spin_wins($pdo);
+        } elseif ($action === 'me' && $param === 'games') {
+            artisan_games_list($pdo);
         } elseif ($action === 'me' && $param === 'services') {
             artisan_my_services($pdo);
         } elseif ($action === 'me') {
@@ -65,6 +68,8 @@ switch ($method) {
             artisan_follow_prospect($pdo, (int)$segments[3], $body);
         } elseif ($action === 'me' && $param === 'spin-offers') {
             artisan_create_spin_offer($pdo, $body);
+        } elseif ($action === 'me' && $param === 'games') {
+            artisan_create_game($pdo, $body);
         } elseif ($action === 'me' && $param === 'spin-wins' && !empty($segments[3]) && ($segments[4] ?? '') === 'validate') {
             artisan_validate_spin_win($pdo, $segments[3]);
         } else {
@@ -78,6 +83,8 @@ switch ($method) {
             artisan_unfollow_prospect($pdo, (int)$segments[3]);
         } elseif ($action === 'me' && $param === 'spin-offers' && is_numeric($segments[3] ?? '')) {
             artisan_delete_spin_offer($pdo, (int)$segments[3]);
+        } elseif ($action === 'me' && $param === 'games' && filter_var($segments[3] ?? '', FILTER_VALIDATE_INT) !== false) {
+            artisan_delete_game($pdo, (int)$segments[3]);
         } elseif ($action === 'me' && $param === 'services' && filter_var($segments[3] ?? '', FILTER_VALIDATE_INT) !== false) {
             artisan_delete_service($pdo, (int)$segments[3]);
         } else {
@@ -94,6 +101,8 @@ switch ($method) {
             artisan_update_service($pdo, (int)$segments[3], $body);
         } elseif ($action === 'me' && $param === 'spin-offers' && is_numeric($segments[3] ?? '')) {
             artisan_update_spin_offer($pdo, (int)$segments[3], $body);
+        } elseif ($action === 'me' && $param === 'games' && filter_var($segments[3] ?? '', FILTER_VALIDATE_INT) !== false) {
+            artisan_update_game($pdo, (int)$segments[3], $body);
         } elseif ($action === 'me') {
             artisan_update_me($pdo, $body);
         } elseif (is_numeric($action)) {
@@ -1462,4 +1471,133 @@ function artisan_delete_service(PDO $pdo, int $serviceId): void
         return;
     }
     echo json_encode(['success' => true, 'message' => 'Service supprimé']);
+}
+
+
+/**
+ * GET /artisans/me/games
+ */
+function artisan_games_list(PDO $pdo): void
+{
+    $artisan = artisan_require_auth($pdo);
+    $stmt = $pdo->prepare("
+        SELECT i.*, gt.`key` AS game_type_key, gt.label_fr AS game_type_label, gt.is_premium
+        FROM local_game_instances i
+        JOIN local_game_types gt ON gt.id = i.game_type_id
+        WHERE i.artisan_id = ?
+        ORDER BY i.created_at DESC
+    ");
+    $stmt->execute([$artisan['id']]);
+    $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($items as &$item) {
+        $item['id'] = (int)$item['id'];
+        $item['is_premium'] = (bool)$item['is_premium'];
+        $item['config'] = json_decode($item['config'], true);
+    }
+    echo json_encode(['success' => true, 'data' => $items]);
+}
+
+/**
+ * POST /artisans/me/games
+ */
+function artisan_create_game(PDO $pdo, array $body): void
+{
+    $artisan = artisan_require_auth($pdo);
+    $artisanId = (int)$artisan['id'];
+
+    $gameTypeKey = $body['game_type_key'] ?? '';
+    $title = trim($body['title'] ?? '');
+    $description = trim($body['description'] ?? '');
+    $config = $body['config'] ?? [];
+
+    if (!$gameTypeKey || !$title) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Type de jeu et titre requis']);
+        return;
+    }
+
+    $typeStmt = $pdo->prepare("SELECT id, is_premium FROM local_game_types WHERE `key` = ? AND is_active = 1");
+    $typeStmt->execute([$gameTypeKey]);
+    $type = $typeStmt->fetch(PDO::FETCH_ASSOC);
+    if (!$type) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Type de jeu inconnu']);
+        return;
+    }
+
+    if ((bool)$type['is_premium']) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Type de jeu premium']);
+        return;
+    }
+
+    if (!games_can_artisan_create($pdo, $artisanId)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Limite de 2 jeux actifs atteinte']);
+        return;
+    }
+
+    $cityStmt = $pdo->prepare("SELECT city_id FROM local_artisans WHERE id = ?");
+    $cityStmt->execute([$artisanId]);
+    $cityId = (int)$cityStmt->fetchColumn();
+
+    $pdo->prepare("
+        INSERT INTO local_game_instances
+            (game_type_id, artisan_id, city_id, title, description, config)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ")->execute([
+        $type['id'], $artisanId, $cityId, $title, $description,
+        json_encode($config, JSON_THROW_ON_ERROR),
+    ]);
+
+    echo json_encode(['success' => true, 'data' => ['id' => (int)$pdo->lastInsertId()]]);
+}
+
+/**
+ * PUT /artisans/me/games/:id
+ */
+function artisan_update_game(PDO $pdo, int $gameId, array $body): void
+{
+    $artisan = artisan_require_auth($pdo);
+    $allowed = ['title', 'description', 'config', 'is_active', 'starts_at', 'ends_at', 'max_plays_per_user', 'play_cooldown_hours'];
+    $sets = [];
+    $params = [];
+    foreach ($allowed as $col) {
+        if (array_key_exists($col, $body)) {
+            $sets[] = "$col = ?";
+            $params[] = is_array($body[$col]) ? json_encode($body[$col], JSON_THROW_ON_ERROR) : $body[$col];
+        }
+    }
+    if (empty($sets)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Aucune donnée à mettre à jour']);
+        return;
+    }
+    $params[] = $gameId;
+    $params[] = $artisan['id'];
+
+    $stmt = $pdo->prepare("UPDATE local_game_instances SET " . implode(', ', $sets) . " WHERE id = ? AND artisan_id = ?");
+    $stmt->execute($params);
+    if ($stmt->rowCount() === 0) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Jeu non trouvé']);
+        return;
+    }
+    echo json_encode(['success' => true, 'message' => 'Jeu mis à jour']);
+}
+
+/**
+ * DELETE /artisans/me/games/:id
+ */
+function artisan_delete_game(PDO $pdo, int $gameId): void
+{
+    $artisan = artisan_require_auth($pdo);
+    $stmt = $pdo->prepare("DELETE FROM local_game_instances WHERE id = ? AND artisan_id = ?");
+    $stmt->execute([$gameId, $artisan['id']]);
+    if ($stmt->rowCount() === 0) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Jeu non trouvé']);
+        return;
+    }
+    echo json_encode(['success' => true, 'message' => 'Jeu supprimé']);
 }
