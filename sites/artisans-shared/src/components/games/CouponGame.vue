@@ -1,13 +1,14 @@
 <template>
   <div class="coupon-game">
     <p class="coupon-game__intro">{{ config.reveal_text || 'Cliquez pour révéler votre offre' }}</p>
-    <button v-if="!result" type="button" class="coupon-game__btn" @click="play">
-      Révéler
+    <button v-if="!result" type="button" class="coupon-game__btn" :disabled="loading" @click="play">
+      {{ loading ? 'Chargement…' : 'Révéler' }}
     </button>
     <div v-else class="coupon-game__result">
       <h4>{{ result.reward?.label || 'Merci d\'avoir joué !' }}</h4>
       <p v-if="result.reward?.reward_value?.code">Code : <strong>{{ result.reward.reward_value.code }}</strong></p>
     </div>
+    <p v-if="errorMessage" class="coupon-game__error">{{ errorMessage }}</p>
   </div>
 </template>
 
@@ -20,16 +21,23 @@ const emit = defineEmits(['played'])
 
 const result = ref(null)
 const loading = ref(false)
+const errorMessage = ref('')
 
 async function play() {
+  errorMessage.value = ''
   loading.value = true
-  const res = await playGame(props.instanceId)
-  loading.value = false
-  if (res.success) {
-    result.value = res.data
-    emit('played', res.data)
-  } else {
-    alert(res.error || 'Erreur')
+  try {
+    const res = await playGame(props.instanceId)
+    if (res.success) {
+      result.value = res.data
+      emit('played', res.data)
+    } else {
+      errorMessage.value = res.error || 'Une erreur est survenue.'
+    }
+  } catch (e) {
+    errorMessage.value = 'Erreur réseau. Veuillez réessayer.'
+  } finally {
+    loading.value = false
   }
 }
 </script>
@@ -48,9 +56,18 @@ async function play() {
   font-size: 1rem;
   cursor: pointer;
 }
+.coupon-game__btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
 .coupon-game__result {
   border: 2px dashed #2d6a4f;
   padding: 1rem;
   border-radius: 0.5rem;
+}
+.coupon-game__error {
+  color: #c62828;
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
 }
 </style>
