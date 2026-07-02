@@ -59,14 +59,14 @@ function user_magic_link(PDO $pdo, array $body): void
 
     $rememberMe = !empty($body['rememberMe']);
 
-    $redirect = $body['redirect'] ?? '/roue';
-    if (!is_string($redirect)) {
+    $rawRedirect = $body['redirect'] ?? '/roue';
+    if (!is_string($rawRedirect)) {
+        $rawRedirect = '/roue';
+    }
+    $redirect = trim(urldecode($rawRedirect));
+    if ($redirect === '' || $redirect[0] !== '/' || preg_match('#^//#', $redirect) || strpbrk($redirect, "\r\n#") !== false || strpos($redirect, '..') !== false) {
         $redirect = '/roue';
-    } else {
-        $redirect = trim(urldecode($redirect));
-        if ($redirect === '' || $redirect[0] !== '/' || preg_match('#^//#', $redirect) || strpbrk($redirect, "\r\n#") !== false || strpos($redirect, '..') !== false) {
-            $redirect = '/roue';
-        }
+        $rawRedirect = '/roue';
     }
 
     $stmt = $pdo->prepare("SELECT id FROM local_users WHERE email = ?");
@@ -104,8 +104,8 @@ function user_magic_link(PDO $pdo, array $body): void
     if ($origin && in_array($origin, $allowedOrigins, true)) {
         $base = $origin;
     }
-    $link = rtrim($base, '/') . $redirect
-        . (strpos($redirect, '?') !== false ? '&' : '?')
+    $link = rtrim($base, '/') . $rawRedirect
+        . (strpos($rawRedirect, '?') !== false ? '&' : '?')
         . 'token=' . urlencode($token)
         . ($rememberMe ? '&rememberMe=1' : '');
 
@@ -135,7 +135,7 @@ HTML;
         $email,
         $userId,
         $rememberMe ? '1' : '0',
-        $redirect,
+        $rawRedirect,
         $_SERVER['HTTP_ORIGIN'] ?? 'none',
         $fromEmail,
         $sent ? '1' : '0',
