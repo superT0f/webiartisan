@@ -149,6 +149,18 @@ if ($module === 'recipes') {
     exit;
 }
 
+if ($module === 'testimonials') {
+    applyRateLimit($pdo, 'public');
+    require_once __DIR__ . '/routes/testimonials.php';
+    exit;
+}
+
+if ($module === 'service-catalog') {
+    applyRateLimit($pdo, 'public');
+    require_once __DIR__ . '/routes/services.php';
+    exit;
+}
+
 if ($module === 'users') {
     applyRateLimit($pdo, 'login');
     require_once __DIR__ . '/routes/users.php';
