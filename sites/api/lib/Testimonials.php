@@ -5,11 +5,14 @@
 
 require_once __DIR__ . '/UserAuth.php';
 
-const TESTIMONIAL_STATUSES = ['pending', 'approved', 'rejected', 'flagged'];
-
 function testimonials_can_user_testify(PDO $pdo, int $userId, int $artisanId): bool
 {
-    // User must exist and artisan must be active
+    $userStmt = $pdo->prepare("SELECT 1 FROM local_users WHERE id = ?");
+    $userStmt->execute([$userId]);
+    if ($userStmt->fetch() === false) {
+        return false;
+    }
+
     $stmt = $pdo->prepare("
         SELECT 1 FROM local_artisans
         WHERE id = ? AND status = 'active'
@@ -34,24 +37,35 @@ function testimonials_get_templates(PDO $pdo, ?string $serviceKey = null): array
         $templates = json_decode($row['testimonial_templates'] ?? '[]', true);
         return [
             'key' => $row['key'],
-            'label' => $row['label_fr'],
+            'label' => htmlspecialchars($row['label_fr'] ?? '', ENT_QUOTES, 'UTF-8'),
             'icon' => $row['icon'],
-            'templates' => is_array($templates) ? $templates : [],
+            'templates' => is_array($templates)
+                ? array_map(function ($t) {
+                    return htmlspecialchars((string) $t, ENT_QUOTES, 'UTF-8');
+                }, $templates)
+                : [],
         ];
     }, $rows);
 }
 
 function testimonials_enrich_with_user(PDO $pdo, array $testimonial): array
 {
+    if (empty($testimonial['user_id'])) {
+        $testimonial['author'] = null;
+        return $testimonial;
+    }
+
     $stmt = $pdo->prepare("
-        SELECT id, display_name, avatar_type, avatar_url, avatar_gender
+        SELECT id, display_name, avatar_url
         FROM local_users WHERE id = ?
     ");
-    $stmt->execute([(int)$testimonial['user_id']]);
+    $stmt->execute([(int) $testimonial['user_id']]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
     $testimonial['author'] = [
-        'id' => (int)($user['id'] ?? $testimonial['user_id']),
-        'display_name' => $user['display_name'] ?? null,
+        'id' => (int) ($user['id'] ?? $testimonial['user_id']),
+        'display_name' => isset($user['display_name'])
+            ? htmlspecialchars($user['display_name'], ENT_QUOTES, 'UTF-8')
+            : null,
         'avatar_url' => $user['avatar_url'] ?? null,
     ];
     return $testimonial;
