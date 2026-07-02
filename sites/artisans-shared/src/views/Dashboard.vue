@@ -82,6 +82,18 @@
         </div>
       </section>
 
+      <section class="dashboard-section card">
+        <div class="section-title">
+          <h2>🎮 Jouer</h2>
+        </div>
+        <div class="prospect-list">
+          <button type="button" class="prospect-mini" @click="playAsConsumer" :disabled="linkingConsumer">
+            <div><strong>Jouer aux mini-jeux</strong><span class="text-muted small">Participer comme un habitant</span></div>
+            <span class="badge badge-green">{{ linkingConsumer ? 'Lien…' : 'Jouer' }}</span>
+          </button>
+        </div>
+      </section>
+
       <div v-if="loading" class="skeleton" style="height: 200px; border-radius: 12px;"></div>
 
       <div v-if="loadingProspects" class="skeleton" style="height: 120px; border-radius: 12px; margin-top: 24px;"></div>
@@ -161,7 +173,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { requestMagicLink, fetchMe, updateMe, getMyProspects, getArtisanToken, setArtisanToken, removeArtisanToken } from '../api.js'
+import { requestMagicLink, fetchMe, updateMe, getMyProspects, getArtisanToken, setArtisanToken, removeArtisanToken, fetchArtisanConsumerToken, setUserToken } from '../api.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -185,6 +197,7 @@ const message = ref('')
 const messageType = ref('')
 const myProspects = ref([])
 const loadingProspects = ref(false)
+const linkingConsumer = ref(false)
 
 function setMessage(text, type = 'info') {
   message.value = text
@@ -280,6 +293,24 @@ function logout() {
   artisan.value = null
   removeArtisanToken()
   message.value = ''
+}
+
+async function playAsConsumer() {
+  linkingConsumer.value = true
+  try {
+    const artisanToken = getArtisanToken()
+    const res = await fetchArtisanConsumerToken(artisanToken)
+    if (res.success && res.token) {
+      setUserToken(res.token, true)
+      router.push('/jeux')
+    } else {
+      setMessage(res.error || 'Impossible de créer le compte joueur.', 'error')
+    }
+  } catch (e) {
+    setMessage('Erreur lors de la création du compte joueur.', 'error')
+  } finally {
+    linkingConsumer.value = false
+  }
 }
 
 onMounted(() => {
