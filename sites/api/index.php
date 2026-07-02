@@ -191,6 +191,12 @@ if ($module === 'actions') {
     exit;
 }
 
+if ($module === 'gamification') {
+    applyRateLimit($pdo, 'public');
+    require_once __DIR__ . '/routes/gamification.php';
+    exit;
+}
+
 // Inject auth + tenant context for protected routes
 $authUser = null;
 if (in_array($module, $protectedRoutes)) {

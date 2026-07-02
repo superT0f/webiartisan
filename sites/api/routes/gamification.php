@@ -1,0 +1,101 @@
+<?php
+/**
+ * WebiArtisan API — Route : Gamification
+ *
+ * GET  /gamification/events
+ * POST /gamification/xp
+ * GET  /users/:id/xp
+ * GET  /leaderboards/city/:city_id
+ */
+
+require_once __DIR__ . '/../lib/Gamification.php';
+
+switch ($method) {
+    case 'GET':
+        if ($action === 'events' || $action === '') {
+            gamification_events_list();
+        } elseif (is_numeric($action) && $param === 'xp') {
+            gamification_user_profile_endpoint($pdo, (int)$action);
+        } elseif ($action === 'leaderboards' && $param === 'city' && is_numeric($segments[3] ?? '')) {
+            gamification_city_leaderboard($pdo, (int)$segments[3]);
+        } else {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'Endpoint inconnu']);
+        }
+        break;
+
+    case 'POST':
+        $body = json_decode(file_get_contents('php://input'), true) ?? [];
+        if ($action === 'xp' || $action === '') {
+            gamification_record_xp($pdo, $body);
+        } else {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'Endpoint inconnu']);
+        }
+        break;
+
+    default:
+        http_response_code(405);
+        echo json_encode(['success' => false, 'error' => 'Méthode non autorisée']);
+}
+
+function gamification_events_list(): void
+{
+    $events = [];
+    foreach (XP_ACTIONS as $key => $cfg) {
+        $events[] = ['key' => $key, 'xp' => $cfg['xp'], 'cooldown' => $cfg['cooldown']];
+    }
+    echo json_encode(['success' => true, 'data' => $events]);
+}
+
+function gamification_user_profile_endpoint(PDO $pdo, int $userId): void
+{
+    $profile = gamificationUserProfile($pdo, $userId);
+    if (!$profile) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Utilisateur non trouvé']);
+        return;
+    }
+    echo json_encode(['success' => true, 'data' => $profile]);
+}
+
+function gamification_record_xp(PDO $pdo, array $body): void
+{
+    $user = user_require_auth($pdo);
+    $actionKey = $body['action'] ?? '';
+    $resourceKey = !empty($body['resource_key']) ? $body['resource_key'] : null;
+    $metadata = !empty($body['metadata']) ? $body['metadata'] : null;
+
+    if (!isset(XP_ACTIONS[$actionKey])) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Action inconnue']);
+        return;
+    }
+
+    $result = gamificationRecordAction($pdo, (int)$user['id'], $actionKey, $resourceKey, $metadata);
+
+    if ($result === null) {
+        http_response_code(429);
+        echo json_encode(['success' => false, 'error' => 'Action en cooldown ou limite atteinte']);
+        return;
+    }
+
+    echo json_encode(['success' => true, 'data' => $result]);
+}
+
+function gamification_city_leaderboard(PDO $pdo, int $cityId): void
+{
+    $stmt = $pdo->prepare("
+        SELECT u.id, u.display_name, u.avatar_url, u.level, u.xp
+        FROM local_users u
+        JOIN local_user_actions a ON a.user_id = u.id
+        JOIN local_artisans ar ON ar.city_id = ?
+        WHERE a.metadata->>'$.artisan_id' = ar.id OR a.metadata->>'$.city_id' = ?
+        GROUP BY u.id
+        ORDER BY u.level DESC, u.xp DESC
+        LIMIT 50
+    ");
+    $stmt->execute([$cityId, $cityId]);
+    $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    echo json_encode(['success' => true, 'data' => $items]);
+}
