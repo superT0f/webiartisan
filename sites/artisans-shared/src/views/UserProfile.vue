@@ -35,9 +35,10 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { getUserToken, fetchUserMe, removeUserToken, resolveAvatarUrl } from '../api.js'
 
+const route = useRoute()
 const router = useRouter()
 const user = ref(null)
 const loading = ref(true)
@@ -68,7 +69,7 @@ onMounted(async () => {
   const token = getUserToken()
   if (!token) {
     loading.value = false
-    router.replace('/roue')
+    router.replace(`/roue?redirect=${encodeURIComponent(route.fullPath)}`)
     return
   }
 
@@ -81,7 +82,7 @@ onMounted(async () => {
       return
     } else if (res.status === 401) {
       removeUserToken()
-      router.replace('/roue')
+      router.replace(`/roue?redirect=${encodeURIComponent(route.fullPath)}`)
     } else {
       error.value = res.error || 'Impossible de charger le profil.'
       user.value = null
