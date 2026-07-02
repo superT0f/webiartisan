@@ -94,14 +94,26 @@ function gamification_city_leaderboard(PDO $pdo, int $cityId): void
     $stmt = $pdo->prepare("
         SELECT u.id, u.display_name, u.avatar_url, u.level, u.xp
         FROM local_users u
-        JOIN local_user_actions a ON a.user_id = u.id
-        JOIN local_artisans ar ON ar.city_id = ?
-        WHERE a.metadata->>'$.artisan_id' = ar.id OR a.metadata->>'$.city_id' = ?
-        GROUP BY u.id
+        WHERE EXISTS (
+            SELECT 1
+            FROM local_user_actions a
+            WHERE a.user_id = u.id
+              AND (
+                  a.metadata->>'$.city_id' = ?
+                  OR a.metadata->>'$.artisan_id' IN (
+                      SELECT id FROM local_artisans WHERE city_id = ?
+                  )
+              )
+        )
         ORDER BY u.level DESC, u.xp DESC
         LIMIT 50
     ");
     $stmt->execute([$cityId, $cityId]);
     $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($items as &$item) {
+        $item['id'] = (int)$item['id'];
+        $item['level'] = (int)$item['level'];
+        $item['xp'] = (int)$item['xp'];
+    }
     echo json_encode(['success' => true, 'data' => $items]);
 }

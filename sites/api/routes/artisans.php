@@ -1410,15 +1410,27 @@ function artisan_update_service(PDO $pdo, int $serviceId, array $body): void
     $artisan = artisan_require_auth($pdo);
     $artisanId = (int)$artisan['id'];
 
-    $check = $pdo->prepare("SELECT id FROM local_services WHERE id = ? AND artisan_id = ?");
+    $check = $pdo->prepare("SELECT id, is_active FROM local_services WHERE id = ? AND artisan_id = ?");
     $check->execute([$serviceId, $artisanId]);
-    if (!$check->fetch()) {
+    $service = $check->fetch(PDO::FETCH_ASSOC);
+    if (!$service) {
         http_response_code(404);
         echo json_encode(['success' => false, 'error' => 'Service non trouvé']);
         return;
     }
 
     $allowed = ['name', 'description', 'price_range', 'duration', 'is_active', 'sort_order', 'service_catalog_id'];
+
+    // Enforce free-tier active limit when activating a service
+    if (array_key_exists('is_active', $body) && (int)$body['is_active'] === 1 && !(bool)$service['is_active']) {
+        $countStmt = $pdo->prepare("SELECT COUNT(*) FROM local_services WHERE artisan_id = ? AND is_active = 1 AND id != ?");
+        $countStmt->execute([$artisanId, $serviceId]);
+        if ((int)$countStmt->fetchColumn() >= 5) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Limite de 5 services actifs atteinte']);
+            return;
+        }
+    }
     $sets = [];
     $params = [];
     foreach ($allowed as $col) {
@@ -1572,6 +1584,25 @@ function artisan_create_game(PDO $pdo, array $body): void
 function artisan_update_game(PDO $pdo, int $gameId, array $body): void
 {
     $artisan = artisan_require_auth($pdo);
+
+    $check = $pdo->prepare("SELECT id, is_active FROM local_game_instances WHERE id = ? AND artisan_id = ?");
+    $check->execute([$gameId, $artisan['id']]);
+    $game = $check->fetch(PDO::FETCH_ASSOC);
+    if (!$game) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Jeu non trouvé']);
+        return;
+    }
+
+    // Enforce free-tier active limit when activating a game
+    if (array_key_exists('is_active', $body) && (int)$body['is_active'] === 1 && !(bool)$game['is_active']) {
+        if (!games_can_artisan_create($pdo, (int)$artisan['id'])) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Limite de 2 jeux actifs atteinte']);
+            return;
+        }
+    }
+
     $allowed = ['title', 'description', 'config', 'is_active', 'starts_at', 'ends_at', 'max_plays_per_user', 'play_cooldown_hours'];
     $sets = [];
     $params = [];
