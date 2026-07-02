@@ -363,82 +363,55 @@ else
   fi
   echo "✅ POST /users/me/avatar accepts custom upload"
 
-  echo ""
-  echo "== Gamification =="
-
-  reset_rate_limit 'login'
-
-  # Ensure a clean gamification state for this test user
-  (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
-    -e "UPDATE local_users SET xp=0, level=1 WHERE id=$TEST_USER_ID; DELETE FROM local_user_actions WHERE user_id = $TEST_USER_ID; DELETE FROM local_user_cooldowns WHERE user_id = $TEST_USER_ID; DELETE FROM local_user_badges WHERE user_id = $TEST_USER_ID; DELETE FROM local_user_streaks WHERE user_id = $TEST_USER_ID;" >/dev/null)
-
-  # Prepare a magic-link token to exercise consumer auth (which updates the streak).
-  # Align the MySQL session timezone with the API (Europe/Paris) so the 1-hour expiry
-  # is evaluated consistently by PHP/PDO.
-  (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
-    -e "SET time_zone = 'Europe/Paris'; UPDATE local_users SET magic_token='test-magic-token-$TEST_USER_ID', magic_token_exp=DATE_ADD(NOW(), INTERVAL 1 HOUR) WHERE id=$TEST_USER_ID;" >/dev/null)
-
-  curl_json_status -X POST "${BASE_URL}/users/auth?token=test-magic-token-$TEST_USER_ID" \
-    -H "Content-Type: application/json"
-  check "$LAST_HTTP_CODE" "POST /users/auth" "200"
-  if [[ "$LAST_HTTP_CODE" == "200" ]]; then
-    assert_json "$JSON_BODY" "d.get('success')" "consumer auth should succeed"
-  fi
-  SESSION_TOKEN=$(echo "$JSON_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))" || true)
-
-  if [[ -n "$SESSION_TOKEN" ]]; then
-    echo "--- Test /users/me gamification ---"
-    curl_json_status -H "Authorization: Bearer $SESSION_TOKEN" "${BASE_URL}/users/me"
-    check "$LAST_HTTP_CODE" "GET /users/me" "200"
-    if [[ "$LAST_HTTP_CODE" == "200" ]]; then
-      assert_json "$JSON_BODY" "'level' in d.get('data',{}) and d.get('data',{}).get('level') == 1" "user level should be 1"
-      assert_json "$JSON_BODY" "'xp' in d.get('data',{}) and isinstance(d.get('data',{}).get('xp'), int)" "user xp should be an integer"
-      assert_json "$JSON_BODY" "'current_streak' in d.get('data',{}) and d.get('data',{}).get('current_streak') >= 1" "user streak should be at least 1 after auth"
-    fi
-    echo "✅ /users/me returns gamification profile"
-
-    echo "--- Test /actions artisan_view ---"
-    curl_json_status -X POST -H "Authorization: Bearer $SESSION_TOKEN" -H "Content-Type: application/json" \
-      -d '{"action":"artisan_view","resource_key":"artisan:1"}' "${BASE_URL}/actions"
-    check "$LAST_HTTP_CODE" "POST /actions artisan_view" "200"
-    if [[ "$LAST_HTTP_CODE" == "200" ]]; then
-      assert_json "$JSON_BODY" "d.get('success')" "action should succeed"
-      assert_json "$JSON_BODY" "d.get('data',{}).get('xp_gained') == 5" "artisan_view should give 5 XP"
-    fi
-    echo "✅ /actions artisan_view awards 5 XP"
-
-    echo "--- Test cooldown ---"
-    curl_json_status -X POST -H "Authorization: Bearer $SESSION_TOKEN" -H "Content-Type: application/json" \
-      -d '{"action":"artisan_view","resource_key":"artisan:1"}' "${BASE_URL}/actions"
-    check "$LAST_HTTP_CODE" "POST /actions artisan_view duplicate" "200"
-    if [[ "$LAST_HTTP_CODE" == "200" ]]; then
-      assert_json "$JSON_BODY" "d.get('success')" "cooldown response should still report success"
-      assert_json "$JSON_BODY" "d.get('data',{}).get('xp_gained') == 0" "duplicate action should give 0 XP"
-    fi
-    echo "✅ duplicate artisan_view is on cooldown"
-
-    echo "--- Test internal action rejection ---"
-    curl_json_status -X POST -H "Authorization: Bearer $SESSION_TOKEN" -H "Content-Type: application/json" \
-      -d '{"action":"daily_visit"}' "${BASE_URL}/actions"
-    check "$LAST_HTTP_CODE" "POST /actions internal action" "400"
-    if [[ "$LAST_HTTP_CODE" == "400" ]]; then
-      assert_json "$JSON_BODY" "d.get('success') is False" "internal action should be rejected"
-    fi
-    echo "✅ /actions rejects internal actions"
-
-    echo "--- Test /actions rejects unknown actions ---"
-    curl_json_status -X POST -H "Authorization: Bearer $SESSION_TOKEN" -H "Content-Type: application/json" \
-      -d '{"action":"nonexistent_action"}' "${BASE_URL}/actions"
-    check "$LAST_HTTP_CODE" "POST /actions unknown action" "400"
-    if [[ "$LAST_HTTP_CODE" == "400" ]]; then
-      assert_json "$JSON_BODY" "d.get('success') is False" "unknown action should be rejected"
-    fi
-    echo "✅ /actions rejects unknown actions"
-  else
-    fail "consumer auth did not return a session token"
-  fi
-
   # cleanup_profile_tests is invoked by the EXIT trap
+fi
+
+echo ""
+echo "== Gamification =="
+
+# Use the same test consumer user as the profile section
+GAMIFICATION_USER_ID=999999
+if command -v openssl >/dev/null 2>&1; then
+  GAMIFICATION_TOKEN="gamification-$(openssl rand -hex 16)"
+else
+  GAMIFICATION_TOKEN="gamification-$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
+fi
+
+if [[ "$MYSQL_AVAILABLE" -eq 1 ]]; then
+  (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
+    -e "REPLACE INTO local_users (id, email, session_token, session_exp) VALUES ($GAMIFICATION_USER_ID, 'gamification-user@example.com', '$GAMIFICATION_TOKEN', DATE_ADD(NOW(), INTERVAL 1 DAY));" >/dev/null)
+fi
+
+# Public events list
+curl_json_status "${BASE_URL}/gamification/events"
+check "$LAST_HTTP_CODE" "GET /gamification/events" "200"
+if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+  assert_json "$JSON_BODY" "d.get('success')" "events endpoint should succeed"
+  assert_json "$JSON_BODY" "isinstance(d.get('data'), list)" "events data should be a list"
+  assert_json "$JSON_BODY" "any(e.get('key') == 'testimonial_view' for e in d.get('data',[]))" "events should include testimonial_view"
+  assert_json "$JSON_BODY" "any(e.get('key') == 'testimonial_post' for e in d.get('data',[]))" "events should include testimonial_post"
+  assert_json "$JSON_BODY" "any(e.get('key') == 'game_play' for e in d.get('data',[]))" "events should include game_play"
+  assert_json "$JSON_BODY" "any(e.get('key') == 'game_win' for e in d.get('data',[]))" "events should include game_win"
+fi
+
+# XP endpoint requires auth
+curl_json_status -X POST "${BASE_URL}/gamification/xp" -H 'Content-Type: application/json' -d '{"action":"artisan_view","resource_key":"artisan:1"}'
+check "$LAST_HTTP_CODE" "POST /gamification/xp without token" "401"
+
+# XP endpoint records action for authenticated user
+if [[ "$MYSQL_AVAILABLE" -eq 1 ]]; then
+  curl_json_status -X POST -H "Authorization: Bearer $GAMIFICATION_TOKEN" -H 'Content-Type: application/json' \
+    -d '{"action":"artisan_view","resource_key":"artisan:1"}' "${BASE_URL}/gamification/xp"
+  check "$LAST_HTTP_CODE" "POST /gamification/xp artisan_view" "200"
+  if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+    assert_json "$JSON_BODY" "d.get('success')" "xp record should succeed"
+    assert_json "$JSON_BODY" "d.get('data',{}).get('xp_gained') == 5" "artisan_view should give 5 XP"
+  fi
+
+  # Second call should be on cooldown (429)
+  curl_json_status -X POST -H "Authorization: Bearer $GAMIFICATION_TOKEN" -H 'Content-Type: application/json' \
+    -d '{"action":"artisan_view","resource_key":"artisan:1"}' "${BASE_URL}/gamification/xp"
+  check "$LAST_HTTP_CODE" "POST /gamification/xp duplicate" "429"
 fi
 
 echo ""
