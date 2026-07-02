@@ -22,3 +22,7 @@ Thumbs.db
 
 # Local deployment symlinks
 sites/api/production
+
+# Local archives and working docs
+archives/
+docs/superpowers/
