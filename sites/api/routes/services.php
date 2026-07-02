@@ -23,7 +23,7 @@ switch ($method) {
 function service_catalog_list(PDO $pdo): void
 {
     $category = $_GET['category'] ?? null;
-    $sql = "SELECT id, `key`, label_fr, icon, category, testimonial_templates FROM local_service_catalog WHERE is_active = 1";
+    $sql = "SELECT id, `key`, label_fr AS label, icon, category, testimonial_templates FROM local_service_catalog WHERE is_active = 1";
     $params = [];
     if ($category) {
         $sql .= " AND category = ?";
@@ -35,7 +35,7 @@ function service_catalog_list(PDO $pdo): void
     $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
     foreach ($items as &$item) {
         $item['id'] = (int)$item['id'];
-        $item['label_fr'] = htmlspecialchars((string)($item['label_fr'] ?? ''), ENT_QUOTES, 'UTF-8');
+        $item['label'] = htmlspecialchars((string)($item['label'] ?? ''), ENT_QUOTES, 'UTF-8');
         $templates = json_decode($item['testimonial_templates'] ?? '[]', true);
         if (is_array($templates)) {
             $item['testimonial_templates'] = array_map(

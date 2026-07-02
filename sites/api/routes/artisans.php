@@ -30,6 +30,8 @@ switch ($method) {
             artisan_my_spin_offers($pdo);
         } elseif ($action === 'me' && $param === 'spin-wins') {
             artisan_my_spin_wins($pdo);
+        } elseif ($action === 'me' && $param === 'services') {
+            artisan_my_services($pdo);
         } elseif ($action === 'me') {
             artisan_me($pdo);
         } elseif (is_numeric($action) && !$param) {
@@ -1294,6 +1296,33 @@ function artisan_validate_spin_win(PDO $pdo, string $code): void
     }
 
     echo json_encode(['success' => true, 'message' => 'Gain validé']);
+}
+
+/**
+ * GET /artisans/me/services
+ */
+function artisan_my_services(PDO $pdo): void
+{
+    $artisan = artisan_require_auth($pdo);
+    $stmt = $pdo->prepare("
+        SELECT s.id, s.name, s.description, s.price_range, s.duration,
+               s.is_custom, s.is_active, s.sort_order, s.service_catalog_id,
+               sc.`key` AS catalog_key, sc.label_fr AS catalog_label, sc.icon AS catalog_icon
+        FROM local_services s
+        LEFT JOIN local_service_catalog sc ON sc.id = s.service_catalog_id
+        WHERE s.artisan_id = ?
+        ORDER BY s.sort_order ASC, s.id ASC
+    ");
+    $stmt->execute([$artisan['id']]);
+    $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($items as &$item) {
+        $item['id'] = (int)$item['id'];
+        $item['service_catalog_id'] = $item['service_catalog_id'] !== null ? (int)$item['service_catalog_id'] : null;
+        $item['is_custom'] = (bool)$item['is_custom'];
+        $item['is_active'] = (bool)$item['is_active'];
+        $item['sort_order'] = (int)$item['sort_order'];
+    }
+    echo json_encode(['success' => true, 'data' => $items]);
 }
 
 /**

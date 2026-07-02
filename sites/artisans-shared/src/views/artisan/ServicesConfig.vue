@@ -9,7 +9,7 @@
     </div>
 
     <section class="dashboard-section card">
-      <p v-if="services.length >= 5" class="limit-warning">
+      <p v-if="activeServicesCount >= 5" class="limit-warning">
         Limite gratuite atteinte (5 services actifs).
       </p>
 
@@ -43,7 +43,7 @@
           </div>
         </div>
 
-        <button type="submit" class="btn btn-primary" :disabled="services.length >= 5 || adding">
+        <button type="submit" class="btn btn-primary" :disabled="activeServicesCount >= 5 || adding">
           {{ adding ? 'Ajout…' : 'Ajouter' }}
         </button>
       </form>
@@ -52,7 +52,7 @@
     <section class="dashboard-section card">
       <div class="section-title">
         <h2>Services actifs</h2>
-        <span class="badge badge-grey">{{ services.length }} / 5</span>
+        <span class="badge badge-grey">{{ activeServicesCount }} / 5</span>
       </div>
 
       <ul v-if="services.length" class="service-list">
@@ -98,6 +98,7 @@ const artisanToken = computed(() => props.token || localStorage.getItem('artisan
 const services = ref([])
 const catalog = ref([])
 const adding = ref(false)
+const activeServicesCount = computed(() => services.value.filter(s => s.is_active).length)
 const newService = ref({
   catalog_id: null,
   name: '',
@@ -121,7 +122,7 @@ async function load() {
 }
 
 async function addService() {
-  if (services.value.length >= 5) return
+  if (activeServicesCount.value >= 5) return
   adding.value = true
   try {
     const res = await createArtisanService(artisanToken.value, {
