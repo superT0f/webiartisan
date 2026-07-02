@@ -25,6 +25,7 @@
         :catalog-map="catalogMap"
         @helpful="markHelpful"
         @report="openReport"
+        @click="onViewTestimonial(t)"
       />
     </div>
     <p v-else>Aucun témoignage pour cette sélection.</p>
@@ -39,9 +40,12 @@ import {
   markTestimonialHelpful,
   reportTestimonial,
 } from '../api.js'
+import { useGamification } from '../composables/useGamification.js'
 import TestimonialCard from '../components/TestimonialCard.vue'
 import ServiceTag from '../components/ServiceTag.vue'
 import BetaBanner from '../components/BetaBanner.vue'
+
+const { recordAction } = useGamification()
 
 const testimonials = ref([])
 const catalog = ref([])
@@ -106,6 +110,10 @@ async function openReport(id) {
 
 function toggleService(key) {
   selectedService.value = selectedService.value === key ? null : key
+}
+
+function onViewTestimonial(t) {
+  recordAction('testimonial_view', `testimonial:${t.id}`, { testimonial_id: t.id, artisan_id: t.artisan_id })
 }
 
 watch(selectedService, loadTestimonials)

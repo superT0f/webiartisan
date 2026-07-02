@@ -59,8 +59,11 @@ import {
   getUserToken,
   setUserToken,
 } from '../api.js'
+import { useGamification } from '../composables/useGamification.js'
 import GameRenderer from '../components/GameRenderer.vue'
 import BetaBanner from '../components/BetaBanner.vue'
+
+const { recordAction } = useGamification()
 
 const route = useRoute()
 const router = useRouter()
@@ -124,7 +127,10 @@ async function load() {
 }
 
 function onPlayed(data) {
-  console.log('played', data)
+  recordAction('game_play', `game:${game.value.id}`, { game_id: game.value.id, artisan_id: game.value.artisan_id })
+  if (data?.reward) {
+    recordAction('game_win', `game:${game.value.id}`, { game_id: game.value.id, reward_id: data.reward.id })
+  }
 }
 
 onMounted(() => {
