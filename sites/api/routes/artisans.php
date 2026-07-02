@@ -236,13 +236,33 @@ function artisan_get(PDO $pdo, int $id): void
 
     // Services
     $stmt2 = $pdo->prepare("
-        SELECT id, name, description, price_range, duration
-        FROM local_services
-        WHERE artisan_id = ?
-        ORDER BY sort_order ASC, name ASC
+        SELECT
+            s.id,
+            s.name,
+            s.description,
+            s.price_range,
+            s.duration,
+            s.is_custom,
+            s.is_active,
+            s.sort_order,
+            s.service_catalog_id,
+            sc.`key` AS catalog_key,
+            sc.label_fr AS catalog_label,
+            sc.icon AS catalog_icon
+        FROM local_services s
+        LEFT JOIN local_service_catalog sc ON sc.id = s.service_catalog_id
+        WHERE s.artisan_id = ? AND s.is_active = 1
+        ORDER BY s.sort_order ASC, s.id ASC
     ");
     $stmt2->execute([$id]);
     $artisan['services'] = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($artisan['services'] as &$svc) {
+        $svc['id'] = (int)$svc['id'];
+        $svc['service_catalog_id'] = $svc['service_catalog_id'] !== null ? (int)$svc['service_catalog_id'] : null;
+        $svc['is_custom'] = (bool)$svc['is_custom'];
+        $svc['is_active'] = (bool)$svc['is_active'];
+        $svc['sort_order'] = (int)$svc['sort_order'];
+    }
 
     $artisan['recipes'] = artisan_recipes($pdo, $artisan['id'], $artisan['email'] ?? '');
     $artisan['nearby'] = artisan_nearby(
@@ -1297,6 +1317,22 @@ function artisan_create_service(PDO $pdo, array $body): void
         return;
     }
 
+    if (mb_strlen($name) > 200) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Nom du service trop long (200 caractères max)']);
+        return;
+    }
+
+    if ($catalogId !== null) {
+        $catCheck = $pdo->prepare("SELECT id FROM local_service_catalog WHERE id = ? AND is_active = 1");
+        $catCheck->execute([$catalogId]);
+        if (!$catCheck->fetch()) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Catalogue de service invalide']);
+            return;
+        }
+    }
+
     // Enforce free-tier limit (5 active services)
     $countStmt = $pdo->prepare("SELECT COUNT(*) FROM local_services WHERE artisan_id = ? AND is_active = 1");
     $countStmt->execute([$artisanId]);
@@ -1323,14 +1359,29 @@ function artisan_update_service(PDO $pdo, int $serviceId, array $body): void
     $artisan = artisan_require_auth($pdo);
     $artisanId = (int)$artisan['id'];
 
+    $check = $pdo->prepare("SELECT id FROM local_services WHERE id = ? AND artisan_id = ?");
+    $check->execute([$serviceId, $artisanId]);
+    if (!$check->fetch()) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Service non trouvé']);
+        return;
+    }
+
     $allowed = ['name', 'description', 'price_range', 'duration', 'is_active', 'sort_order'];
     $sets = [];
     $params = [];
     foreach ($allowed as $col) {
-        if (array_key_exists($col, $body)) {
-            $sets[] = "$col = ?";
-            $params[] = $body[$col];
+        if (!array_key_exists($col, $body)) {
+            continue;
         }
+        $sets[] = "$col = ?";
+        $value = $body[$col];
+        if ($col === 'is_active' || $col === 'sort_order') {
+            $value = (int)$value;
+        } elseif (in_array($col, ['name', 'description', 'price_range', 'duration'], true)) {
+            $value = trim((string)$value);
+        }
+        $params[] = $value;
     }
     if (empty($sets)) {
         http_response_code(400);
@@ -1344,11 +1395,6 @@ function artisan_update_service(PDO $pdo, int $serviceId, array $body): void
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
 
-    if ($stmt->rowCount() === 0) {
-        http_response_code(404);
-        echo json_encode(['success' => false, 'error' => 'Service non trouvé']);
-        return;
-    }
     echo json_encode(['success' => true, 'message' => 'Service mis à jour']);
 }
 

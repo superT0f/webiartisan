@@ -35,7 +35,16 @@ function service_catalog_list(PDO $pdo): void
     $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
     foreach ($items as &$item) {
         $item['id'] = (int)$item['id'];
-        $item['testimonial_templates'] = json_decode($item['testimonial_templates'] ?? '[]', true);
+        $item['label_fr'] = htmlspecialchars((string)($item['label_fr'] ?? ''), ENT_QUOTES, 'UTF-8');
+        $templates = json_decode($item['testimonial_templates'] ?? '[]', true);
+        if (is_array($templates)) {
+            $item['testimonial_templates'] = array_map(
+                static fn($t) => htmlspecialchars((string)$t, ENT_QUOTES, 'UTF-8'),
+                $templates
+            );
+        } else {
+            $item['testimonial_templates'] = [];
+        }
     }
     echo json_encode(['success' => true, 'data' => $items]);
 }

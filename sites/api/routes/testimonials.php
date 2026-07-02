@@ -14,13 +14,32 @@
 
 require_once __DIR__ . '/../lib/Testimonials.php';
 
+function is_valid_id(mixed $value): bool
+{
+    return filter_var($value, FILTER_VALIDATE_INT) !== false && (int)$value > 0;
+}
+
+function e(string $text): string
+{
+    return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+}
+
+function is_valid_url(string $url): bool
+{
+    if (!filter_var($url, FILTER_VALIDATE_URL)) {
+        return false;
+    }
+    $scheme = strtolower(parse_url($url, PHP_URL_SCHEME) ?: '');
+    return in_array($scheme, ['http', 'https'], true);
+}
+
 switch ($method) {
     case 'GET':
         if ($action === '' || $action === 'list') {
             testimonials_list($pdo);
         } elseif ($action === 'templates') {
             testimonials_templates($pdo);
-        } elseif (is_numeric($action) && !$param) {
+        } elseif (is_valid_id($action) && !$param) {
             testimonials_get($pdo, (int)$action);
         } else {
             http_response_code(404);
@@ -30,9 +49,9 @@ switch ($method) {
 
     case 'POST':
         $body = json_decode(file_get_contents('php://input'), true) ?? [];
-        if (is_numeric($action) && $param === 'report') {
+        if (is_valid_id($action) && $param === 'report') {
             testimonials_report($pdo, (int)$action, $body);
-        } elseif (is_numeric($action) && $param === 'helpful') {
+        } elseif (is_valid_id($action) && $param === 'helpful') {
             testimonials_helpful($pdo, (int)$action);
         } elseif ($action === '' || $action === 'list') {
             testimonials_create($pdo, $body);
@@ -44,7 +63,7 @@ switch ($method) {
 
     case 'PATCH':
         $body = json_decode(file_get_contents('php://input'), true) ?? [];
-        if (is_numeric($action) && !$param) {
+        if (is_valid_id($action) && !$param) {
             testimonials_update($pdo, (int)$action, $body);
         } else {
             http_response_code(404);
@@ -53,7 +72,7 @@ switch ($method) {
         break;
 
     case 'DELETE':
-        if (is_numeric($action) && !$param) {
+        if (is_valid_id($action) && !$param) {
             testimonials_delete($pdo, (int)$action);
         } else {
             http_response_code(404);
@@ -126,6 +145,12 @@ function testimonials_list(PDO $pdo): void
         $item['artisan_service_id'] = $item['artisan_service_id'] !== null ? (int)$item['artisan_service_id'] : null;
         $item['rating'] = $item['rating'] !== null ? (int)$item['rating'] : null;
         $item['helpful_count'] = (int)$item['helpful_count'];
+        $item['display_name'] = e((string)($item['display_name'] ?? ''));
+        $item['title'] = $item['title'] !== null ? e((string)$item['title']) : null;
+        $item['content'] = e((string)($item['content'] ?? ''));
+        if (!empty($item['avatar_url']) && !is_valid_url($item['avatar_url'])) {
+            $item['avatar_url'] = null;
+        }
         $item['media'] = testimonials_get_media($pdo, (int)$item['id']);
     }
 
@@ -161,6 +186,12 @@ function testimonials_get(PDO $pdo, int $id): void
     $item['artisan_service_id'] = $item['artisan_service_id'] !== null ? (int)$item['artisan_service_id'] : null;
     $item['rating'] = $item['rating'] !== null ? (int)$item['rating'] : null;
     $item['helpful_count'] = (int)$item['helpful_count'];
+    $item['display_name'] = e((string)($item['display_name'] ?? ''));
+    $item['title'] = $item['title'] !== null ? e((string)$item['title']) : null;
+    $item['content'] = e((string)($item['content'] ?? ''));
+    if (!empty($item['avatar_url']) && !is_valid_url($item['avatar_url'])) {
+        $item['avatar_url'] = null;
+    }
     $item['media'] = testimonials_get_media($pdo, $id);
 
     echo json_encode(['success' => true, 'data' => $item]);
@@ -220,8 +251,13 @@ function testimonials_create(PDO $pdo, array $body): void
         $order = 0;
         foreach (array_slice($media, 0, 5) as $m) {
             $url = is_string($m) ? $m : ($m['url'] ?? null);
+            if (!is_string($url) || !$url || !is_valid_url($url)) {
+                continue;
+            }
             $type = is_string($m) ? 'image' : ($m['type'] ?? 'image');
-            if (!$url) continue;
+            if (!in_array($type, ['image', 'video'], true)) {
+                $type = 'image';
+            }
             $pdo->prepare("
                 INSERT INTO local_testimonial_media (testimonial_id, media_url, media_type, display_order)
                 VALUES (?, ?, ?, ?)
@@ -249,6 +285,27 @@ function testimonials_delete(PDO $pdo, int $id): void
 function testimonials_report(PDO $pdo, int $id, array $body): void
 {
     $user = user_require_auth($pdo);
+
+    $check = $pdo->prepare("SELECT id FROM local_testimonials WHERE id = ? AND status = 'approved'");
+    $check->execute([$id]);
+    if (!$check->fetch()) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Témoignage non trouvé']);
+        return;
+    }
+
+    $dup = $pdo->prepare("
+        SELECT id FROM local_testimonial_reports
+        WHERE testimonial_id = ? AND reporter_user_id = ?
+        LIMIT 1
+    ");
+    $dup->execute([$id, $user['id']]);
+    if ($dup->fetch()) {
+        http_response_code(429);
+        echo json_encode(['success' => false, 'error' => 'Vous avez déjà signalé ce témoignage']);
+        return;
+    }
+
     $reason = trim($body['reason'] ?? '');
     if (!$reason) {
         http_response_code(400);
@@ -267,6 +324,15 @@ function testimonials_report(PDO $pdo, int $id, array $body): void
 function testimonials_helpful(PDO $pdo, int $id): void
 {
     user_require_auth($pdo);
+
+    $check = $pdo->prepare("SELECT id FROM local_testimonials WHERE id = ? AND status = 'approved'");
+    $check->execute([$id]);
+    if (!$check->fetch()) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Témoignage non trouvé']);
+        return;
+    }
+
     // Simple increment; duplicate clicks accepted but could be rate-limited later
     $pdo->prepare("UPDATE local_testimonials SET helpful_count = helpful_count + 1 WHERE id = ? AND status = 'approved'")
         ->execute([$id]);
@@ -292,6 +358,9 @@ function testimonials_get_media(PDO $pdo, int $testimonialId): array
     foreach ($items as &$item) {
         $item['id'] = (int)$item['id'];
         $item['display_order'] = (int)$item['display_order'];
+        if (!empty($item['media_url']) && !is_valid_url($item['media_url'])) {
+            $item['media_url'] = null;
+        }
     }
     return $items;
 }
