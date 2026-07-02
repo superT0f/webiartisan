@@ -59,9 +59,14 @@ function user_magic_link(PDO $pdo, array $body): void
 
     $rememberMe = !empty($body['rememberMe']);
 
-    $redirect = trim($body['redirect'] ?? '/roue');
-    if (!is_string($redirect) || $redirect === '' || $redirect[0] !== '/' || preg_match('#^//#', $redirect) || strpbrk($redirect, "\r\n#") !== false) {
+    $redirect = $body['redirect'] ?? '/roue';
+    if (!is_string($redirect)) {
         $redirect = '/roue';
+    } else {
+        $redirect = trim($redirect);
+        if ($redirect === '' || $redirect[0] !== '/' || preg_match('#^//#', $redirect) || strpbrk($redirect, "\r\n#") !== false || strpos($redirect, '..') !== false) {
+            $redirect = '/roue';
+        }
     }
 
     $stmt = $pdo->prepare("SELECT id FROM local_users WHERE email = ?");
@@ -113,7 +118,7 @@ HTML;
     $config = getAppConfig();
     $fromEmail = $config['mail_from'] ?? 'noreply@webiartisan.prigent.tech';
 
-    $sent = send_html_email($email, $subject, $html, null, 'WebIArtisan');
+    $sent = send_html_email($email, $subject, $html, $fromEmail, 'WebIArtisan');
     if (!$sent) {
         error_log("[USER-MAGIC-LINK] Échec envoi email à {$email}");
     }
