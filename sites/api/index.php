@@ -116,7 +116,7 @@ $param  = $segments[2] ?? null;
 $method = $_SERVER['REQUEST_METHOD'];
 
 // Route map
-$publicRoutes = ['cities', 'artisans'];
+$publicRoutes = ['cities', 'artisans', 'games'];
 $protectedRoutes = [];
 
 // Global auth instance (kept harmless; no protected routes in POC)
@@ -176,6 +176,12 @@ if ($module === 'avatars') {
 if ($module === 'spin') {
     applyRateLimit($pdo, 'public');
     require_once __DIR__ . '/routes/spin.php';
+    exit;
+}
+
+if ($module === 'games') {
+    applyRateLimit($pdo, 'public');
+    require_once __DIR__ . '/routes/games.php';
     exit;
 }
 
