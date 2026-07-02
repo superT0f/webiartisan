@@ -189,9 +189,9 @@ function spin_play(PDO $pdo): void
             $expiresAt,
         ]);
 
-        $pdo->commit();
+        gamificationRecordAction($pdo, (int)$user['id'], 'game_play', "city:{$city['id']}", ['city_id' => $city['id']], true);
 
-    gamificationRecordAction($pdo, (int)$user['id'], 'game_play', "city:{$city['id']}", ['city_id' => $city['id']]);
+        $pdo->commit();
     } catch (Exception $e) {
         $pdo->rollBack();
         if ($e->getMessage() === 'daily_limit_exceeded') {

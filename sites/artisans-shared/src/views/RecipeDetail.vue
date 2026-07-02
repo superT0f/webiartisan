@@ -98,9 +98,6 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getRecipe, reportRecipe } from '../api.js'
-import { useGamification } from '../composables/useGamification.js'
-
-const { recordAction } = useGamification()
 
 const route = useRoute()
 const router = useRouter()
@@ -147,9 +144,6 @@ onMounted(async () => {
     if (res.success && res.data) {
       recipe.value = res.data
       servings.value = res.data.servings || 1
-      if (recipe.value?.slug) {
-        await recordAction('recipe_view', `recipe:${recipe.value.slug}`)
-      }
     }
   } catch (e) {
     console.error('Erreur chargement recette', e)

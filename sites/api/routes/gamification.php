@@ -4,8 +4,8 @@
  *
  * GET  /gamification/events
  * POST /gamification/xp
- * GET  /users/:id/xp
- * GET  /leaderboards/city/:city_id
+ * GET  /gamification/:id/xp
+ * GET  /gamification/leaderboards/city/:city_id
  */
 
 require_once __DIR__ . '/../lib/Gamification.php';
@@ -14,9 +14,9 @@ switch ($method) {
     case 'GET':
         if ($action === 'events' || $action === '') {
             gamification_events_list();
-        } elseif (is_numeric($action) && $param === 'xp') {
+        } elseif (filter_var($action, FILTER_VALIDATE_INT) !== false && $param === 'xp') {
             gamification_user_profile_endpoint($pdo, (int)$action);
-        } elseif ($action === 'leaderboards' && $param === 'city' && is_numeric($segments[3] ?? '')) {
+        } elseif ($action === 'leaderboards' && $param === 'city' && filter_var($segments[3] ?? '', FILTER_VALIDATE_INT) !== false) {
             gamification_city_leaderboard($pdo, (int)$segments[3]);
         } else {
             http_response_code(404);
@@ -69,6 +69,12 @@ function gamification_record_xp(PDO $pdo, array $body): void
     if (!isset(XP_ACTIONS[$actionKey])) {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Action inconnue']);
+        return;
+    }
+
+    if (!empty(XP_ACTIONS[$actionKey]['internal'])) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Action réservée']);
         return;
     }
 

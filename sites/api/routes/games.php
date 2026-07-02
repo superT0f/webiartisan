@@ -207,6 +207,8 @@ function games_play(PDO $pdo, int $id, array $body): void
 
     games_record_play($pdo, $id, (int)$user['id'], $result, 10);
 
+    gamificationRecordAction($pdo, (int)$user['id'], 'game_play', "game:$id", ['game_id' => $id, 'artisan_id' => $instance['artisan_id']]);
+
     if (!empty($result['reward'])) {
         gamificationRecordAction($pdo, (int)$user['id'], 'game_win', "game:$id", ['game_id' => $id, 'reward_id' => $result['reward']['id']]);
     }

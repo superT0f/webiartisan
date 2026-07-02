@@ -79,7 +79,6 @@
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import QRCode from 'qrcode'
-import { useGamification } from '../composables/useGamification.js'
 import {
   requestUserMagicLink,
   authUser,
@@ -94,7 +93,6 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-const { recordAction } = useGamification()
 
 const email = ref('')
 const token = ref(getUserToken() || '')
@@ -209,9 +207,6 @@ async function spin() {
     setMessage('Erreur réseau.', 'error')
   } finally {
     spinning.value = false
-  }
-  if (success) {
-    await recordAction('spin_play')
   }
 }
 

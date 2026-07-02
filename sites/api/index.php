@@ -192,7 +192,7 @@ if ($module === 'actions') {
 }
 
 if ($module === 'gamification') {
-    applyRateLimit($pdo, 'public');
+    applyRateLimit($pdo, 'login');
     require_once __DIR__ . '/routes/gamification.php';
     exit;
 }
