@@ -17,6 +17,7 @@
         <RouterLink to="/roue" class="nav-link">🎰 Roue</RouterLink>
         <RouterLink to="/jeux" class="nav-link">🎮 Jeux</RouterLink>
         <RouterLink to="/#services-locaux" class="nav-link" @click.prevent="scrollTo('services-locaux')">Services locaux</RouterLink>
+        <RouterLink v-if="!user" to="/profil" class="nav-link">Se connecter / Mon compte</RouterLink>
         <RouterLink to="/espace" class="nav-link">Mon espace</RouterLink>
         <RouterLink to="/inscrire" class="btn btn-primary btn-sm">
           <span>+ Inscrire mon entreprise</span>
@@ -47,6 +48,7 @@
         <RouterLink to="/jeux" class="nav-mobile-link">🎮 Jeux</RouterLink>
         <a href="/#meteo" class="nav-mobile-link">🌤️ Météo locale</a>
         <a href="/#services-locaux" class="nav-mobile-link">🏙️ Services locaux</a>
+        <RouterLink v-if="!user" to="/profil" class="nav-mobile-link">👤 Se connecter / Mon compte</RouterLink>
         <RouterLink to="/espace" class="nav-mobile-link">🔐 Mon espace</RouterLink>
         <RouterLink v-if="user" to="/profil" class="nav-mobile-link">👤 Mon profil (Lv.{{ user.level }})</RouterLink>
         <RouterLink to="/inscrire" class="btn btn-primary" style="margin: 12px 20px;">
