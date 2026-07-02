@@ -1,9 +1,42 @@
+<script setup>
+import { computed } from 'vue'
+import { resolveAvatarUrl } from '../api.js'
+
+const props = defineProps({
+  testimonial: { type: Object, required: true },
+  catalogMap: { type: Object, default: () => ({}) },
+})
+defineEmits(['helpful', 'report'])
+
+const displayName = computed(() => props.testimonial.display_name || 'Utilisateur anonyme')
+const initials = computed(() => displayName.value.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase())
+const formattedDate = computed(() => {
+  if (!props.testimonial.created_at) return ''
+  return new Date(props.testimonial.created_at).toLocaleDateString('fr-FR')
+})
+
+const avatarUrl = computed(() => resolveAvatarUrl(props.testimonial.avatar_url))
+
+const serviceEntry = computed(() => {
+  const key = props.testimonial.service_type
+  if (!key) return null
+  return props.catalogMap[key] || null
+})
+
+function isHttpUrl(url) {
+  if (!url || typeof url !== 'string') return false
+  return url.startsWith('http://') || url.startsWith('https://')
+}
+
+const validMedia = computed(() => (props.testimonial.media || []).filter(m => isHttpUrl(m.media_url)))
+</script>
+
 <template>
   <article class="testimonial-card">
     <header class="testimonial-card__header">
       <img
-        v-if="testimonial.avatar_url"
-        :src="testimonial.avatar_url"
+        v-if="avatarUrl"
+        :src="avatarUrl"
         alt=""
         class="testimonial-card__avatar"
       />
@@ -12,8 +45,8 @@
       </div>
       <div class="testimonial-card__meta">
         <strong>{{ displayName }}</strong>
-        <span v-if="testimonial.service_label" class="testimonial-card__service">
-          {{ testimonial.service_icon }} {{ testimonial.service_label }}
+        <span v-if="serviceEntry" class="testimonial-card__service">
+          {{ serviceEntry.icon }} {{ serviceEntry.label }}
         </span>
         <time :datetime="testimonial.created_at">{{ formattedDate }}</time>
       </div>
@@ -25,9 +58,9 @@
     <h3 v-if="testimonial.title" class="testimonial-card__title">{{ testimonial.title }}</h3>
     <p class="testimonial-card__content">{{ testimonial.content }}</p>
 
-    <div v-if="testimonial.media?.length" class="testimonial-card__media">
+    <div v-if="validMedia.length" class="testimonial-card__media">
       <img
-        v-for="m in testimonial.media"
+        v-for="m in validMedia"
         :key="m.id"
         :src="m.media_url"
         alt=""
@@ -45,22 +78,6 @@
     </footer>
   </article>
 </template>
-
-<script setup>
-import { computed } from 'vue'
-
-const props = defineProps({
-  testimonial: { type: Object, required: true },
-})
-defineEmits(['helpful', 'report'])
-
-const displayName = computed(() => props.testimonial.display_name || 'Utilisateur anonyme')
-const initials = computed(() => displayName.value.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase())
-const formattedDate = computed(() => {
-  if (!props.testimonial.created_at) return ''
-  return new Date(props.testimonial.created_at).toLocaleDateString('fr-FR')
-})
-</script>
 
 <style scoped>
 .testimonial-card {

@@ -497,19 +497,12 @@ export function todayIndex() {
   return (new Date().getDay() + 6) % 7
 }
 
-// --- Authentification consommateur (témoignages) ------------------
-
-export async function authenticateUser(token) {
-  const res = await fetch(`${API_BASE}/users/auth?token=${encodeURIComponent(token)}`)
-  return res.json()
-}
+// --- Témoignages ---------------------------------------------------
 
 function userHeaders() {
-  const token = localStorage.getItem('user_session_token')
+  const token = getUserToken()
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
-
-// --- Témoignages ---------------------------------------------------
 
 export async function fetchTestimonials(filters = {}) {
   const qs = new URLSearchParams({ city: CITY_SLUG, ...filters }).toString()
@@ -525,12 +518,19 @@ export async function fetchTestimonial(id) {
 }
 
 export async function createTestimonial(data) {
-  const res = await fetch(`${API_BASE}/testimonials`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...userHeaders() },
-    body: JSON.stringify({ city_slug: CITY_SLUG, ...data }),
-  })
-  return res.json()
+  try {
+    const res = await fetch(`${API_BASE}/testimonials`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...userHeaders() },
+      body: JSON.stringify(data),
+    })
+    return await res.json()
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      throw e
+    }
+    return { success: false, error: 'Erreur réseau lors de la publication' }
+  }
 }
 
 export async function reportTestimonial(id, reason, details = '') {

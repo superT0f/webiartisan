@@ -1,3 +1,75 @@
+<script setup>
+import { ref, computed, watch } from 'vue'
+import { createTestimonial, fetchTestimonialTemplates } from '../api.js'
+import BetaBanner from './BetaBanner.vue'
+
+const props = defineProps({
+  artisanId: { type: Number, required: true },
+  services: { type: Array, default: () => [] },
+})
+const emit = defineEmits(['posted'])
+
+const form = ref({
+  artisan_service_id: null,
+  rating: null,
+  title: '',
+  content: '',
+})
+const templates = ref([])
+const submitting = ref(false)
+const error = ref('')
+
+const selectedCatalogKey = computed(() => {
+  if (!form.value.artisan_service_id) return null
+  const s = props.services.find(s => s.id === form.value.artisan_service_id)
+  return s?.catalog_key || null
+})
+
+watch(selectedCatalogKey, async (key) => {
+  if (!key) {
+    templates.value = []
+    return
+  }
+  const requestedKey = key
+  try {
+    const res = await fetchTestimonialTemplates(key)
+    if (requestedKey !== selectedCatalogKey.value) return
+    templates.value = res.data?.[0]?.templates || []
+  } catch {
+    if (requestedKey !== selectedCatalogKey.value) return
+    templates.value = []
+  }
+})
+
+function useTemplate(text) {
+  form.value.content = text
+}
+
+async function submit() {
+  error.value = ''
+  submitting.value = true
+  try {
+    const res = await createTestimonial({
+      artisan_id: props.artisanId,
+      artisan_service_id: form.value.artisan_service_id,
+      rating: form.value.rating,
+      title: form.value.title,
+      content: form.value.content,
+    })
+    if (!res.success) {
+      error.value = res.error || 'Erreur lors de la publication'
+      return
+    }
+    form.value = { artisan_service_id: null, rating: null, title: '', content: '' }
+    emit('posted')
+  } catch {
+    error.value = 'Problème de connexion. Veuillez réessayer.'
+  } finally {
+    submitting.value = false
+  }
+}
+</script>
+
 <template>
   <div class="testimonial-composer">
     <BetaBanner message="Les témoignages sont en version beta. Merci pour votre patience." />
@@ -52,70 +124,6 @@
     </form>
   </div>
 </template>
-
-<script setup>
-import { ref, computed, watch } from 'vue'
-import { createTestimonial, fetchTestimonialTemplates } from '../api.js'
-import BetaBanner from './BetaBanner.vue'
-
-const props = defineProps({
-  artisanId: { type: Number, required: true },
-  services: { type: Array, default: () => [] },
-})
-const emit = defineEmits(['posted'])
-
-const form = ref({
-  artisan_service_id: null,
-  rating: null,
-  title: '',
-  content: '',
-})
-const templates = ref([])
-const submitting = ref(false)
-const error = ref('')
-
-const selectedCatalogKey = computed(() => {
-  if (!form.value.artisan_service_id) return null
-  const s = props.services.find(s => s.id === form.value.artisan_service_id)
-  return s?.catalog_key || null
-})
-
-watch(selectedCatalogKey, async (key) => {
-  if (!key) {
-    templates.value = []
-    return
-  }
-  try {
-    const res = await fetchTestimonialTemplates(key)
-    templates.value = res.data?.[0]?.templates || []
-  } catch {
-    templates.value = []
-  }
-})
-
-function useTemplate(text) {
-  form.value.content = text
-}
-
-async function submit() {
-  error.value = ''
-  submitting.value = true
-  const res = await createTestimonial({
-    artisan_id: props.artisanId,
-    artisan_service_id: form.value.artisan_service_id,
-    rating: form.value.rating,
-    title: form.value.title,
-    content: form.value.content,
-  })
-  submitting.value = false
-  if (!res.success) {
-    error.value = res.error || 'Erreur lors de la publication'
-    return
-  }
-  form.value = { artisan_service_id: null, rating: null, title: '', content: '' }
-  emit('posted')
-}
-</script>
 
 <style scoped>
 .testimonial-composer label {
