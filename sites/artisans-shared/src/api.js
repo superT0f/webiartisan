@@ -602,3 +602,11 @@ export async function deleteArtisanService(token, serviceId) {
   })
   return res.json()
 }
+
+export async function fetchMyServices(token) {
+  const res = await fetch(`${API_BASE}/artisans/me/services`, {
+    headers: { 'X-Artisan-Token': token },
+  })
+  if (!res.ok) throw new Error('Erreur chargement de mes services')
+  return res.json()
+}

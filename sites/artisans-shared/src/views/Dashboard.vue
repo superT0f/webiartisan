@@ -54,6 +54,18 @@
         </div>
       </section>
 
+      <section class="dashboard-section card">
+        <div class="section-title">
+          <h2>Mes services</h2>
+        </div>
+        <div class="prospect-list">
+          <RouterLink to="/artisan/services" class="prospect-mini">
+            <div><strong>Gérer mes services</strong><span class="text-muted small">Catalogue et services personnalisés</span></div>
+            <span class="badge badge-green">Gérer</span>
+          </RouterLink>
+        </div>
+      </section>
+
       <div v-if="loading" class="skeleton" style="height: 200px; border-radius: 12px;"></div>
 
       <div v-if="loadingProspects" class="skeleton" style="height: 120px; border-radius: 12px; margin-top: 24px;"></div>
