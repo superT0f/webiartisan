@@ -6,32 +6,33 @@
 require_once __DIR__ . '/UserAuth.php';
 
 const XP_ACTIONS = [
-    'artisan_view'      => ['xp' => 5,  'cooldown' => 'hourly', 'limit' => null],
-    'spin_play'         => ['xp' => 10, 'cooldown' => 'daily',  'limit' => null],
-    'qr_validate'       => ['xp' => 25, 'cooldown' => 'once_per_resource', 'limit' => null],
-    'recipe_view'       => ['xp' => 3,  'cooldown' => 'daily',  'limit' => null],
-    'share'             => ['xp' => 15, 'cooldown' => 'daily',  'limit' => 3],
-    'review'            => ['xp' => 20, 'cooldown' => 'once_per_resource', 'limit' => null],
-    'recipe_suggest'    => ['xp' => 10, 'cooldown' => 'once_per_resource', 'limit' => null],
-    'daily_visit'       => ['xp' => 0,  'cooldown' => 'daily',  'limit' => 1, 'internal' => true],
-    'streak_3days'      => ['xp' => 30, 'cooldown' => 'daily',  'limit' => 1, 'internal' => true],
+    'artisan_view'         => ['xp' => 5,  'cooldown' => 'hourly', 'limit' => null],
+    'testimonial_view'     => ['xp' => 3,  'cooldown' => 'daily',  'limit' => null],
+    'testimonial_post'     => ['xp' => 25, 'cooldown' => 'once_per_resource', 'limit' => null],
+    'game_play'            => ['xp' => 10, 'cooldown' => 'daily',  'limit' => null],
+    'game_win'             => ['xp' => 20, 'cooldown' => 'daily',  'limit' => null],
+    'share'                => ['xp' => 15, 'cooldown' => 'daily',  'limit' => 3],
+    'daily_visit'          => ['xp' => 10, 'cooldown' => 'daily',  'limit' => 1, 'internal' => true],
+    'streak_3days'         => ['xp' => 30, 'cooldown' => 'daily',  'limit' => 1, 'internal' => true],
 ];
 
 const LEVEL_TITLES = [
     1  => 'Nouveau dans le quartier',
     3  => 'Explorateur local',
-    5  => 'Habitulé du marché',
+    5  => 'Habitué du marché',
     10 => 'Ambassadeur du terroir',
     20 => 'Légende du village',
 ];
 
 const BADGES = [
-    'first_visit'   => ['name' => 'Première visite', 'condition' => 'Visiter une fiche artisan.', 'target' => 1, 'action' => 'artisan_view'],
-    'gourmand'      => ['name' => 'Gourmand',        'condition' => 'Consulter 10 recettes.',      'target' => 10, 'action' => 'recipe_view'],
-    'lucky'         => ['name' => 'Chanceux',        'condition' => 'Gagner 5 offres à la roue.',  'target' => 5, 'action' => 'spin_play'],
-    'benefactor'    => ['name' => 'Bienfaiteur',     'condition' => 'Laisser 3 avis.',             'target' => 3, 'action' => 'review'],
-    'generous'      => ['name' => 'Généreux',        'condition' => 'Partager 5 pages.',           'target' => 5, 'action' => 'share'],
-    'faithful'      => ['name' => 'Fidèle',          'condition' => '7 jours de connexion.',       'target' => 7, 'action' => 'daily_visit'],
+    'first_visit'    => ['name' => 'Première visite',  'condition' => 'Visiter une fiche artisan.',        'target' => 1,   'action' => 'artisan_view'],
+    'curieux'        => ['name' => 'Curieux',          'condition' => 'Lire 10 témoignages.',              'target' => 10,  'action' => 'testimonial_view'],
+    'ambassadeur'    => ['name' => 'Ambassadeur',      'condition' => 'Publier 3 témoignages.',            'target' => 3,   'action' => 'testimonial_post'],
+    'joueur'         => ['name' => 'Joueur',           'condition' => 'Jouer 10 fois.',                    'target' => 10,  'action' => 'game_play'],
+    'vainqueur'      => ['name' => 'Vainqueur',        'condition' => 'Gagner 5 récompenses.',             'target' => 5,   'action' => 'game_win'],
+    'chanceux'       => ['name' => 'Chanceux',         'condition' => 'Gagner 3 fois à la suite.',         'target' => 3,   'action' => 'game_win'],
+    'generous'       => ['name' => 'Généreux',         'condition' => 'Partager 5 pages.',                 'target' => 5,   'action' => 'share'],
+    'faithful'       => ['name' => 'Fidèle',           'condition' => '7 jours de connexion.',             'target' => 7,   'action' => 'daily_visit'],
 ];
 
 const STREAK_MILESTONE_DAYS = 3;
