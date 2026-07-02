@@ -57,6 +57,13 @@ function user_magic_link(PDO $pdo, array $body): void
         return;
     }
 
+    $rememberMe = !empty($body['rememberMe']);
+
+    $redirect = $body['redirect'] ?? '/roue';
+    if (!is_string($redirect) || $redirect === '' || $redirect[0] !== '/') {
+        $redirect = '/roue';
+    }
+
     $stmt = $pdo->prepare("SELECT id FROM local_users WHERE email = ?");
     $stmt->execute([$email]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -81,7 +88,7 @@ function user_magic_link(PDO $pdo, array $body): void
     $base = ($origin && filter_var($origin, FILTER_VALIDATE_URL))
         ? $origin
         : 'https://artisans-livry.prigent.tech';
-    $link = rtrim($base, '/') . '/roue?token=' . urlencode($token);
+    $link = rtrim($base, '/') . $redirect . (strpos($redirect, '?') !== false ? '&' : '?') . 'token=' . urlencode($token);
 
     $subject = 'Votre lien pour tourner la roue des artisans';
     $html = <<<HTML
@@ -96,11 +103,24 @@ function user_magic_link(PDO $pdo, array $body): void
 </body></html>
 HTML;
 
+    $config = getAppConfig();
+    $fromEmail = $config['mail_from'] ?? 'noreply@webiartisan.prigent.tech';
+
     $sent = send_html_email($email, $subject, $html, null, 'WebIArtisan');
     if (!$sent) {
         error_log("[USER-MAGIC-LINK] Échec envoi email à {$email}");
     }
-    error_log("[USER-MAGIC-LINK] {$link}");
+    error_log(sprintf(
+        "[USER-MAGIC-LINK] email=%s user_id=%s rememberMe=%s redirect=%s origin=%s from=%s sent=%s link=%s",
+        $email,
+        $userId,
+        $rememberMe ? '1' : '0',
+        $redirect,
+        $_SERVER['HTTP_ORIGIN'] ?? 'none',
+        $fromEmail,
+        $sent ? '1' : '0',
+        $link
+    ));
 
     echo json_encode([
         'success' => true,
