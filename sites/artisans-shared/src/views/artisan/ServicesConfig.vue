@@ -8,6 +8,8 @@
       <RouterLink to="/espace" class="btn btn-outline">Retour à l'espace</RouterLink>
     </div>
 
+    <div v-if="error" class="error-banner">{{ error }}</div>
+
     <section class="dashboard-section card">
       <p v-if="activeServicesCount >= 5" class="limit-warning">
         Limite gratuite atteinte (5 services actifs).
@@ -98,6 +100,7 @@ const artisanToken = computed(() => props.token || localStorage.getItem('artisan
 const services = ref([])
 const catalog = ref([])
 const adding = ref(false)
+const error = ref('')
 const activeServicesCount = computed(() => services.value.filter(s => s.is_active).length)
 const newService = ref({
   catalog_id: null,
@@ -109,6 +112,7 @@ const newService = ref({
 
 async function load() {
   if (!artisanToken.value) return
+  error.value = ''
   try {
     const [svcRes, catRes] = await Promise.all([
       fetchMyServices(artisanToken.value),
@@ -118,11 +122,13 @@ async function load() {
     catalog.value = catRes.data || []
   } catch (e) {
     console.error('Erreur chargement services', e)
+    error.value = 'Impossible de charger vos services.'
   }
 }
 
 async function addService() {
   if (activeServicesCount.value >= 5) return
+  error.value = ''
   adding.value = true
   try {
     const res = await createArtisanService(artisanToken.value, {
@@ -134,34 +140,43 @@ async function addService() {
       is_custom: !newService.value.catalog_id,
     })
     if (!res.success) {
-      alert(res.error || 'Erreur lors de l\'ajout')
+      error.value = res.error || 'Erreur lors de l\'ajout'
       return
     }
     newService.value = { catalog_id: null, name: '', description: '', price_range: '', duration: '' }
     await load()
   } catch (e) {
     console.error('Erreur ajout service', e)
+    error.value = 'Impossible d\'ajouter le service.'
   } finally {
     adding.value = false
   }
 }
 
 async function toggleActive(s) {
+  if (!s.is_active && activeServicesCount.value >= 5) {
+    error.value = 'Vous ne pouvez pas activer plus de 5 services.'
+    return
+  }
+  error.value = ''
   try {
     await updateArtisanService(artisanToken.value, s.id, { is_active: !s.is_active })
     await load()
   } catch (e) {
     console.error('Erreur mise à jour service', e)
+    error.value = 'Impossible de mettre à jour le service.'
   }
 }
 
 async function removeService(id) {
   if (!confirm('Supprimer ce service ?')) return
+  error.value = ''
   try {
     await deleteArtisanService(artisanToken.value, id)
     await load()
   } catch (e) {
     console.error('Erreur suppression service', e)
+    error.value = 'Impossible de supprimer le service.'
   }
 }
 
@@ -197,6 +212,13 @@ onMounted(load)
   color: #b71c1c;
   margin-bottom: 16px;
   font-weight: 600;
+}
+.error-banner {
+  background: #ffebee;
+  color: #b71c1c;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 24px;
 }
 
 .service-list {

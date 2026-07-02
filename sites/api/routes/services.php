@@ -37,14 +37,7 @@ function service_catalog_list(PDO $pdo): void
         $item['id'] = (int)$item['id'];
         $item['label'] = htmlspecialchars((string)($item['label'] ?? ''), ENT_QUOTES, 'UTF-8');
         $templates = json_decode($item['testimonial_templates'] ?? '[]', true);
-        if (is_array($templates)) {
-            $item['testimonial_templates'] = array_map(
-                static fn($t) => htmlspecialchars((string)$t, ENT_QUOTES, 'UTF-8'),
-                $templates
-            );
-        } else {
-            $item['testimonial_templates'] = [];
-        }
+        $item['testimonial_templates'] = is_array($templates) ? $templates : [];
     }
     echo json_encode(['success' => true, 'data' => $items]);
 }

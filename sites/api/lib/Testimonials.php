@@ -39,11 +39,7 @@ function testimonials_get_templates(PDO $pdo, ?string $serviceKey = null): array
             'key' => $row['key'],
             'label' => htmlspecialchars($row['label_fr'] ?? '', ENT_QUOTES, 'UTF-8'),
             'icon' => $row['icon'],
-            'templates' => is_array($templates)
-                ? array_map(function ($t) {
-                    return htmlspecialchars((string) $t, ENT_QUOTES, 'UTF-8');
-                }, $templates)
-                : [],
+            'templates' => is_array($templates) ? $templates : [],
         ];
     }, $rows);
 }
