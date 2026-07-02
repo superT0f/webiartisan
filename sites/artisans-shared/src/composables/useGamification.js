@@ -28,16 +28,21 @@ export function useGamification() {
     const token = getUserToken()
     if (!token) return { success: false, status: 0, error: 'Non authentifié' }
 
-    const result = await recordXpEvent(action, resourceKey, metadata)
+    try {
+      const result = await recordXpEvent(action, resourceKey, metadata)
 
-    if (result.success && result.data && result.data.xp_gained > 0) {
-      showToast(`+${result.data.xp_gained} XP`)
-      if (result.data.level_up) showToast('Niveau supérieur !')
-      if (result.data.new_badges?.length) {
-        for (const b of result.data.new_badges) showToast(`Badge débloqué : ${b.name}`)
+      if (result.success && result.data && result.data.xp_gained > 0) {
+        showToast(`+${result.data.xp_gained} XP`)
+        if (result.data.level_up) showToast('Niveau supérieur !')
+        if (result.data.new_badges?.length) {
+          for (const b of result.data.new_badges) showToast(`Badge débloqué : ${b.name}`)
+        }
       }
+      return result
+    } catch (e) {
+      console.error('Gamification action failed', e)
+      return { success: false, status: 0, error: 'Erreur lors de l\'enregistrement de l\'action' }
     }
-    return result
   }
 
   function showToast(message, duration = 3000) {

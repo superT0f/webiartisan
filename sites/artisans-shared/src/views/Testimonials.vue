@@ -112,8 +112,12 @@ function toggleService(key) {
   selectedService.value = selectedService.value === key ? null : key
 }
 
-function onViewTestimonial(t) {
-  recordAction('testimonial_view', `testimonial:${t.id}`, { testimonial_id: t.id, artisan_id: t.artisan_id })
+async function onViewTestimonial(t) {
+  try {
+    await recordAction('testimonial_view', `testimonial:${t.id}`, { testimonial_id: t.id, artisan_id: t.artisan_id })
+  } catch (e) {
+    // Gamification failures should not break the testimonial feed
+  }
 }
 
 watch(selectedService, loadTestimonials)

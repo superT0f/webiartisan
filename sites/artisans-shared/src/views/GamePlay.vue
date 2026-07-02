@@ -126,10 +126,14 @@ async function load() {
   }
 }
 
-function onPlayed(data) {
-  recordAction('game_play', `game:${game.value.id}`, { game_id: game.value.id, artisan_id: game.value.artisan_id })
-  if (data?.reward) {
-    recordAction('game_win', `game:${game.value.id}`, { game_id: game.value.id, reward_id: data.reward.id })
+async function onPlayed(data) {
+  try {
+    await recordAction('game_play', `game:${game.value.id}`, { game_id: game.value.id, artisan_id: game.value.artisan_id })
+    if (data?.reward) {
+      await recordAction('game_win', `game:${game.value.id}`, { game_id: game.value.id, reward_id: data.reward.id })
+    }
+  } catch (e) {
+    // Gamification failures should not break the game experience
   }
 }
 

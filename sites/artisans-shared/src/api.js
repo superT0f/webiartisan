@@ -629,12 +629,11 @@ export async function fetchUserProfile(userId) {
 }
 
 export async function recordXpEvent(action, resourceKey = null, metadata = null) {
-  const res = await fetch(`${API_BASE}/gamification/xp`, {
+  return requestJson(`${API_BASE}/gamification/xp`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...userHeaders() },
     body: JSON.stringify({ action, resource_key: resourceKey, metadata }),
-  })
-  return res.json()
+  }, 'Erreur lors de l\'enregistrement de l\'action')
 }
 
 export async function fetchCityLeaderboard(cityId) {
