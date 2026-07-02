@@ -576,6 +576,47 @@ if [[ -n "$GAMES_ARTISAN_TOKEN" ]]; then
   fi
 fi
 
+echo ""
+echo "== Consumer auth =="
+
+CONSUMER_USER_ID=999997
+CONSUMER_EMAIL="consumer-test@example.com"
+CONSUMER_MAGIC_TOKEN=""
+
+if command -v docker >/dev/null 2>&1 && docker compose ps | grep -q mysql; then
+  (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
+    -e "DELETE FROM local_users WHERE email = '$CONSUMER_EMAIL'; DELETE FROM local_user_actions WHERE user_id = $CONSUMER_USER_ID; DELETE FROM local_user_badges WHERE user_id = $CONSUMER_USER_ID; DELETE FROM local_user_streaks WHERE user_id = $CONSUMER_USER_ID;") >/dev/null 2>&1 || true
+fi
+
+reset_rate_limit 'login'
+
+curl_json_status -X POST "${BASE_URL}/users/magic-link" \
+  -H 'Content-Type: application/json' \
+  -H 'Origin: http://localhost:8080' \
+  -d "{\"email\":\"$CONSUMER_EMAIL\",\"rememberMe\":true,\"redirect\":\"/jeu/1\"}"
+check "$LAST_HTTP_CODE" "POST /users/magic-link" "200"
+
+if [[ "$MYSQL_AVAILABLE" -eq 1 ]]; then
+  CONSUMER_MAGIC_TOKEN=$(cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
+    -N -B -e "SELECT magic_token FROM local_users WHERE email = '$CONSUMER_EMAIL' LIMIT 1" 2>/dev/null | tr -d '\r')
+fi
+
+if [[ -n "$CONSUMER_MAGIC_TOKEN" ]]; then
+  curl_json_status -X POST "${BASE_URL}/users/auth?token=$CONSUMER_MAGIC_TOKEN&rememberMe=1"
+  check "$LAST_HTTP_CODE" "POST /users/auth with rememberMe" "200"
+  if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+    assert_json "$JSON_BODY" "d.get('success')" "consumer auth should succeed"
+    assert_json "$JSON_BODY" "len(d.get('token','')) > 0" "consumer auth should return token"
+  fi
+
+  CONSUMER_SESSION_TOKEN=$(echo "$JSON_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))" || true)
+
+  if [[ -n "$CONSUMER_SESSION_TOKEN" ]]; then
+    curl_json_status "${BASE_URL}/users/me" -H "Authorization: Bearer $CONSUMER_SESSION_TOKEN"
+    check "$LAST_HTTP_CODE" "GET /users/me consumer" "200"
+  fi
+fi
+
 if [[ "$FAILED" -ne 0 ]]; then
   echo "❌ Some API tests failed."
   exit 1
