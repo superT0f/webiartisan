@@ -226,6 +226,17 @@ function testimonials_create(PDO $pdo, array $body): void
         return;
     }
 
+    // Verify artisan_service_id ownership
+    if ($artisanServiceId) {
+        $svcOwner = $pdo->prepare("SELECT id FROM local_services WHERE id = ? AND artisan_id = ?");
+        $svcOwner->execute([$artisanServiceId, $artisanId]);
+        if (!$svcOwner->fetch()) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Le service sélectionné n\'appartient pas à cet artisan']);
+            return;
+        }
+    }
+
     // Resolve service_type from artisan_service_id if not provided
     if (!$serviceType && $artisanServiceId) {
         $stmt = $pdo->prepare("

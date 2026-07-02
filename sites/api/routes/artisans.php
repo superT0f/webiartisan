@@ -76,7 +76,7 @@ switch ($method) {
             artisan_unfollow_prospect($pdo, (int)$segments[3]);
         } elseif ($action === 'me' && $param === 'spin-offers' && is_numeric($segments[3] ?? '')) {
             artisan_delete_spin_offer($pdo, (int)$segments[3]);
-        } elseif ($action === 'me' && $param === 'services' && is_numeric($segments[3] ?? '')) {
+        } elseif ($action === 'me' && $param === 'services' && filter_var($segments[3] ?? '', FILTER_VALIDATE_INT) !== false) {
             artisan_delete_service($pdo, (int)$segments[3]);
         } else {
             http_response_code(404);
@@ -88,7 +88,7 @@ switch ($method) {
         $body = json_decode(file_get_contents('php://input'), true) ?? [];
         if ($action === 'me' && $param === 'admin-recipes' && is_numeric($segments[3] ?? '')) {
             artisan_archive_recipe($pdo, (int)$segments[3]);
-        } elseif ($action === 'me' && $param === 'services' && is_numeric($segments[3] ?? '')) {
+        } elseif ($action === 'me' && $param === 'services' && filter_var($segments[3] ?? '', FILTER_VALIDATE_INT) !== false) {
             artisan_update_service($pdo, (int)$segments[3], $body);
         } elseif ($action === 'me' && $param === 'spin-offers' && is_numeric($segments[3] ?? '')) {
             artisan_update_spin_offer($pdo, (int)$segments[3], $body);
@@ -1367,20 +1367,39 @@ function artisan_update_service(PDO $pdo, int $serviceId, array $body): void
         return;
     }
 
-    $allowed = ['name', 'description', 'price_range', 'duration', 'is_active', 'sort_order'];
+    $allowed = ['name', 'description', 'price_range', 'duration', 'is_active', 'sort_order', 'service_catalog_id'];
     $sets = [];
     $params = [];
     foreach ($allowed as $col) {
         if (!array_key_exists($col, $body)) {
             continue;
         }
-        $sets[] = "$col = ?";
-        $value = $body[$col];
-        if ($col === 'is_active' || $col === 'sort_order') {
-            $value = (int)$value;
-        } elseif (in_array($col, ['name', 'description', 'price_range', 'duration'], true)) {
-            $value = trim((string)$value);
+        if ($col === 'name') {
+            $value = trim((string)$body[$col]);
+            if (mb_strlen($value) > 200) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Nom du service trop long (200 caractères max)']);
+                return;
+            }
+        } elseif ($col === 'service_catalog_id') {
+            $catalogId = (int)$body[$col];
+            $catCheck = $pdo->prepare("SELECT id FROM local_service_catalog WHERE id = ? AND is_active = 1");
+            $catCheck->execute([$catalogId]);
+            if (!$catCheck->fetch()) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Catalogue de service invalide']);
+                return;
+            }
+            $value = $catalogId;
+        } else {
+            $value = $body[$col];
+            if ($col === 'is_active' || $col === 'sort_order') {
+                $value = (int)$value;
+            } elseif (in_array($col, ['description', 'price_range', 'duration'], true)) {
+                $value = trim((string)$value);
+            }
         }
+        $sets[] = "$col = ?";
         $params[] = $value;
     }
     if (empty($sets)) {
