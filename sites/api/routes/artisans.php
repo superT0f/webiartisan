@@ -17,6 +17,7 @@
 
 require_once __DIR__ . '/../lib/Mailer.php';
 require_once __DIR__ . '/../lib/Games.php';
+require_once __DIR__ . '/../lib/Gamification.php';
 
 switch ($method) {
 
@@ -744,6 +745,18 @@ function artisan_add_review(PDO $pdo, int $id, array $body): void
         VALUES (?, ?, ?, ?, ?, 0)
     ");
     $stmt->execute([$id, $name, $email ?: null, $rating, $comment]);
+
+    $artisanId = $id;
+    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+    $token = str_replace('Bearer ', '', $authHeader);
+    if ($token) {
+        $usr = $pdo->prepare("SELECT id FROM local_users WHERE session_token = ? AND session_exp > NOW() LIMIT 1");
+        $usr->execute([$token]);
+        $uid = $usr->fetchColumn();
+        if ($uid) {
+            gamificationRecordAction($pdo, (int)$uid, 'testimonial_post', "artisan:$artisanId", ['artisan_id' => $artisanId]);
+        }
+    }
 
     echo json_encode([
         'success' => true,

@@ -9,6 +9,8 @@
  * POST /recipes/:id/suggest                           — complément / variante
  */
 
+require_once __DIR__ . '/../lib/Gamification.php';
+
 switch ($method) {
     case 'GET':
         if ($action === '' || $action === 'list') {
@@ -150,6 +152,16 @@ function recipes_get(PDO $pdo, string $slug): void
     $stmt->execute([$recipe['id']]);
     $recipe['variants'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    if (!empty($_SERVER['HTTP_AUTHORIZATION'])) {
+        $token = str_replace('Bearer ', '', $_SERVER['HTTP_AUTHORIZATION']);
+        $usr = $pdo->prepare("SELECT id FROM local_users WHERE session_token = ? AND session_exp > NOW() LIMIT 1");
+        $usr->execute([$token]);
+        $uid = $usr->fetchColumn();
+        if ($uid) {
+            gamificationRecordAction($pdo, (int)$uid, 'testimonial_view', "recipe:{$recipe['id']}", ['recipe_id' => $recipe['id']]);
+        }
+    }
+
     echo json_encode(['success' => true, 'data' => $recipe]);
 }
 
@@ -251,6 +263,16 @@ function recipes_create(PDO $pdo, array $body): void
             $idx + 1,
             trim($step['instruction'] ?? ''),
         ]);
+    }
+
+    if (!empty($_SERVER['HTTP_AUTHORIZATION'])) {
+        $token = str_replace('Bearer ', '', $_SERVER['HTTP_AUTHORIZATION']);
+        $usr = $pdo->prepare("SELECT id FROM local_users WHERE session_token = ? AND session_exp > NOW() LIMIT 1");
+        $usr->execute([$token]);
+        $uid = $usr->fetchColumn();
+        if ($uid) {
+            gamificationRecordAction($pdo, (int)$uid, 'testimonial_post', "recipe:$recipeId", ['recipe_id' => $recipeId]);
+        }
     }
 
     echo json_encode(['success' => true, 'slug' => $slug, 'message' => 'Recette publiée']);

@@ -8,6 +8,7 @@
  */
 
 require_once __DIR__ . '/../lib/UserAuth.php';
+require_once __DIR__ . '/../lib/Gamification.php';
 
 switch ($method) {
     case 'GET':
@@ -189,6 +190,8 @@ function spin_play(PDO $pdo): void
         ]);
 
         $pdo->commit();
+
+    gamificationRecordAction($pdo, (int)$user['id'], 'game_play', "city:{$city['id']}", ['city_id' => $city['id']]);
     } catch (Exception $e) {
         $pdo->rollBack();
         if ($e->getMessage() === 'daily_limit_exceeded') {
