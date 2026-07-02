@@ -13,6 +13,7 @@
  */
 
 require_once __DIR__ . '/../lib/Testimonials.php';
+require_once __DIR__ . '/../lib/Gamification.php';
 
 function is_valid_id(mixed $value): bool
 {
@@ -193,6 +194,17 @@ function testimonials_get(PDO $pdo, int $id): void
         $item['avatar_url'] = null;
     }
     $item['media'] = testimonials_get_media($pdo, $id);
+
+    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+    $token = str_replace('Bearer ', '', $authHeader);
+    if ($token) {
+        $usr = $pdo->prepare("SELECT id FROM local_users WHERE session_token = ? AND session_exp > NOW() LIMIT 1");
+        $usr->execute([$token]);
+        $uid = $usr->fetchColumn();
+        if ($uid) {
+            gamificationRecordAction($pdo, (int)$uid, 'testimonial_view', "testimonial:$id", ['testimonial_id' => $id, 'artisan_id' => $item['artisan_id']]);
+        }
+    }
 
     echo json_encode(['success' => true, 'data' => $item]);
 }

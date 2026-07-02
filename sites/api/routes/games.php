@@ -10,6 +10,7 @@
  */
 
 require_once __DIR__ . '/../lib/Games.php';
+require_once __DIR__ . '/../lib/Gamification.php';
 
 switch ($method) {
     case 'GET':
@@ -205,6 +206,10 @@ function games_play(PDO $pdo, int $id, array $body): void
     };
 
     games_record_play($pdo, $id, (int)$user['id'], $result, 10);
+
+    if (!empty($result['reward'])) {
+        gamificationRecordAction($pdo, (int)$user['id'], 'game_win', "game:$id", ['game_id' => $id, 'reward_id' => $result['reward']['id']]);
+    }
 
     echo json_encode(['success' => true, 'data' => $result]);
 }
