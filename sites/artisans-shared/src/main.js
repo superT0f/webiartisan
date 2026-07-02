@@ -1,6 +1,7 @@
 import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import App from './App.vue'
+import GamesHub from './views/GamesHub.vue'
 import './style.css'
 
 const routes = [
@@ -22,6 +23,7 @@ const routes = [
   { path: '/flyers', component: () => import('./views/Flyer.vue'), meta: { title: 'Imprimer les flyers / plaquettes' } },
   { path: '/plaquette', redirect: '/flyers' },
   { path: '/roue', component: () => import('./views/SpinWheel.vue'), meta: { title: 'La roue des artisans' } },
+  { path: '/jeux', name: 'GamesHub', component: GamesHub, meta: { title: 'Jeux et bons plans' } },
   { path: '/profil', component: () => import('./views/UserProfile.vue'), meta: { title: 'Mon profil' } },
   { path: '/personnage', component: () => import('./views/CharacterEdit.vue'), meta: { title: 'Mon personnage' } },
   { path: '/:pathMatch(.*)*', redirect: '/' }

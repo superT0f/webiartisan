@@ -15,6 +15,7 @@
         <RouterLink to="/prospection" class="nav-link">Prospection</RouterLink>
         <RouterLink to="/recettes" class="nav-link">Recettes</RouterLink>
         <RouterLink to="/roue" class="nav-link">🎰 Roue</RouterLink>
+        <RouterLink to="/jeux" class="nav-link">🎮 Jeux</RouterLink>
         <RouterLink to="/#services-locaux" class="nav-link" @click.prevent="scrollTo('services-locaux')">Services locaux</RouterLink>
         <RouterLink to="/espace" class="nav-link">Mon espace</RouterLink>
         <RouterLink to="/inscrire" class="btn btn-primary btn-sm">
@@ -43,6 +44,7 @@
         <RouterLink to="/prospection" class="nav-mobile-link">🎯 Prospection</RouterLink>
         <RouterLink to="/recettes" class="nav-mobile-link">🍳 Recettes</RouterLink>
         <RouterLink to="/roue" class="nav-mobile-link">🎰 La roue</RouterLink>
+        <RouterLink to="/jeux" class="nav-mobile-link">🎮 Jeux</RouterLink>
         <a href="/#meteo" class="nav-mobile-link">🌤️ Météo locale</a>
         <a href="/#services-locaux" class="nav-mobile-link">🏙️ Services locaux</a>
         <RouterLink to="/espace" class="nav-mobile-link">🔐 Mon espace</RouterLink>
