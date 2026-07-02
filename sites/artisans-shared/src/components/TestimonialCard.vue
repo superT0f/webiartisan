@@ -69,10 +69,10 @@ const validMedia = computed(() => (props.testimonial.media || []).filter(m => is
     </div>
 
     <footer class="testimonial-card__actions">
-      <button type="button" @click="$emit('helpful', testimonial.id)">
+      <button type="button" @click.stop="$emit('helpful', testimonial.id)">
         Utile ({{ testimonial.helpful_count }})
       </button>
-      <button type="button" @click="$emit('report', testimonial.id)">
+      <button type="button" @click.stop="$emit('report', testimonial.id)">
         Signaler
       </button>
     </footer>
