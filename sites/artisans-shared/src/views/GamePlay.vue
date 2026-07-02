@@ -27,6 +27,10 @@
             required
             :disabled="sending"
           />
+          <label class="form-checkbox">
+            <input v-model="rememberMe" type="checkbox" :disabled="sending" />
+            Rester connecté sur cet appareil
+          </label>
           <button type="submit" class="btn btn-primary" :disabled="sending || !email">
             {{ sending ? 'Envoi…' : 'Recevoir mon lien' }}
           </button>
@@ -76,6 +80,8 @@ const email = ref('')
 const sending = ref(false)
 const message = ref('')
 const messageType = ref('')
+const rememberMe = ref(true)
+const redirectPath = ref(route.fullPath)
 
 function setMessage(text, type = 'info') {
   message.value = text
@@ -85,7 +91,7 @@ function setMessage(text, type = 'info') {
 if (route.query.token) {
   authUser(route.query.token).then(res => {
     if (res.success && res.token) {
-      setUserToken(res.token)
+      setUserToken(res.token, rememberMe.value)
       token.value = res.token
       router.replace({ path: route.path, query: {} })
       load()
@@ -99,7 +105,7 @@ async function sendMagicLink() {
   sending.value = true
   message.value = ''
   try {
-    const res = await requestUserMagicLink(email.value)
+    const res = await requestUserMagicLink(email.value, rememberMe.value, redirectPath.value)
     setMessage(res.message || 'Si votre email est valide, vous recevrez un lien.', 'success')
   } catch (e) {
     setMessage('Erreur lors de l\'envoi.', 'error')
@@ -194,5 +200,17 @@ onMounted(() => {
 .auth-message.error {
   background: rgba(183, 28, 28, 0.08);
   color: #b71c1c;
+}
+.form-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.form-checkbox input {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
 }
 </style>
