@@ -255,6 +255,7 @@ export async function archiveRecipe(token, recipeId) {
 // --- Authentification consommateur ------------------------------
 
 const USER_TOKEN_KEY = 'spin_user_token'
+const USER_TOKEN_COOKIE = 'user_token'
 
 export const authEvents = new EventTarget()
 export function notifyAuthChanged() {
@@ -262,16 +263,23 @@ export function notifyAuthChanged() {
 }
 
 export function getUserToken() {
-  return localStorage.getItem(USER_TOKEN_KEY)
+  return localStorage.getItem(USER_TOKEN_KEY) || getCookie(USER_TOKEN_COOKIE) || ''
 }
 
-export function setUserToken(token) {
-  localStorage.setItem(USER_TOKEN_KEY, token)
+export function setUserToken(token, remember = false) {
+  if (remember) {
+    setCookie(USER_TOKEN_COOKIE, token, 365)
+    localStorage.removeItem(USER_TOKEN_KEY)
+  } else {
+    localStorage.setItem(USER_TOKEN_KEY, token)
+    deleteCookie(USER_TOKEN_COOKIE)
+  }
   notifyAuthChanged()
 }
 
 export function removeUserToken() {
   localStorage.removeItem(USER_TOKEN_KEY)
+  deleteCookie(USER_TOKEN_COOKIE)
   notifyAuthChanged()
 }
 
@@ -280,11 +288,19 @@ function userHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
-export async function requestUserMagicLink(email) {
+export async function requestUserMagicLink(email, rememberMe = true, redirect = '/roue') {
   const res = await fetch(`${API_BASE}/users/magic-link`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, rememberMe, redirect }),
+  })
+  return res.json()
+}
+
+export async function fetchArtisanConsumerToken(artisanToken) {
+  const res = await fetch(`${API_BASE}/artisans/me/consumer-token`, {
+    method: 'POST',
+    headers: { 'X-Artisan-Token': artisanToken },
   })
   return res.json()
 }
