@@ -175,8 +175,10 @@ function user_auth(PDO $pdo): void
         return;
     }
 
+    $rememberMe = !empty($_GET['rememberMe']);
+
     $sessionToken = bin2hex(random_bytes(32));
-    $sessionExp = date('Y-m-d H:i:s', strtotime('+30 days'));
+    $sessionExp = date('Y-m-d H:i:s', $rememberMe ? strtotime('+365 days') : strtotime('+30 days'));
 
     $pdo->prepare("
         UPDATE local_users
