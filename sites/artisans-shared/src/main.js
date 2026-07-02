@@ -6,8 +6,10 @@ import './style.css'
 const routes = [
   { path: '/', component: () => import('./views/Home.vue'), meta: { title: 'Artisans de ' + import.meta.env.VITE_CITY_NAME } },
   { path: '/artisan/:id', component: () => import('./views/Artisan.vue'), meta: { title: 'Fiche artisan' } },
+  { path: '/temoignages', name: 'Testimonials', component: () => import('./views/Testimonials.vue'), meta: { title: 'Avis et recommandations locales' } },
   { path: '/inscrire', component: () => import('./views/Register.vue'), meta: { title: 'Inscrire mon entreprise' } },
   { path: '/espace', component: () => import('./views/Dashboard.vue'), meta: { title: 'Mon espace artisan' } },
+  { path: '/artisan/services', component: () => import('./views/artisan/ServicesConfig.vue'), props: true, meta: { title: 'Mes services' } },
   { path: '/prospection', component: () => import('./views/Prospects.vue'), meta: { title: 'Prospection locale' } },
   { path: '/prospect/:id', component: () => import('./views/ProspectDetail.vue'), meta: { title: 'Fiche prospect' } },
   { path: '/recettes', component: () => import('./views/Recipes.vue'), meta: { title: 'Recettes locales' } },

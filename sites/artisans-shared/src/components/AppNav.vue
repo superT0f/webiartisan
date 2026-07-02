@@ -11,6 +11,7 @@
 
       <div class="nav-links">
         <RouterLink to="/" class="nav-link">Annuaire</RouterLink>
+        <RouterLink to="/temoignages" class="nav-link">Avis</RouterLink>
         <RouterLink to="/prospection" class="nav-link">Prospection</RouterLink>
         <RouterLink to="/recettes" class="nav-link">Recettes</RouterLink>
         <RouterLink to="/roue" class="nav-link">🎰 Roue</RouterLink>
@@ -38,6 +39,7 @@
     <Transition name="slide-down">
       <div v-if="menuOpen" class="nav-mobile" @click="menuOpen = false">
         <RouterLink to="/" class="nav-mobile-link">🏠 Annuaire des artisans</RouterLink>
+        <RouterLink to="/temoignages" class="nav-mobile-link">💬 Avis locaux</RouterLink>
         <RouterLink to="/prospection" class="nav-mobile-link">🎯 Prospection</RouterLink>
         <RouterLink to="/recettes" class="nav-mobile-link">🍳 Recettes</RouterLink>
         <RouterLink to="/roue" class="nav-mobile-link">🎰 La roue</RouterLink>
