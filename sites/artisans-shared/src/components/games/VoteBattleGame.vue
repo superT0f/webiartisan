@@ -21,7 +21,7 @@
 import { ref, watch } from 'vue'
 import { playGame } from '../../api.js'
 
-const props = defineProps({ instanceId: { type: Number, required: true }, config: Object })
+const props = defineProps({ instanceId: { type: [String, Number], required: true }, config: Object })
 const emit = defineEmits(['played'])
 
 const result = ref(null)
