@@ -11,6 +11,7 @@
           <button :class="{ active: authTab === 'magic' }" @click="authTab = 'magic'">Lien magique</button>
           <button :class="{ active: authTab === 'login' }" @click="authTab = 'login'">Mot de passe</button>
           <button :class="{ active: authTab === 'register' }" @click="authTab = 'register'">Créer un compte</button>
+          <button :class="{ active: authTab === 'forgot' }" @click="authTab = 'forgot'">Mot de passe oublié</button>
         </div>
 
         <form v-if="authTab === 'magic'" @submit.prevent="sendMagicLink" class="auth-form">
