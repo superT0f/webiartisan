@@ -204,8 +204,8 @@ if ($module && file_exists($routeFile)) {
         'module' => $module,
         'action' => $action,
         'method' => $method,
-        'user_id' => $authUser['sub'] ?? null,
-        'tenant_id' => $authUser['tenant_id'] ?? null
+        'user_id' => null,
+        'tenant_id' => null
     ]);
     require_once $routeFile;
 } elseif ($module === '' || $module === 'health') {
