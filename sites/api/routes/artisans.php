@@ -628,6 +628,7 @@ function artisan_magic_link(PDO $pdo, array $body): void
     $safeLink    = htmlspecialchars($link, ENT_QUOTES, 'UTF-8');
 
     $subject = 'Votre lien de connexion WebIArtisan';
+    $expiryText = $rememberMe ? '365 jours' : '1 heure';
     $html    = <<<HTML
 <!DOCTYPE html>
 <html><body style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 20px;">
@@ -636,7 +637,7 @@ function artisan_magic_link(PDO $pdo, array $body): void
   <div style="text-align: center; margin: 24px 0;">
     <a href="{$safeLink}" style="display: inline-block; background: #1a1a2e; color: #fff; padding: 14px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">Me connecter</a>
   </div>
-  <p style="color: #888; font-size: 13px;">Ce lien est valable 1 heure. Si vous n'avez pas demandé ce lien, ignorez cet email.</p>
+  <p style="color: #888; font-size: 13px;">Ce lien est valable {$expiryText}. Si vous n'avez pas demandé ce lien, ignorez cet email.</p>
   <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
   <p style="color: #aaa; font-size: 12px;">WebIArtisan</p>
 </body></html>
@@ -649,7 +650,7 @@ HTML;
         $fromEmail,
         'WebIArtisan',
         null,
-        ['type' => 'artisan_magic_link', 'artisan_id' => (int)$artisan['id'], 'token' => $token]
+        ['type' => 'artisan_magic_link', 'artisan_id' => (int)$artisan['id']]
     );
 
     $redactedLink = preg_replace('/token=[^&]+/', 'token=REDACTED', $link);
@@ -742,12 +743,7 @@ function artisan_portal_url(): string {
         return $origin;
     }
 
-    $config = getAppConfig();
-    $fallback = $config['url'] ?? 'https://artisans-livry.prigent.tech';
-    if (!filter_var($fallback, FILTER_VALIDATE_URL)) {
-        $fallback = 'https://artisans-livry.prigent.tech';
-    }
-    return $fallback;
+    return 'https://artisans-livry.prigent.tech';
 }
 
 /**
