@@ -92,38 +92,49 @@ function user_magic_link(PDO $pdo, array $body): void
         $rawRedirect = '/roue';
     }
 
-    $stmt = $pdo->prepare("SELECT id FROM local_users WHERE email = ?");
-    $stmt->execute([$email]);
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    $startTime = microtime(true);
 
-    if ($user) {
-        $userId = (int)$user['id'];
-    } else {
-        try {
-            $insert = $pdo->prepare("INSERT INTO local_users (email) VALUES (?)");
-            $insert->execute([$email]);
-            $userId = (int)$pdo->lastInsertId();
-        } catch (PDOException $e) {
-            if ((int)$e->getCode() === 23000) {
-                // Duplicate-key race: re-fetch the existing user.
-                $stmt = $pdo->prepare("SELECT id FROM local_users WHERE email = ?");
-                $stmt->execute([$email]);
-                $user = $stmt->fetch(PDO::FETCH_ASSOC);
-                $userId = $user ? (int)$user['id'] : 0;
-            } else {
-                throw $e;
+    $pdo->beginTransaction();
+    try {
+        $stmt = $pdo->prepare("SELECT id FROM local_users WHERE email = ?");
+        $stmt->execute([$email]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($user) {
+            $userId = (int)$user['id'];
+        } else {
+            try {
+                $insert = $pdo->prepare("INSERT INTO local_users (email) VALUES (?)");
+                $insert->execute([$email]);
+                $userId = (int)$pdo->lastInsertId();
+            } catch (PDOException $e) {
+                if ((int)$e->getCode() === 23000) {
+                    $stmt = $pdo->prepare("SELECT id FROM local_users WHERE email = ?");
+                    $stmt->execute([$email]);
+                    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+                    $userId = $user ? (int)$user['id'] : 0;
+                } else {
+                    throw $e;
+                }
             }
         }
+
+        $token = bin2hex(random_bytes(32));
+        $exp = date('Y-m-d H:i:s', strtotime('+1 hour'));
+
+        $pdo->prepare("
+            UPDATE local_users
+            SET magic_token = ?, magic_token_exp = ?
+            WHERE id = ?
+        ")->execute([$token, $exp, $userId]);
+
+        $pdo->commit();
+    } catch (PDOException $e) {
+        $pdo->rollBack();
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
+        return;
     }
-
-    $token = bin2hex(random_bytes(32));
-    $exp = date('Y-m-d H:i:s', strtotime('+1 hour'));
-
-    $pdo->prepare("
-        UPDATE local_users
-        SET magic_token = ?, magic_token_exp = ?
-        WHERE id = ?
-    ")->execute([$token, $exp, $userId]);
 
     $allowedOrigins = [
         'http://localhost:8080',
@@ -188,6 +199,13 @@ HTML;
         $queued ? '1' : '0',
         $redactedLink
     ));
+
+    // Pad response time to prevent email enumeration via timing.
+    $elapsedMs = (int) ((microtime(true) - $startTime) * 1000);
+    $targetMs = 350;
+    if ($elapsedMs < $targetMs) {
+        usleep(($targetMs - $elapsedMs) * 1000);
+    }
 
     echo json_encode([
         'success' => true,
@@ -611,11 +629,20 @@ function user_login(PDO $pdo, array $body): void
         return;
     }
 
+    $dummyHash = '$2y$10$abcdefghijklmnopqrstuvxxxxxxyyyyyyyyyyyyyyyyyyyyyyyyyy';
+
     $stmt = $pdo->prepare("SELECT id, email, password_hash FROM local_users WHERE email = ?");
     $stmt->execute([$email]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$user || !password_verify($password, $user['password_hash'] ?? '')) {
+    $hashToVerify = $user['password_hash'] ?? $dummyHash;
+    if (!password_verify($password, $hashToVerify)) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'error' => 'Email ou mot de passe incorrect']);
+        return;
+    }
+
+    if (!$user) {
         http_response_code(401);
         echo json_encode(['success' => false, 'error' => 'Email ou mot de passe incorrect']);
         return;
@@ -648,6 +675,8 @@ function user_forgot_password(PDO $pdo, array $body): void
         return;
     }
 
+    $startTime = microtime(true);
+
     // Always respond success to avoid email enumeration.
     $stmt = $pdo->prepare("SELECT id FROM local_users WHERE email = ?");
     $stmt->execute([$email]);
@@ -655,6 +684,7 @@ function user_forgot_password(PDO $pdo, array $body): void
 
     if ($user) {
         $token = bin2hex(random_bytes(32));
+        $tokenHash = hash('sha256', $token);
         $exp   = date('Y-m-d H:i:s', strtotime('+1 hour'));
 
         $pdo->beginTransaction();
@@ -666,9 +696,9 @@ function user_forgot_password(PDO $pdo, array $body): void
             ")->execute([$email]);
 
             $pdo->prepare("
-                INSERT INTO local_user_password_resets (email, token, expires_at)
+                INSERT INTO local_user_password_resets (email, token_hash, expires_at)
                 VALUES (?, ?, ?)
-            ")->execute([$email, $token, $exp]);
+            ")->execute([$email, $tokenHash, $exp]);
 
             $pdo->commit();
         } catch (PDOException $e) {
@@ -683,8 +713,12 @@ function user_forgot_password(PDO $pdo, array $body): void
         queuePasswordResetEmail($email, $token, $baseUrl);
     }
 
-    // Normalize response time to prevent email enumeration via timing.
-    usleep(200000); // 200 ms
+    // Pad response time to prevent email enumeration via timing.
+    $elapsedMs = (int) ((microtime(true) - $startTime) * 1000);
+    $targetMs = 400;
+    if ($elapsedMs < $targetMs) {
+        usleep(($targetMs - $elapsedMs) * 1000);
+    }
 
     echo json_encode([
         'success' => true,
@@ -694,23 +728,25 @@ function user_forgot_password(PDO $pdo, array $body): void
 
 function user_reset_password(PDO $pdo, array $body): void
 {
-    $token       = $body['token'] ?? '';
+    $rawToken    = $body['token'] ?? '';
     $newPassword = $body['password'] ?? '';
 
-    if (!$token || strlen($newPassword) < 8) {
+    if (!$rawToken || strlen($newPassword) < 8) {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Token ou mot de passe invalide']);
         return;
     }
+
+    $tokenHash = hash('sha256', $rawToken);
 
     $pdo->beginTransaction();
     try {
         $consume = $pdo->prepare("
             UPDATE local_user_password_resets
             SET used_at = NOW()
-            WHERE token = ? AND used_at IS NULL AND expires_at > NOW()
+            WHERE token_hash = ? AND used_at IS NULL AND expires_at > NOW()
         ");
-        $consume->execute([$token]);
+        $consume->execute([$tokenHash]);
 
         if ($consume->rowCount() === 0) {
             $pdo->rollBack();
@@ -719,8 +755,8 @@ function user_reset_password(PDO $pdo, array $body): void
             return;
         }
 
-        $stmt = $pdo->prepare("SELECT email FROM local_user_password_resets WHERE token = ?");
-        $stmt->execute([$token]);
+        $stmt = $pdo->prepare("SELECT email FROM local_user_password_resets WHERE token_hash = ?");
+        $stmt->execute([$tokenHash]);
         $reset = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$reset) {
