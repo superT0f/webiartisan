@@ -7,11 +7,11 @@
       <!-- Auth -->
       <div v-if="!token" class="auth-card card">
         <h2>Connexion</h2>
-        <div class="auth-tabs">
-          <button :class="{ active: authTab === 'magic' }" @click="authTab = 'magic'">Lien magique</button>
-          <button :class="{ active: authTab === 'login' }" @click="authTab = 'login'">Mot de passe</button>
-          <button :class="{ active: authTab === 'register' }" @click="authTab = 'register'">Créer un compte</button>
-          <button :class="{ active: authTab === 'forgot' }" @click="authTab = 'forgot'">Mot de passe oublié</button>
+        <div class="auth-tabs" role="tablist" aria-label="Méthode de connexion">
+          <button role="tab" :aria-selected="authTab === 'magic'" :class="{ active: authTab === 'magic' }" @click="authTab = 'magic'">Lien magique</button>
+          <button role="tab" :aria-selected="authTab === 'login'" :class="{ active: authTab === 'login' }" @click="authTab = 'login'">Mot de passe</button>
+          <button role="tab" :aria-selected="authTab === 'register'" :class="{ active: authTab === 'register' }" @click="authTab = 'register'">Créer un compte</button>
+          <button role="tab" :aria-selected="authTab === 'forgot'" :class="{ active: authTab === 'forgot' }" @click="authTab = 'forgot'">Oublié</button>
         </div>
 
         <form v-if="authTab === 'magic'" @submit.prevent="sendMagicLink" class="auth-form">
@@ -171,6 +171,7 @@ const qrCanvas = ref(null)
 
 watch(authTab, () => {
   message.value = ''
+  messageType.value = ''
 })
 
 const alreadySpun = computed(() => {
@@ -189,16 +190,20 @@ function setMessage(text, type = 'info') {
   messageType.value = type
 }
 
-if (route.query.token) {
-  authUser(route.query.token, rememberMe.value).then(res => {
+async function exchangeMagicLink() {
+  if (!route.query.token) return
+  try {
+    const res = await authUser(route.query.token, rememberMe.value)
     if (res.success && res.token) {
       setUserToken(res.token, rememberMe.value)
       token.value = res.token
-      router.replace('/roue')
+      await router.replace('/roue')
     } else {
       setMessage(res.error || 'Lien invalide', 'error')
     }
-  })
+  } catch (e) {
+    setMessage('Erreur réseau.', 'error')
+  }
 }
 
 async function sendMagicLink() {
@@ -243,16 +248,19 @@ async function submitRegister() {
       display_name: displayName.value,
     })
     if (res.success) {
-      // Auto-login after successful registration.
-      const loginRes = await loginUser({ email: email.value, password: password.value, rememberMe: rememberMe.value })
-      if (loginRes.success && loginRes.token) {
-        setUserToken(loginRes.token, rememberMe.value)
-        token.value = loginRes.token
-        router.replace('/roue')
-      } else {
-        setMessage('Compte créé. Veuillez vous connecter.', 'success')
-        authTab.value = 'login'
+      try {
+        const loginRes = await loginUser({ email: email.value, password: password.value, rememberMe: rememberMe.value })
+        if (loginRes.success && loginRes.token) {
+          setUserToken(loginRes.token, rememberMe.value)
+          token.value = loginRes.token
+          await router.replace('/roue')
+          return
+        }
+      } catch (loginErr) {
+        // ignore, fall through to manual login prompt
       }
+      setMessage('Compte créé. Veuillez vous connecter.', 'success')
+      authTab.value = 'login'
     } else {
       setMessage(res.error || 'Erreur lors de l\'inscription.', 'error')
     }
@@ -284,7 +292,7 @@ async function loadUser() {
     if (res.success) {
       user.value = res.data
     } else if (res.status === 401) {
-      logout()
+      await logout()
       setMessage('Session expirée.', 'error')
     } else {
       setMessage(res.error || 'Impossible de charger le profil.', 'error')
@@ -395,6 +403,7 @@ async function logout() {
 }
 
 onMounted(async () => {
+  await exchangeMagicLink()
   await loadUser()
   loadOffers()
   if (token.value) {
@@ -410,20 +419,24 @@ onMounted(async () => {
 .auth-form { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
 .auth-tabs {
   display: flex;
-  gap: 8px;
+  gap: 4px;
   margin: 16px 0;
   border-bottom: 1px solid var(--c-border);
   padding-bottom: 8px;
+  overflow-x: auto;
 }
 .auth-tabs button {
-  flex: 1;
-  padding: 10px;
+  flex: 1 0 auto;
+  min-width: 80px;
+  padding: 10px 8px;
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
   cursor: pointer;
   font-weight: 500;
+  font-size: 0.9rem;
   color: var(--c-text-muted);
+  white-space: nowrap;
 }
 .auth-tabs button.active {
   color: var(--c-primary);
