@@ -50,9 +50,11 @@ function user_create_session(PDO $pdo, int $userId, bool $rememberMe): string
         UPDATE local_users
         SET session_token = ?, session_exp = DATE_ADD(NOW(), INTERVAL ? DAY)
         WHERE id = ?
-        LIMIT 1
     ");
-    $stmt->execute([$token, $expiryDays, $userId]);
+    $stmt->execute([$token, (int)$expiryDays, $userId]);
+    if ($stmt->rowCount() === 0) {
+        throw new RuntimeException('User not found');
+    }
     return $token;
 }
 
@@ -62,7 +64,6 @@ function user_logout(PDO $pdo, int $userId): void
         UPDATE local_users
         SET session_token = NULL, session_exp = NULL
         WHERE id = ?
-        LIMIT 1
     ");
     $stmt->execute([$userId]);
 }
