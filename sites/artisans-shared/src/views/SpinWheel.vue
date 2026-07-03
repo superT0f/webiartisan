@@ -80,7 +80,7 @@
         </form>
       </div>
 
-      <div v-if="message" class="auth-message" :class="messageType" role="status" aria-live="polite">{{ message }}</div>
+      <div v-show="message" class="auth-message" :class="messageType" role="status" aria-live="polite">{{ message }}</div>
 
       <!-- Connected -->
       <template v-if="token">
@@ -239,7 +239,9 @@ async function submitLogin() {
     if (res.success && res.token) {
       setUserToken(res.token, rememberMe.value)
       token.value = res.token
-      router.replace('/roue')
+      await loadUser()
+      loadOffers()
+      loadWins()
     } else {
       setMessage(res.error || 'Erreur de connexion.', 'error')
     }
@@ -265,7 +267,9 @@ async function submitRegister() {
         if (loginRes.success && loginRes.token) {
           setUserToken(loginRes.token, rememberMe.value)
           token.value = loginRes.token
-          await router.replace('/roue')
+          await loadUser()
+          loadOffers()
+          loadWins()
           return
         }
       } catch (loginErr) {
@@ -323,6 +327,7 @@ async function loadOffers() {
     drawWheel()
   } catch (e) {
     console.error('Erreur chargement offres', e)
+    setMessage('Impossible de charger les offres.', 'error')
   }
 }
 
@@ -333,6 +338,7 @@ async function loadWins() {
     wins.value = res.data || []
   } catch (e) {
     console.error('Erreur chargement gains', e)
+    setMessage('Impossible de charger vos gains.', 'error')
   }
 }
 
