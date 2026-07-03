@@ -815,9 +815,10 @@ function user_reset_password(PDO $pdo, array $body): void
         return;
     }
 
+    pad_user_auth_response($startTime);
+
     echo json_encode([
         'success' => true,
         'message' => 'Votre mot de passe a été mis à jour.',
     ]);
-    pad_user_auth_response($startTime);
 }
