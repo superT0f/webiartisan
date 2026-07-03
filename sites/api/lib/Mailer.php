@@ -84,3 +84,35 @@ function queueEmail(
         return false;
     }
 }
+
+function queuePasswordResetEmail(string $email, string $token, string $baseUrl): bool
+{
+    $config    = getAppConfig();
+    $fromEmail = $config['mail_from'] ?? 'noreply@webiartisan.prigent.tech';
+
+    $link = rtrim($baseUrl, '/') . '/reinitialiser?token=' . urlencode($token);
+    $safeLink = htmlspecialchars($link, ENT_QUOTES, 'UTF-8');
+
+    $subject = 'Réinitialisation de votre mot de passe WebIArtisan';
+    $html = <<<HTML
+<!DOCTYPE html>
+<html><body style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #1a1a2e;">Réinitialisation de mot de passe</h2>
+  <p>Vous avez demandé à réinitialiser votre mot de passe. Cliquez sur le lien ci-dessous :</p>
+  <div style="text-align: center; margin: 24px 0;">
+    <a href="{$safeLink}" style="display: inline-block; background: #1a1a2e; color: #fff; padding: 14px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">Réinitialiser mon mot de passe</a>
+  </div>
+  <p style="color: #888; font-size: 13px;">Ce lien est valable 1 heure. Si vous ne l'avez pas demandé, ignorez cet email.</p>
+</body></html>
+HTML;
+
+    return queueEmail(
+        $email,
+        $subject,
+        $html,
+        $fromEmail,
+        'WebIArtisan',
+        null,
+        ['type' => 'password_reset', 'email' => $email]
+    );
+}
