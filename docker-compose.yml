@@ -43,6 +43,7 @@ services:
       - ./sites/api/migrations/028_gamification.sql:/docker-entrypoint-initdb.d/028_gamification.sql:ro
       - ./sites/api/migrations/029_testimonials_services.sql:/docker-entrypoint-initdb.d/029_testimonials_services.sql:ro
       - ./sites/api/migrations/030_mini_games.sql:/docker-entrypoint-initdb.d/030_mini_games.sql:ro
+      - ./sites/api/migrations/031_email_queue.sql:/docker-entrypoint-initdb.d/031_email_queue.sql:ro
       - ./data/seeds/livry.sql:/docker-entrypoint-initdb.d/livry.sql:ro
       - ./data/seeds/livry_prospects.sql:/docker-entrypoint-initdb.d/livry_prospects.sql:ro
       - ./data/seeds/livry_recipes.sql:/docker-entrypoint-initdb.d/livry_recipes.sql:ro
