@@ -637,10 +637,18 @@ function artisan_magic_link(PDO $pdo, array $body): void
 </body></html>
 HTML;
 
-    $sent = send_html_email($email, $subject, $html, null, 'WebIArtisan');
+    $queued = queueEmail(
+        $email,
+        $subject,
+        $html,
+        $fromEmail,
+        'WebIArtisan',
+        null,
+        ['type' => 'artisan_magic_link', 'artisan_id' => (int)$artisan['id'], 'token' => $token]
+    );
 
     error_log(sprintf(
-        "[MAGIC-LINK] email=%s artisan_id=%s status=%s rememberMe=%s exp=%s origin=%s portalUrl=%s from=%s sent=%s link=%s",
+        "[MAGIC-LINK] email=%s artisan_id=%s status=%s rememberMe=%s exp=%s origin=%s portalUrl=%s from=%s queued=%s link=%s",
         $email,
         $artisan['id'],
         $artisan['status'],
@@ -649,7 +657,7 @@ HTML;
         $_SERVER['HTTP_ORIGIN'] ?? 'none',
         $portalUrl,
         $fromEmail,
-        $sent ? '1' : '0',
+        $queued ? '1' : '0',
         $link
     ));
 
