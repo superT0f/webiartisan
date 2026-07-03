@@ -777,12 +777,13 @@ function artisan_contact(PDO $pdo, int $id, array $body): void
         ->execute([$id]);
 
     // Envoyer l'email à l'artisan
-    $safeCompany = htmlspecialchars($artisan['company_name']);
-    $safeName    = htmlspecialchars($name);
-    $safeEmail   = htmlspecialchars($email);
-    $safeMessage = nl2br(htmlspecialchars($message));
+    $plainCompany = $artisan['company_name'];
+    $safeCompany  = htmlspecialchars($artisan['company_name'], ENT_QUOTES, 'UTF-8');
+    $safeName     = htmlspecialchars($name, ENT_QUOTES, 'UTF-8');
+    $safeEmail    = htmlspecialchars($email, ENT_QUOTES, 'UTF-8');
+    $safeMessage  = nl2br(htmlspecialchars($message, ENT_QUOTES, 'UTF-8'));
 
-    $contactSubject = "Nouveau message depuis WebIArtisan — {$safeCompany}";
+    $contactSubject = "Nouveau message depuis WebIArtisan — {$plainCompany}";
     $contactHtml    = <<<HTML
 <!DOCTYPE html>
 <html><body style="font-family: -apple-system, sans-serif; max-width: 520px; margin: 0 auto; padding: 20px;">
