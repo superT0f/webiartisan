@@ -800,7 +800,7 @@ function user_reset_password(PDO $pdo, array $body): void
         ")->execute([$reset['email']]);
 
         $pdo->commit();
-    } catch (PDOException $e) {
+    } catch (Throwable $e) {
         $pdo->rollBack();
         http_response_code(500);
         echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
