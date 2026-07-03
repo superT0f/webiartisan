@@ -116,11 +116,6 @@ $param  = $segments[2] ?? null;
 $method = $_SERVER['REQUEST_METHOD'];
 
 // Route map
-$publicRoutes = ['cities', 'artisans', 'games'];
-$protectedRoutes = [];
-
-// Global auth instance (kept harmless; no protected routes in POC)
-$auth = new Auth();
 
 // Routes publiques artisans locaux (pas d'auth requise pour lecture)
 if ($module === 'cities') {
@@ -199,13 +194,6 @@ if ($module === 'gamification') {
     applyRateLimit($pdo, 'login');
     require_once __DIR__ . '/routes/gamification.php';
     exit;
-}
-
-// Inject auth + tenant context for protected routes
-$authUser = null;
-if (in_array($module, $protectedRoutes)) {
-    $authUser = $auth->requireAuth();
-    TenantContext::setFromAuth($authUser);
 }
 
 // Route to the correct module

@@ -96,11 +96,24 @@ function user_magic_link(PDO $pdo, array $body): void
     $stmt->execute([$email]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$user) {
-        $pdo->prepare("INSERT INTO local_users (email) VALUES (?)")->execute([$email]);
-        $userId = (int)$pdo->lastInsertId();
-    } else {
+    if ($user) {
         $userId = (int)$user['id'];
+    } else {
+        try {
+            $insert = $pdo->prepare("INSERT INTO local_users (email) VALUES (?)");
+            $insert->execute([$email]);
+            $userId = (int)$pdo->lastInsertId();
+        } catch (PDOException $e) {
+            if ((int)$e->getCode() === 23000) {
+                // Duplicate-key race: re-fetch the existing user.
+                $stmt = $pdo->prepare("SELECT id FROM local_users WHERE email = ?");
+                $stmt->execute([$email]);
+                $user = $stmt->fetch(PDO::FETCH_ASSOC);
+                $userId = $user ? (int)$user['id'] : 0;
+            } else {
+                throw $e;
+            }
+        }
     }
 
     $token = bin2hex(random_bytes(32));
@@ -207,13 +220,23 @@ function user_auth(PDO $pdo): void
 
     $rememberMe = !empty($_GET['rememberMe']);
 
-    $sessionToken = user_create_session($pdo, (int)$user['id'], $rememberMe);
+    $pdo->beginTransaction();
+    try {
+        $sessionToken = user_create_session($pdo, (int)$user['id'], $rememberMe);
 
-    $pdo->prepare("
-        UPDATE local_users
-        SET magic_token = NULL, magic_token_exp = NULL
-        WHERE id = ?
-    ")->execute([$user['id']]);
+        $pdo->prepare("
+            UPDATE local_users
+            SET magic_token = NULL, magic_token_exp = NULL
+            WHERE id = ?
+        ")->execute([$user['id']]);
+
+        $pdo->commit();
+    } catch (PDOException $e) {
+        $pdo->rollBack();
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
+        return;
+    }
 
     try {
         require_once __DIR__ . '/../lib/Gamification.php';
@@ -529,6 +552,9 @@ function user_register(PDO $pdo, array $body): void
         return;
     }
 
+    $passwordHash = password_hash($password, PASSWORD_BCRYPT);
+    $displayNameToStore = $displayName ? substr($displayName, 0, 80) : null;
+
     $stmt = $pdo->prepare("SELECT id FROM local_users WHERE email = ?");
     $stmt->execute([$email]);
     if ($stmt->fetch()) {
@@ -538,9 +564,6 @@ function user_register(PDO $pdo, array $body): void
         ]);
         return;
     }
-
-    $passwordHash = password_hash($password, PASSWORD_BCRYPT);
-    $displayNameToStore = $displayName ? substr($displayName, 0, 80) : null;
 
     try {
         $insert = $pdo->prepare("
@@ -631,25 +654,37 @@ function user_forgot_password(PDO $pdo, array $body): void
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($user) {
-        // Invalidate previous unused tokens before creating a new one.
-        $pdo->prepare("
-            UPDATE local_user_password_resets
-            SET used_at = NOW()
-            WHERE email = ? AND used_at IS NULL
-        ")->execute([$email]);
-
         $token = bin2hex(random_bytes(32));
         $exp   = date('Y-m-d H:i:s', strtotime('+1 hour'));
 
-        $pdo->prepare("
-            INSERT INTO local_user_password_resets (email, token, expires_at)
-            VALUES (?, ?, ?)
-        ")->execute([$email, $token, $exp]);
+        $pdo->beginTransaction();
+        try {
+            $pdo->prepare("
+                UPDATE local_user_password_resets
+                SET used_at = NOW()
+                WHERE email = ? AND used_at IS NULL
+            ")->execute([$email]);
+
+            $pdo->prepare("
+                INSERT INTO local_user_password_resets (email, token, expires_at)
+                VALUES (?, ?, ?)
+            ")->execute([$email, $token, $exp]);
+
+            $pdo->commit();
+        } catch (PDOException $e) {
+            $pdo->rollBack();
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
+            return;
+        }
 
         $config  = getAppConfig();
         $baseUrl = $config['url'] ?? 'https://artisans-livry.prigent.tech';
         queuePasswordResetEmail($email, $token, $baseUrl);
     }
+
+    // Normalize response time to prevent email enumeration via timing.
+    usleep(200000); // 200 ms
 
     echo json_encode([
         'success' => true,
@@ -698,6 +733,13 @@ function user_reset_password(PDO $pdo, array $body): void
         $passwordHash = password_hash($newPassword, PASSWORD_BCRYPT);
         $pdo->prepare("UPDATE local_users SET password_hash = ? WHERE email = ?")
             ->execute([$passwordHash, $reset['email']]);
+
+        // Invalidate all existing sessions for this user.
+        $pdo->prepare("
+            UPDATE local_users
+            SET session_token = NULL, session_exp = NULL
+            WHERE email = ?
+        ")->execute([$reset['email']]);
 
         $pdo->prepare("
             UPDATE local_user_password_resets
