@@ -15,6 +15,16 @@
 require_once __DIR__ . '/../lib/Mailer.php';
 require_once __DIR__ . '/../lib/UserAuth.php';
 
+const USER_AUTH_TIMING_TARGET_MS = 400;
+
+function pad_user_auth_response(float $startTime): void
+{
+    $elapsedMs = (int) ((microtime(true) - $startTime) * 1000);
+    if ($elapsedMs < USER_AUTH_TIMING_TARGET_MS) {
+        usleep((USER_AUTH_TIMING_TARGET_MS - $elapsedMs) * 1000);
+    }
+}
+
 $authActions = ['magic-link', 'auth', 'register', 'login', 'forgot-password', 'reset-password'];
 if (in_array($action, $authActions, true)) {
     applyRateLimit($pdo, 'login');
@@ -193,11 +203,7 @@ HTML;
     ));
 
     // Pad response time to prevent email enumeration via timing.
-    $elapsedMs = (int) ((microtime(true) - $startTime) * 1000);
-    $targetMs = 350;
-    if ($elapsedMs < $targetMs) {
-        usleep(($targetMs - $elapsedMs) * 1000);
-    }
+    pad_user_auth_response($startTime);
 
     echo json_encode([
         'success' => true,
@@ -571,11 +577,11 @@ function user_register(PDO $pdo, array $body): void
     $passwordHash = password_hash($password, PASSWORD_BCRYPT);
     $displayNameToStore = $displayName ? substr($displayName, 0, 80) : null;
 
-    $stmt = $pdo->prepare("SELECT id FROM local_users WHERE email = ?");
+    $stmt = $pdo->prepare("SELECT id, password_hash FROM local_users WHERE email = ?");
     $stmt->execute([$email]);
-    $exists = (bool) $stmt->fetch();
+    $existing = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$exists) {
+    if (!$existing) {
         try {
             $insert = $pdo->prepare("
                 INSERT INTO local_users (email, password_hash, display_name, email_verified)
@@ -592,19 +598,25 @@ function user_register(PDO $pdo, array $body): void
                 echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
                 return;
             }
-            // Duplicate-key race: treat as if the account already existed.
-            $exists = true;
+            // Duplicate-key race: re-fetch to see if we can complete the account.
+            $stmt = $pdo->prepare("SELECT id, password_hash FROM local_users WHERE email = ?");
+            $stmt->execute([$email]);
+            $existing = $stmt->fetch(PDO::FETCH_ASSOC);
         }
+    }
+
+    if ($existing && empty($existing['password_hash'])) {
+        $pdo->prepare("
+            UPDATE local_users
+            SET password_hash = ?, display_name = COALESCE(?, display_name)
+            WHERE email = ? AND password_hash IS NULL
+        ")->execute([$passwordHash, $displayNameToStore, $email]);
     }
 
     $response = ['success' => true, 'message' => $genericMessage];
 
     // Pad response time to prevent email enumeration via timing.
-    $elapsedMs = (int) ((microtime(true) - $startTime) * 1000);
-    $targetMs = 400;
-    if ($elapsedMs < $targetMs) {
-        usleep(($targetMs - $elapsedMs) * 1000);
-    }
+    pad_user_auth_response($startTime);
 
     echo json_encode($response);
 }
@@ -644,11 +656,7 @@ function user_login(PDO $pdo, array $body): void
     }
 
     // Pad response time to prevent email enumeration via timing.
-    $elapsedMs = (int) ((microtime(true) - $startTime) * 1000);
-    $targetMs = 400;
-    if ($elapsedMs < $targetMs) {
-        usleep(($targetMs - $elapsedMs) * 1000);
-    }
+    pad_user_auth_response($startTime);
 
     if ($error) {
         http_response_code($error['code']);
@@ -677,18 +685,17 @@ function user_forgot_password(PDO $pdo, array $body): void
 
     $startTime = microtime(true);
 
-    // Always respond success to avoid email enumeration.
-    $stmt = $pdo->prepare("SELECT id FROM local_users WHERE email = ?");
-    $stmt->execute([$email]);
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    $token = bin2hex(random_bytes(32));
+    $tokenHash = hash('sha256', $token);
+    $exp = date('Y-m-d H:i:s', strtotime('+1 hour'));
 
-    if ($user) {
-        $token = bin2hex(random_bytes(32));
-        $tokenHash = hash('sha256', $token);
-        $exp   = date('Y-m-d H:i:s', strtotime('+1 hour'));
+    $pdo->beginTransaction();
+    try {
+        $lock = $pdo->prepare("SELECT id FROM local_users WHERE email = ? FOR UPDATE");
+        $lock->execute([$email]);
+        $user = $lock->fetch(PDO::FETCH_ASSOC);
 
-        $pdo->beginTransaction();
-        try {
+        if ($user) {
             $pdo->prepare("
                 UPDATE local_user_password_resets
                 SET used_at = NOW()
@@ -699,26 +706,24 @@ function user_forgot_password(PDO $pdo, array $body): void
                 INSERT INTO local_user_password_resets (email, token_hash, expires_at)
                 VALUES (?, ?, ?)
             ")->execute([$email, $tokenHash, $exp]);
-
-            $pdo->commit();
-        } catch (Throwable $e) {
-            $pdo->rollBack();
-            http_response_code(500);
-            echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
-            return;
         }
 
+        $pdo->commit();
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
+        return;
+    }
+
+    if ($user) {
         $config  = getAppConfig();
         $baseUrl = $config['url'] ?? 'https://artisans-livry.prigent.tech';
         queuePasswordResetEmail($email, $token, $baseUrl);
     }
 
     // Pad response time to prevent email enumeration via timing.
-    $elapsedMs = (int) ((microtime(true) - $startTime) * 1000);
-    $targetMs = 400;
-    if ($elapsedMs < $targetMs) {
-        usleep(($targetMs - $elapsedMs) * 1000);
-    }
+    pad_user_auth_response($startTime);
 
     echo json_encode([
         'success' => true,
@@ -731,9 +736,12 @@ function user_reset_password(PDO $pdo, array $body): void
     $rawToken    = $body['token'] ?? '';
     $newPassword = $body['password'] ?? '';
 
+    $startTime = microtime(true);
+
     if (!$rawToken || strlen($newPassword) < 8) {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Token ou mot de passe invalide']);
+        pad_user_auth_response($startTime);
         return;
     }
 
@@ -752,6 +760,7 @@ function user_reset_password(PDO $pdo, array $body): void
             $pdo->rollBack();
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => 'Lien invalide ou expiré']);
+            pad_user_auth_response($startTime);
             return;
         }
 
@@ -763,6 +772,7 @@ function user_reset_password(PDO $pdo, array $body): void
             $pdo->rollBack();
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => 'Lien invalide ou expiré']);
+            pad_user_auth_response($startTime);
             return;
         }
 
@@ -772,6 +782,7 @@ function user_reset_password(PDO $pdo, array $body): void
             $pdo->rollBack();
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => 'Lien invalide ou expiré']);
+            pad_user_auth_response($startTime);
             return;
         }
 
@@ -804,6 +815,7 @@ function user_reset_password(PDO $pdo, array $body): void
         $pdo->rollBack();
         http_response_code(500);
         echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
+        pad_user_auth_response($startTime);
         return;
     }
 
@@ -811,4 +823,5 @@ function user_reset_password(PDO $pdo, array $body): void
         'success' => true,
         'message' => 'Votre mot de passe a été mis à jour.',
     ]);
+    pad_user_auth_response($startTime);
 }
