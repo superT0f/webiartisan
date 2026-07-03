@@ -7,8 +7,14 @@
       <!-- Auth -->
       <div v-if="!token" class="auth-card card">
         <h2>Connexion</h2>
-        <p class="text-muted">Recevez un lien magique par email pour participer.</p>
-        <form @submit.prevent="sendMagicLink" class="auth-form">
+        <div class="auth-tabs">
+          <button :class="{ active: authTab === 'magic' }" @click="authTab = 'magic'">Lien magique</button>
+          <button :class="{ active: authTab === 'login' }" @click="authTab = 'login'">Mot de passe</button>
+          <button :class="{ active: authTab === 'register' }" @click="authTab = 'register'">Créer un compte</button>
+        </div>
+
+        <form v-if="authTab === 'magic'" @submit.prevent="sendMagicLink" class="auth-form">
+          <p class="text-muted">Recevez un lien magique par email pour participer.</p>
           <input
             v-model="email"
             type="email"
@@ -25,6 +31,44 @@
             {{ sending ? 'Envoi…' : 'Recevoir mon lien' }}
           </button>
         </form>
+
+        <form v-if="authTab === 'login'" @submit.prevent="submitLogin" class="auth-form">
+          <p class="text-muted">Connectez-vous avec votre email et mot de passe.</p>
+          <input v-model="email" type="email" class="form-input" placeholder="votre@email.fr" required />
+          <input v-model="password" type="password" class="form-input" placeholder="Mot de passe" required />
+          <label class="form-checkbox">
+            <input v-model="rememberMe" type="checkbox" />
+            Rester connecté sur cet appareil
+          </label>
+          <button type="submit" class="btn btn-primary" :disabled="sending">
+            {{ sending ? 'Connexion…' : 'Se connecter' }}
+          </button>
+          <button type="button" class="btn btn-link" @click="authTab = 'forgot'">Mot de passe oublié ?</button>
+        </form>
+
+        <form v-if="authTab === 'register'" @submit.prevent="submitRegister" class="auth-form">
+          <p class="text-muted">Créez un compte pour sauvegarder votre progression.</p>
+          <input v-model="email" type="email" class="form-input" placeholder="votre@email.fr" required />
+          <input v-model="displayName" type="text" class="form-input" placeholder="Pseudo (optionnel)" maxlength="80" />
+          <input v-model="password" type="password" class="form-input" placeholder="Mot de passe (min 8 caractères)" minlength="8" required />
+          <label class="form-checkbox">
+            <input v-model="rememberMe" type="checkbox" />
+            Rester connecté sur cet appareil
+          </label>
+          <button type="submit" class="btn btn-primary" :disabled="sending">
+            {{ sending ? 'Création…' : 'Créer mon compte' }}
+          </button>
+        </form>
+
+        <form v-if="authTab === 'forgot'" @submit.prevent="submitForgot" class="auth-form">
+          <p class="text-muted">Recevez un lien de réinitialisation par email.</p>
+          <input v-model="email" type="email" class="form-input" placeholder="votre@email.fr" required />
+          <button type="submit" class="btn btn-primary" :disabled="sending">
+            {{ sending ? 'Envoi…' : 'Envoyer' }}
+          </button>
+          <button type="button" class="btn btn-link" @click="authTab = 'login'">Retour</button>
+        </form>
+
         <div v-if="message" class="auth-message" :class="messageType">{{ message }}</div>
       </div>
 
@@ -90,6 +134,10 @@ import {
   getUserToken,
   setUserToken,
   removeUserToken,
+  registerUser,
+  loginUser,
+  logoutUser,
+  requestPasswordReset,
   getSpinOffers,
   postSpin,
   getSpinWins,
@@ -101,6 +149,9 @@ const router = useRouter()
 const email = ref('')
 const rememberMe = ref(true)
 const token = ref(getUserToken() || '')
+const authTab = ref('magic') // 'magic' | 'login' | 'register' | 'forgot'
+const password = ref('')
+const displayName = ref('')
 const user = ref(null)
 const offers = ref([])
 const wins = ref([])
@@ -130,7 +181,7 @@ function setMessage(text, type = 'info') {
 }
 
 if (route.query.token) {
-  authUser(route.query.token).then(res => {
+  authUser(route.query.token, rememberMe.value).then(res => {
     if (res.success && res.token) {
       setUserToken(res.token, rememberMe.value)
       token.value = res.token
@@ -149,6 +200,68 @@ async function sendMagicLink() {
     setMessage(res.message || 'Si votre email est valide, vous recevrez un lien.', 'success')
   } catch (e) {
     setMessage('Erreur lors de l\'envoi.', 'error')
+  } finally {
+    sending.value = false
+  }
+}
+
+async function submitLogin() {
+  sending.value = true
+  message.value = ''
+  try {
+    const res = await loginUser({ email: email.value, password: password.value, rememberMe: rememberMe.value })
+    if (res.success && res.token) {
+      setUserToken(res.token, rememberMe.value)
+      token.value = res.token
+      router.replace('/roue')
+    } else {
+      setMessage(res.error || 'Erreur de connexion.', 'error')
+    }
+  } catch (e) {
+    setMessage('Erreur réseau.', 'error')
+  } finally {
+    sending.value = false
+  }
+}
+
+async function submitRegister() {
+  sending.value = true
+  message.value = ''
+  try {
+    const res = await registerUser({
+      email: email.value,
+      password: password.value,
+      display_name: displayName.value,
+    })
+    if (res.success) {
+      // Auto-login after successful registration.
+      const loginRes = await loginUser({ email: email.value, password: password.value, rememberMe: rememberMe.value })
+      if (loginRes.success && loginRes.token) {
+        setUserToken(loginRes.token, rememberMe.value)
+        token.value = loginRes.token
+        router.replace('/roue')
+      } else {
+        setMessage('Compte créé. Veuillez vous connecter.', 'success')
+        authTab.value = 'login'
+      }
+    } else {
+      setMessage(res.error || 'Erreur lors de l\'inscription.', 'error')
+    }
+  } catch (e) {
+    setMessage('Erreur réseau.', 'error')
+  } finally {
+    sending.value = false
+  }
+}
+
+async function submitForgot() {
+  sending.value = true
+  message.value = ''
+  try {
+    const res = await requestPasswordReset(email.value)
+    setMessage(res.message || 'Si votre email est valide, vous recevrez un lien.', 'success')
+  } catch (e) {
+    setMessage('Erreur réseau.', 'error')
   } finally {
     sending.value = false
   }
@@ -258,10 +371,18 @@ function formatDate(iso) {
   return new Date(iso).toLocaleDateString('fr-FR')
 }
 
-function logout() {
+async function logout() {
+  const currentToken = token.value
   token.value = ''
   user.value = null
   removeUserToken()
+  if (currentToken) {
+    try {
+      await logoutUser(currentToken)
+    } catch (e) {
+      console.error('Erreur lors de la déconnexion', e)
+    }
+  }
 }
 
 onMounted(() => {
@@ -276,6 +397,36 @@ onMounted(() => {
 .narrow { max-width: 720px; }
 .auth-card, .result-card, .wins-card { padding: 28px; margin-top: 24px; }
 .auth-form { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
+.auth-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0;
+  border-bottom: 1px solid var(--c-border);
+  padding-bottom: 8px;
+}
+.auth-tabs button {
+  flex: 1;
+  padding: 10px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--c-text-muted);
+}
+.auth-tabs button.active {
+  color: var(--c-primary);
+  border-bottom-color: var(--c-primary);
+}
+.btn-link {
+  background: transparent;
+  border: none;
+  color: var(--c-primary);
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+  margin-top: 8px;
+}
 .form-checkbox {
   display: flex;
   align-items: center;
