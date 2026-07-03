@@ -19,13 +19,15 @@ function user_require_auth(PDO $pdo): array
         exit;
     }
 
+    $tokenHash = hash('sha256', $token);
+
     $stmt = $pdo->prepare("
         SELECT id, email
         FROM local_users
         WHERE session_token = ? AND session_exp > NOW()
         LIMIT 1
     ");
-    $stmt->execute([$token]);
+    $stmt->execute([$tokenHash]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$user) {
@@ -45,13 +47,14 @@ function user_generate_session_token(): string
 function user_create_session(PDO $pdo, int $userId, bool $rememberMe): string
 {
     $token = user_generate_session_token();
+    $tokenHash = hash('sha256', $token);
     $expiryDays = $rememberMe ? 365 : 30;
     $stmt = $pdo->prepare("
         UPDATE local_users
         SET session_token = ?, session_exp = DATE_ADD(NOW(), INTERVAL ? DAY)
         WHERE id = ?
     ");
-    $stmt->execute([$token, (int)$expiryDays, $userId]);
+    $stmt->execute([$tokenHash, (int)$expiryDays, $userId]);
     if ($stmt->rowCount() === 0) {
         throw new RuntimeException('User not found');
     }

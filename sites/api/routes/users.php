@@ -573,9 +573,9 @@ function user_register(PDO $pdo, array $body): void
 
     $stmt = $pdo->prepare("SELECT id FROM local_users WHERE email = ?");
     $stmt->execute([$email]);
-    if ($stmt->fetch()) {
-        $userId = null;
-    } else {
+    $created = !$stmt->fetch();
+
+    if ($created) {
         try {
             $insert = $pdo->prepare("
                 INSERT INTO local_users (email, password_hash, display_name, email_verified)
@@ -586,15 +586,14 @@ function user_register(PDO $pdo, array $body): void
                 $passwordHash,
                 $displayNameToStore,
             ]);
-            $userId = (int)$pdo->lastInsertId();
         } catch (PDOException $e) {
-            if ((int)$e->getCode() === 23000) {
-                $userId = null;
-            } else {
+            if ((int)$e->getCode() !== 23000) {
                 http_response_code(500);
                 echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
                 return;
             }
+            // Duplicate-key race: treat as if the account already existed.
+            $created = false;
         }
     }
 
@@ -615,40 +614,49 @@ function user_login(PDO $pdo, array $body): void
     $email    = strtolower(trim($body['email'] ?? ''));
     $password = $body['password'] ?? '';
 
+    $startTime = microtime(true);
+    $error = null;
+    $response = null;
+
     if (!$email || !$password) {
-        http_response_code(400);
-        echo json_encode(['success' => false, 'error' => 'Email et mot de passe requis']);
-        return;
+        $error = ['code' => 400, 'body' => ['success' => false, 'error' => 'Email et mot de passe requis']];
+    } else {
+        static $dummyHash = null;
+        $dummyHash ??= password_hash('dummy', PASSWORD_BCRYPT);
+
+        $stmt = $pdo->prepare("SELECT id, email, password_hash FROM local_users WHERE email = ?");
+        $stmt->execute([$email]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        $hashToVerify = $user['password_hash'] ?? $dummyHash;
+        if (!password_verify($password, $hashToVerify)) {
+            $error = ['code' => 401, 'body' => ['success' => false, 'error' => 'Email ou mot de passe incorrect']];
+        } elseif (!$user) {
+            $error = ['code' => 401, 'body' => ['success' => false, 'error' => 'Email ou mot de passe incorrect']];
+        } else {
+            $rememberMe   = !empty($body['rememberMe']);
+            $sessionToken = user_create_session($pdo, (int)$user['id'], $rememberMe);
+            $response = [
+                'success' => true,
+                'token'   => $sessionToken,
+                'data'    => ['id' => (int)$user['id'], 'email' => $user['email']],
+            ];
+        }
     }
 
-    static $dummyHash = null;
-    $dummyHash ??= password_hash('dummy', PASSWORD_BCRYPT);
-
-    $stmt = $pdo->prepare("SELECT id, email, password_hash FROM local_users WHERE email = ?");
-    $stmt->execute([$email]);
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    $hashToVerify = $user['password_hash'] ?? $dummyHash;
-    if (!password_verify($password, $hashToVerify)) {
-        http_response_code(401);
-        echo json_encode(['success' => false, 'error' => 'Email ou mot de passe incorrect']);
-        return;
+    // Pad response time to prevent email enumeration via timing.
+    $elapsedMs = (int) ((microtime(true) - $startTime) * 1000);
+    $targetMs = 400;
+    if ($elapsedMs < $targetMs) {
+        usleep(($targetMs - $elapsedMs) * 1000);
     }
 
-    if (!$user) {
-        http_response_code(401);
-        echo json_encode(['success' => false, 'error' => 'Email ou mot de passe incorrect']);
-        return;
+    if ($error) {
+        http_response_code($error['code']);
+        echo json_encode($error['body']);
+    } else {
+        echo json_encode($response);
     }
-
-    $rememberMe   = !empty($body['rememberMe']);
-    $sessionToken = user_create_session($pdo, (int)$user['id'], $rememberMe);
-
-    echo json_encode([
-        'success' => true,
-        'token'   => $sessionToken,
-        'data'    => ['id' => (int)$user['id'], 'email' => $user['email']],
-    ]);
 }
 
 function user_logout_endpoint(PDO $pdo): void
@@ -759,6 +767,15 @@ function user_reset_password(PDO $pdo, array $body): void
             return;
         }
 
+        $lock = $pdo->prepare("SELECT id FROM local_users WHERE email = ? FOR UPDATE");
+        $lock->execute([$reset['email']]);
+        if ($lock->rowCount() === 0) {
+            $pdo->rollBack();
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Lien invalide ou expiré']);
+            return;
+        }
+
         $passwordHash = password_hash($newPassword, PASSWORD_BCRYPT);
         $pdo->prepare("UPDATE local_users SET password_hash = ? WHERE email = ?")
             ->execute([$passwordHash, $reset['email']]);
@@ -767,6 +784,13 @@ function user_reset_password(PDO $pdo, array $body): void
         $pdo->prepare("
             UPDATE local_users
             SET session_token = NULL, session_exp = NULL
+            WHERE email = ?
+        ")->execute([$reset['email']]);
+
+        // Invalidate active magic-link tokens.
+        $pdo->prepare("
+            UPDATE local_users
+            SET magic_token = NULL, magic_token_exp = NULL
             WHERE email = ?
         ")->execute([$reset['email']]);
 
