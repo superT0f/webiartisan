@@ -119,14 +119,22 @@ function user_magic_link(PDO $pdo, array $body): void
             }
         }
 
+        if ($userId === 0) {
+            $pdo->rollBack();
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
+            return;
+        }
+
         $token = bin2hex(random_bytes(32));
+        $tokenHash = hash('sha256', $token);
         $exp = date('Y-m-d H:i:s', strtotime('+1 hour'));
 
         $pdo->prepare("
             UPDATE local_users
             SET magic_token = ?, magic_token_exp = ?
             WHERE id = ?
-        ")->execute([$token, $exp, $userId]);
+        ")->execute([$tokenHash, $exp, $userId]);
 
         $pdo->commit();
     } catch (PDOException $e) {
@@ -215,31 +223,34 @@ HTML;
 
 function user_auth(PDO $pdo): void
 {
-    $token = $_GET['token'] ?? '';
-    if (!$token) {
+    $rawToken = $_GET['token'] ?? '';
+    if (!$rawToken) {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Token manquant']);
         return;
     }
 
-    $stmt = $pdo->prepare("
-        SELECT id, email
-        FROM local_users
-        WHERE magic_token = ? AND magic_token_exp > NOW()
-    ");
-    $stmt->execute([$token]);
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$user) {
-        http_response_code(401);
-        echo json_encode(['success' => false, 'error' => 'Lien invalide ou expiré']);
-        return;
-    }
-
-    $rememberMe = !empty($_GET['rememberMe']);
+    $tokenHash = hash('sha256', $rawToken);
 
     $pdo->beginTransaction();
     try {
+        $stmt = $pdo->prepare("
+            SELECT id, email
+            FROM local_users
+            WHERE magic_token = ? AND magic_token_exp > NOW()
+            FOR UPDATE
+        ");
+        $stmt->execute([$tokenHash]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$user) {
+            $pdo->rollBack();
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Lien invalide ou expiré']);
+            return;
+        }
+
+        $rememberMe = !empty($_GET['rememberMe']);
         $sessionToken = user_create_session($pdo, (int)$user['id'], $rememberMe);
 
         $pdo->prepare("
@@ -570,52 +581,55 @@ function user_register(PDO $pdo, array $body): void
         return;
     }
 
+    $startTime = microtime(true);
+    $genericMessage = 'Si votre email est valide, votre inscription est prise en compte.';
+
     $passwordHash = password_hash($password, PASSWORD_BCRYPT);
     $displayNameToStore = $displayName ? substr($displayName, 0, 80) : null;
 
     $stmt = $pdo->prepare("SELECT id FROM local_users WHERE email = ?");
     $stmt->execute([$email]);
     if ($stmt->fetch()) {
-        echo json_encode([
-            'success' => true,
-            'message' => 'Si votre email est valide, votre inscription est prise en compte.',
-        ]);
-        return;
-    }
-
-    try {
-        $insert = $pdo->prepare("
-            INSERT INTO local_users (email, password_hash, display_name, email_verified)
-            VALUES (?, ?, ?, FALSE)
-        ");
-        $insert->execute([
-            $email,
-            $passwordHash,
-            $displayNameToStore,
-        ]);
-    } catch (PDOException $e) {
-        if ((int)$e->getCode() === 23000) {
-            echo json_encode([
-                'success' => true,
-                'message' => 'Si votre email est valide, votre inscription est prise en compte.',
+        $userId = null;
+    } else {
+        try {
+            $insert = $pdo->prepare("
+                INSERT INTO local_users (email, password_hash, display_name, email_verified)
+                VALUES (?, ?, ?, FALSE)
+            ");
+            $insert->execute([
+                $email,
+                $passwordHash,
+                $displayNameToStore,
             ]);
-            return;
+            $userId = (int)$pdo->lastInsertId();
+        } catch (PDOException $e) {
+            if ((int)$e->getCode() === 23000) {
+                $userId = null;
+            } else {
+                http_response_code(500);
+                echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
+                return;
+            }
         }
-        http_response_code(500);
-        echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
-        return;
     }
 
-    $userId = (int)$pdo->lastInsertId();
+    $response = ['success' => true, 'message' => $genericMessage];
+    if ($userId !== null) {
+        $rememberMe = !empty($body['rememberMe']);
+        $sessionToken = user_create_session($pdo, $userId, $rememberMe);
+        $response['token'] = $sessionToken;
+        $response['data'] = ['id' => $userId, 'email' => $email];
+    }
 
-    $rememberMe = !empty($body['rememberMe']);
-    $sessionToken = user_create_session($pdo, $userId, $rememberMe);
+    // Pad response time to prevent email enumeration via timing.
+    $elapsedMs = (int) ((microtime(true) - $startTime) * 1000);
+    $targetMs = 400;
+    if ($elapsedMs < $targetMs) {
+        usleep(($targetMs - $elapsedMs) * 1000);
+    }
 
-    echo json_encode([
-        'success' => true,
-        'token'   => $sessionToken,
-        'data'    => ['id' => $userId, 'email' => $email],
-    ]);
+    echo json_encode($response);
 }
 
 function user_login(PDO $pdo, array $body): void
