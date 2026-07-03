@@ -530,7 +530,7 @@ function user_register(PDO $pdo, array $body): void
         // Do not reveal that the account exists.
         echo json_encode([
             'success' => true,
-            'message' => 'Si votre email est valide, vous recevrez un lien de connexion.',
+            'message' => 'Si votre email est valide, vous recevrez un lien de réinitialisation.',
         ]);
         return;
     }
