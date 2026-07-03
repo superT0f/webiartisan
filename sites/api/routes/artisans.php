@@ -624,14 +624,17 @@ function artisan_magic_link(PDO $pdo, array $body): void
     $config    = getAppConfig();
     $fromEmail = $config['mail_from'] ?? 'noreply@webiartisan.prigent.tech';
 
+    $safeCompany = htmlspecialchars($artisan['company_name'], ENT_QUOTES, 'UTF-8');
+    $safeLink    = htmlspecialchars($link, ENT_QUOTES, 'UTF-8');
+
     $subject = 'Votre lien de connexion WebIArtisan';
     $html    = <<<HTML
 <!DOCTYPE html>
 <html><body style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 20px;">
-  <h2 style="color: #1a1a2e;">Bonjour {$artisan['company_name']},</h2>
+  <h2 style="color: #1a1a2e;">Bonjour {$safeCompany},</h2>
   <p>Voici votre lien de connexion sécurisé à votre espace artisan :</p>
   <div style="text-align: center; margin: 24px 0;">
-    <a href="{$link}" style="display: inline-block; background: #1a1a2e; color: #fff; padding: 14px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">Me connecter</a>
+    <a href="{$safeLink}" style="display: inline-block; background: #1a1a2e; color: #fff; padding: 14px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">Me connecter</a>
   </div>
   <p style="color: #888; font-size: 13px;">Ce lien est valable 1 heure. Si vous n'avez pas demandé ce lien, ignorez cet email.</p>
   <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
@@ -649,8 +652,10 @@ HTML;
         ['type' => 'artisan_magic_link', 'artisan_id' => (int)$artisan['id'], 'token' => $token]
     );
 
+    $redactedLink = preg_replace('/token=[^&]+/', 'token=REDACTED', $link);
+    $tokenFingerprint = substr(hash('sha256', $token), 0, 16);
     error_log(sprintf(
-        "[MAGIC-LINK] email=%s artisan_id=%s status=%s rememberMe=%s exp=%s origin=%s portalUrl=%s from=%s queued=%s link=%s",
+        "[MAGIC-LINK] email=%s artisan_id=%s status=%s rememberMe=%s exp=%s origin=%s portalUrl=%s from=%s queued=%s token_fp=%s link=%s",
         $email,
         $artisan['id'],
         $artisan['status'],
@@ -660,7 +665,8 @@ HTML;
         $portalUrl,
         $fromEmail,
         $queued ? '1' : '0',
-        $link
+        $tokenFingerprint,
+        $redactedLink
     ));
 
     echo json_encode(['success' => true, 'message' => 'Lien de connexion envoyé par email.']);
@@ -737,7 +743,11 @@ function artisan_portal_url(): string {
     }
 
     $config = getAppConfig();
-    return $config['url'] ?? 'https://artisans-livry.prigent.tech';
+    $fallback = $config['url'] ?? 'https://artisans-livry.prigent.tech';
+    if (!filter_var($fallback, FILTER_VALIDATE_URL)) {
+        $fallback = 'https://artisans-livry.prigent.tech';
+    }
+    return $fallback;
 }
 
 /**
