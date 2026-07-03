@@ -55,3 +55,32 @@ function send_html_email(
 
     return $result;
 }
+
+function queueEmail(
+    string $to,
+    string $subject,
+    string $htmlBody,
+    ?string $fromEmail = null,
+    ?string $fromName = null,
+    ?string $replyTo = null,
+    ?array $metadata = null
+): bool {
+    try {
+        $pdo = getDatabase();
+        $stmt = $pdo->prepare("INSERT INTO email_queue
+            (to_email, subject, html_body, from_email, from_name, reply_to, metadata, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')");
+        return $stmt->execute([
+            $to,
+            $subject,
+            $htmlBody,
+            $fromEmail,
+            $fromName,
+            $replyTo,
+            $metadata ? json_encode($metadata, JSON_UNESCAPED_UNICODE) : null,
+        ]);
+    } catch (Throwable $e) {
+        error_log('[QUEUE-EMAIL] Failed to queue email to ' . $to . ': ' . $e->getMessage());
+        return false;
+    }
+}
