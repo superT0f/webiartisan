@@ -129,20 +129,28 @@ HTML;
     $config = getAppConfig();
     $fromEmail = $config['mail_from'] ?? 'noreply@webiartisan.prigent.tech';
 
-    $sent = send_html_email($email, $subject, $html, $fromEmail, 'WebIArtisan');
-    if (!$sent) {
-        error_log("[USER-MAGIC-LINK] Échec envoi email à {$email}");
+    $queued = queueEmail(
+        $email,
+        $subject,
+        $html,
+        $fromEmail,
+        'WebIArtisan',
+        null,
+        ['type' => 'user_magic_link', 'user_id' => $userId, 'redirect' => $rawRedirect]
+    );
+    if (!$queued) {
+        error_log("[USER-MAGIC-LINK] Échec mise en file email à {$email}");
     }
     $redactedLink = preg_replace('/token=[^&]+/', 'token=REDACTED', $link);
     error_log(sprintf(
-        "[USER-MAGIC-LINK] email=%s user_id=%s rememberMe=%s redirect=%s base=%s from=%s sent=%s link=%s",
+        "[USER-MAGIC-LINK] email=%s user_id=%s rememberMe=%s redirect=%s base=%s from=%s queued=%s link=%s",
         $email,
         $userId,
         $rememberMe ? '1' : '0',
         $rawRedirect,
         $base,
         $fromEmail,
-        $sent ? '1' : '0',
+        $queued ? '1' : '0',
         $redactedLink
     ));
 
