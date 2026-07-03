@@ -179,6 +179,11 @@ if ($module === 'spin') {
     exit;
 }
 
+if ($module === 'cron') {
+    require_once __DIR__ . '/routes/cron.php';
+    exit;
+}
+
 if ($module === 'games') {
     applyRateLimit($pdo, 'public');
     require_once __DIR__ . '/routes/games.php';
