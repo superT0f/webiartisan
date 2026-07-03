@@ -59,6 +59,8 @@ switch ($method) {
             artisan_login($pdo, $body);
         } elseif ($action === 'magic-link') {
             artisan_magic_link($pdo, $body);
+        } elseif ($action === 'logout') {
+            artisan_logout($pdo);
         } elseif (is_numeric($action) && $param === 'contact') {
             artisan_contact($pdo, (int)$action, $body);
         } elseif (is_numeric($action) && $param === 'review') {
@@ -617,7 +619,7 @@ function artisan_magic_link(PDO $pdo, array $body): void
         ->execute([$token, $exp, $artisan['id']]);
 
     $portalUrl = artisan_portal_url();
-    $link      = rtrim($portalUrl, '/') . '/espace?token=' . urlencode($token);
+    $link      = rtrim($portalUrl, '/') . '/espace?token=' . urlencode($token) . ($rememberMe ? '&rememberMe=1' : '');
 
     $config    = getAppConfig();
     $fromEmail = $config['mail_from'] ?? 'noreply@webiartisan.prigent.tech';
@@ -704,6 +706,14 @@ function artisan_consumer_token(PDO $pdo): void
         'token'   => $sessionToken,
         'data'    => ['id' => (int)$userId, 'email' => $email],
     ]);
+}
+
+function artisan_logout(PDO $pdo): void
+{
+    $artisan = artisan_require_auth($pdo);
+    $pdo->prepare("UPDATE local_artisans SET auth_token = NULL, auth_token_exp = NULL WHERE id = ?")
+        ->execute([$artisan['id']]);
+    echo json_encode(['success' => true, 'message' => 'Déconnecté']);
 }
 
 /**
