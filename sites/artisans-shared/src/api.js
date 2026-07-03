@@ -122,6 +122,18 @@ export function removeArtisanToken() {
   deleteCookie(ARTISAN_TOKEN_COOKIE)
 }
 
+export async function logoutArtisan(token) {
+  const res = await fetch(`${API_BASE}/artisans/logout`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Artisan-Token': token,
+    },
+  })
+  removeArtisanToken()
+  return res.json()
+}
+
 export async function requestMagicLink(email, rememberMe = true) {
   const res = await fetch(`${API_BASE}/artisans/magic-link`, {
     method: 'POST',
@@ -305,9 +317,54 @@ export async function fetchArtisanConsumerToken(artisanToken) {
   return res.json()
 }
 
-export async function authUser(token) {
-  const res = await fetch(`${API_BASE}/users/auth?token=${encodeURIComponent(token)}`, {
+export async function authUser(token, rememberMe = true) {
+  const res = await fetch(`${API_BASE}/users/auth?token=${encodeURIComponent(token)}&rememberMe=${rememberMe ? 1 : 0}`, {
     method: 'POST',
+  })
+  return res.json()
+}
+
+export async function registerUser(data) {
+  const res = await fetch(`${API_BASE}/users/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  return res.json()
+}
+
+export async function loginUser(data) {
+  const res = await fetch(`${API_BASE}/users/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  return res.json()
+}
+
+export async function logoutUser(token) {
+  const res = await fetch(`${API_BASE}/users/logout`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  removeUserToken()
+  return res.json()
+}
+
+export async function requestPasswordReset(email) {
+  const res = await fetch(`${API_BASE}/users/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  })
+  return res.json()
+}
+
+export async function resetPassword(token, password) {
+  const res = await fetch(`${API_BASE}/users/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, password }),
   })
   return res.json()
 }
