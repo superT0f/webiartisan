@@ -96,28 +96,12 @@ function user_magic_link(PDO $pdo, array $body): void
 
     $pdo->beginTransaction();
     try {
-        $stmt = $pdo->prepare("SELECT id FROM local_users WHERE email = ?");
-        $stmt->execute([$email]);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if ($user) {
-            $userId = (int)$user['id'];
-        } else {
-            try {
-                $insert = $pdo->prepare("INSERT INTO local_users (email) VALUES (?)");
-                $insert->execute([$email]);
-                $userId = (int)$pdo->lastInsertId();
-            } catch (PDOException $e) {
-                if ((int)$e->getCode() === 23000) {
-                    $stmt = $pdo->prepare("SELECT id FROM local_users WHERE email = ?");
-                    $stmt->execute([$email]);
-                    $user = $stmt->fetch(PDO::FETCH_ASSOC);
-                    $userId = $user ? (int)$user['id'] : 0;
-                } else {
-                    throw $e;
-                }
-            }
-        }
+        $insert = $pdo->prepare("
+            INSERT INTO local_users (email) VALUES (?)
+            ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)
+        ");
+        $insert->execute([$email]);
+        $userId = (int)$pdo->lastInsertId();
 
         if ($userId === 0) {
             $pdo->rollBack();
