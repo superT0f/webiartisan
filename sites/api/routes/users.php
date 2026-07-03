@@ -160,7 +160,7 @@ function user_magic_link(PDO $pdo, array $body): void
     if ($origin && in_array($origin, $allowedOrigins, true)) {
         $base = $origin;
     }
-    $link = rtrim($base, '/') . $rawRedirect
+    $link = rtrim($base, '/') . $redirect
         . (strpos($redirect, '?') !== false ? '&' : '?')
         . 'token=' . urlencode($token)
         . ($rememberMe ? '&rememberMe=1' : '');
@@ -615,12 +615,6 @@ function user_register(PDO $pdo, array $body): void
     }
 
     $response = ['success' => true, 'message' => $genericMessage];
-    if ($userId !== null) {
-        $rememberMe = !empty($body['rememberMe']);
-        $sessionToken = user_create_session($pdo, $userId, $rememberMe);
-        $response['token'] = $sessionToken;
-        $response['data'] = ['id' => $userId, 'email' => $email];
-    }
 
     // Pad response time to prevent email enumeration via timing.
     $elapsedMs = (int) ((microtime(true) - $startTime) * 1000);
@@ -643,7 +637,8 @@ function user_login(PDO $pdo, array $body): void
         return;
     }
 
-    $dummyHash = '$2y$10$abcdefghijklmnopqrstuvxxxxxxyyyyyyyyyyyyyyyyyyyyyyyyyy';
+    static $dummyHash = null;
+    $dummyHash ??= password_hash('dummy', PASSWORD_BCRYPT);
 
     $stmt = $pdo->prepare("SELECT id, email, password_hash FROM local_users WHERE email = ?");
     $stmt->execute([$email]);
