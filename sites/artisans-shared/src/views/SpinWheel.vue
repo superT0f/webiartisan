@@ -7,80 +7,88 @@
       <!-- Auth -->
       <div v-if="!token" class="auth-card card">
         <h2>Connexion</h2>
-        <div class="auth-tabs" role="group" aria-label="Méthode de connexion">
-          <button type="button" :class="{ active: authTab === 'magic' }" @click="authTab = 'magic'">Lien magique</button>
-          <button type="button" :class="{ active: authTab === 'login' }" @click="authTab = 'login'">Mot de passe</button>
-          <button type="button" :class="{ active: authTab === 'register' }" @click="authTab = 'register'">Créer un compte</button>
-          <button type="button" :class="{ active: authTab === 'forgot' }" @click="authTab = 'forgot'">Oublié</button>
+        <div class="auth-tabs" role="tablist" aria-label="Méthode de connexion">
+          <button id="tab-magic" type="button" role="tab" :aria-selected="authTab === 'magic'" aria-controls="panel-magic" :class="{ active: authTab === 'magic' }" @click="authTab = 'magic'">Lien magique</button>
+          <button id="tab-login" type="button" role="tab" :aria-selected="authTab === 'login'" aria-controls="panel-login" :class="{ active: authTab === 'login' }" @click="authTab = 'login'">Mot de passe</button>
+          <button id="tab-register" type="button" role="tab" :aria-selected="authTab === 'register'" aria-controls="panel-register" :class="{ active: authTab === 'register' }" @click="authTab = 'register'">Créer un compte</button>
+          <button id="tab-forgot" type="button" role="tab" :aria-selected="authTab === 'forgot'" aria-controls="panel-forgot" :class="{ active: authTab === 'forgot' }" @click="authTab = 'forgot'">Oublié</button>
         </div>
 
-        <form v-if="authTab === 'magic'" @submit.prevent="sendMagicLink" class="auth-form">
-          <p class="text-muted">Recevez un lien magique par email pour participer.</p>
-          <label class="form-label" for="auth-email">Email</label>
-          <input
-            id="auth-email"
-            v-model="email"
-            type="email"
-            class="form-input"
-            placeholder="votre@email.fr"
-            autocomplete="email"
-            required
-            :disabled="sending"
-          />
-          <label class="form-checkbox">
-            <input v-model="rememberMe" type="checkbox" :disabled="sending" />
-            Rester connecté sur cet appareil
-          </label>
-          <button type="submit" class="btn btn-primary" :disabled="sending || !email">
-            {{ sending ? 'Envoi…' : 'Recevoir mon lien' }}
-          </button>
-        </form>
+        <div v-if="authTab === 'magic'" role="tabpanel" id="panel-magic" aria-labelledby="tab-magic">
+          <form @submit.prevent="sendMagicLink" class="auth-form">
+            <p class="text-muted">Recevez un lien magique par email pour participer.</p>
+            <label class="form-label" for="auth-email">Email</label>
+            <input
+              id="auth-email"
+              v-model="email"
+              type="email"
+              class="form-input"
+              placeholder="votre@email.fr"
+              autocomplete="email"
+              required
+              :disabled="sending"
+            />
+            <label class="form-checkbox">
+              <input v-model="rememberMe" type="checkbox" :disabled="sending" />
+              Rester connecté sur cet appareil
+            </label>
+            <button type="submit" class="btn btn-primary" :disabled="sending || !email">
+              {{ sending ? 'Envoi…' : 'Recevoir mon lien' }}
+            </button>
+          </form>
+        </div>
 
-        <form v-if="authTab === 'login'" @submit.prevent="submitLogin" class="auth-form">
-          <p class="text-muted">Connectez-vous avec votre email et mot de passe.</p>
-          <label class="form-label" for="login-email">Email</label>
-          <input id="login-email" v-model="email" type="email" class="form-input" placeholder="votre@email.fr" autocomplete="email" required />
-          <label class="form-label" for="login-password">Mot de passe</label>
-          <input id="login-password" v-model="password" type="password" class="form-input" placeholder="Mot de passe" autocomplete="current-password" required />
-          <label class="form-checkbox">
-            <input v-model="rememberMe" type="checkbox" />
-            Rester connecté sur cet appareil
-          </label>
-          <button type="submit" class="btn btn-primary" :disabled="sending">
-            {{ sending ? 'Connexion…' : 'Se connecter' }}
-          </button>
-          <button type="button" class="btn btn-link" @click="authTab = 'forgot'">Mot de passe oublié ?</button>
-        </form>
+        <div v-if="authTab === 'login'" role="tabpanel" id="panel-login" aria-labelledby="tab-login">
+          <form @submit.prevent="submitLogin" class="auth-form">
+            <p class="text-muted">Connectez-vous avec votre email et mot de passe.</p>
+            <label class="form-label" for="login-email">Email</label>
+            <input id="login-email" v-model="email" type="email" class="form-input" placeholder="votre@email.fr" autocomplete="email" required />
+            <label class="form-label" for="login-password">Mot de passe</label>
+            <input id="login-password" v-model="password" type="password" class="form-input" placeholder="Mot de passe" autocomplete="current-password" required />
+            <label class="form-checkbox">
+              <input v-model="rememberMe" type="checkbox" />
+              Rester connecté sur cet appareil
+            </label>
+            <button type="submit" class="btn btn-primary" :disabled="sending">
+              {{ sending ? 'Connexion…' : 'Se connecter' }}
+            </button>
+            <button type="button" class="btn btn-link" @click="authTab = 'forgot'">Mot de passe oublié ?</button>
+          </form>
+        </div>
 
-        <form v-if="authTab === 'register'" @submit.prevent="submitRegister" class="auth-form">
-          <p class="text-muted">Créez un compte pour sauvegarder votre progression.</p>
-          <label class="form-label" for="register-email">Email</label>
-          <input id="register-email" v-model="email" type="email" class="form-input" placeholder="votre@email.fr" autocomplete="email" required />
-          <label class="form-label" for="register-display-name">Pseudo (optionnel)</label>
-          <input id="register-display-name" v-model="displayName" type="text" class="form-input" placeholder="Pseudo (optionnel)" autocomplete="nickname" maxlength="80" />
-          <label class="form-label" for="register-password">Mot de passe</label>
-          <input id="register-password" v-model="password" type="password" class="form-input" placeholder="Mot de passe (min 8 caractères)" autocomplete="new-password" minlength="8" required />
-          <label class="form-checkbox">
-            <input v-model="rememberMe" type="checkbox" />
-            Rester connecté sur cet appareil
-          </label>
-          <button type="submit" class="btn btn-primary" :disabled="sending">
-            {{ sending ? 'Création…' : 'Créer mon compte' }}
-          </button>
-        </form>
+        <div v-if="authTab === 'register'" role="tabpanel" id="panel-register" aria-labelledby="tab-register">
+          <form @submit.prevent="submitRegister" class="auth-form">
+            <p class="text-muted">Créez un compte pour sauvegarder votre progression.</p>
+            <label class="form-label" for="register-email">Email</label>
+            <input id="register-email" v-model="email" type="email" class="form-input" placeholder="votre@email.fr" autocomplete="email" required />
+            <label class="form-label" for="register-display-name">Pseudo (optionnel)</label>
+            <input id="register-display-name" v-model="displayName" type="text" class="form-input" placeholder="Pseudo (optionnel)" autocomplete="nickname" maxlength="80" />
+            <label class="form-label" for="register-password">Mot de passe</label>
+            <input id="register-password" v-model="password" type="password" class="form-input" placeholder="Mot de passe (min 8 caractères)" autocomplete="new-password" minlength="8" required />
+            <label class="form-checkbox">
+              <input v-model="rememberMe" type="checkbox" />
+              Rester connecté sur cet appareil
+            </label>
+            <button type="submit" class="btn btn-primary" :disabled="sending">
+              {{ sending ? 'Création…' : 'Créer mon compte' }}
+            </button>
+          </form>
+        </div>
 
-        <form v-if="authTab === 'forgot'" @submit.prevent="submitForgot" class="auth-form">
-          <p class="text-muted">Recevez un lien de réinitialisation par email.</p>
-          <label class="form-label" for="forgot-email">Email</label>
-          <input id="forgot-email" v-model="email" type="email" class="form-input" placeholder="votre@email.fr" autocomplete="email" required />
-          <button type="submit" class="btn btn-primary" :disabled="sending">
-            {{ sending ? 'Envoi…' : 'Envoyer' }}
-          </button>
-          <button type="button" class="btn btn-link" @click="authTab = 'login'">Retour</button>
-        </form>
+        <div v-if="authTab === 'forgot'" role="tabpanel" id="panel-forgot" aria-labelledby="tab-forgot">
+          <form @submit.prevent="submitForgot" class="auth-form">
+            <p class="text-muted">Recevez un lien de réinitialisation par email.</p>
+            <label class="form-label" for="forgot-email">Email</label>
+            <input id="forgot-email" v-model="email" type="email" class="form-input" placeholder="votre@email.fr" autocomplete="email" required />
+            <button type="submit" class="btn btn-primary" :disabled="sending">
+              {{ sending ? 'Envoi…' : 'Envoyer' }}
+            </button>
+            <button type="button" class="btn btn-link" @click="authTab = 'login'">Retour</button>
+          </form>
+        </div>
       </div>
 
-      <div v-show="message" class="auth-message" :class="messageType" role="status" aria-live="polite">{{ message }}</div>
+      <div class="auth-message" :class="[messageType, { 'is-empty': !message }]" role="status" aria-live="polite">{{ message }}</div>
 
       <!-- Connected -->
       <template v-if="token">
@@ -184,7 +192,8 @@ watch(authTab, () => {
 })
 
 const alreadySpun = computed(() => {
-  const today = new Date().toISOString().slice(0, 10)
+  const now = new Date()
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   return wins.value.some(w => w.spin_date === today && w.status !== 'expired')
 })
 
@@ -240,8 +249,8 @@ async function submitLogin() {
       setUserToken(res.token, rememberMe.value)
       token.value = res.token
       await loadUser()
-      loadOffers()
-      loadWins()
+      await loadOffers()
+      await loadWins()
     } else {
       setMessage(res.error || 'Erreur de connexion.', 'error')
     }
@@ -268,8 +277,8 @@ async function submitRegister() {
           setUserToken(loginRes.token, rememberMe.value)
           token.value = loginRes.token
           await loadUser()
-          loadOffers()
-          loadWins()
+          await loadOffers()
+          await loadWins()
           return
         }
       } catch (loginErr) {
@@ -423,13 +432,11 @@ async function logout() {
 }
 
 onMounted(async () => {
-  const magicOk = await exchangeMagicLink()
-  if (magicOk) {
-    await loadUser()
-    loadOffers()
-    if (token.value) {
-      loadWins()
-    }
+  await exchangeMagicLink()
+  await loadUser()
+  loadOffers()
+  if (token.value) {
+    loadWins()
   }
 })
 </script>
@@ -521,6 +528,7 @@ onMounted(async () => {
 .status-claimed { background: #E8F5E9; color: #2E7D32; }
 .status-expired { background: #FFEBEE; color: #C62828; }
 .auth-message { margin-top: 16px; padding: 12px; border-radius: 8px; }
+.auth-message.is-empty { visibility: hidden; min-height: 0; padding: 0; margin: 0; }
 .auth-message.success { background: #e6f4ea; color: #1e7e34; }
 .auth-message.error { background: #fdecea; color: #c5221f; }
 .auth-message.info { background: #e8f0fe; color: #1967d2; }
