@@ -15,7 +15,7 @@
 require_once __DIR__ . '/../lib/Mailer.php';
 require_once __DIR__ . '/../lib/UserAuth.php';
 
-$authActions = ['register', 'login', 'forgot-password', 'reset-password'];
+$authActions = ['magic-link', 'auth', 'register', 'login', 'forgot-password', 'reset-password'];
 if (in_array($action, $authActions, true)) {
     applyRateLimit($pdo, 'login');
 } else {
