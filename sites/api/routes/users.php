@@ -17,6 +17,16 @@ switch ($method) {
             user_magic_link($pdo, $body);
         } elseif ($action === 'auth') {
             user_auth($pdo);
+        } elseif ($action === 'register') {
+            user_register($pdo, $body);
+        } elseif ($action === 'login') {
+            user_login($pdo, $body);
+        } elseif ($action === 'logout') {
+            user_logout_endpoint($pdo);
+        } elseif ($action === 'forgot-password') {
+            user_forgot_password($pdo, $body);
+        } elseif ($action === 'reset-password') {
+            user_reset_password($pdo, $body);
         } elseif ($action === 'me' && $param === 'avatar') {
             user_update_avatar($pdo, $body);
         } else {
@@ -185,15 +195,13 @@ function user_auth(PDO $pdo): void
 
     $rememberMe = !empty($_GET['rememberMe']);
 
-    $sessionToken = bin2hex(random_bytes(32));
-    $sessionExp = date('Y-m-d H:i:s', $rememberMe ? strtotime('+365 days') : strtotime('+30 days'));
+    $sessionToken = user_create_session($pdo, (int)$user['id'], $rememberMe);
 
     $pdo->prepare("
         UPDATE local_users
-        SET session_token = ?, session_exp = ?,
-            magic_token = NULL, magic_token_exp = NULL
+        SET magic_token = NULL, magic_token_exp = NULL
         WHERE id = ?
-    ")->execute([$sessionToken, $sessionExp, $user['id']]);
+    ")->execute([$user['id']]);
 
     try {
         require_once __DIR__ . '/../lib/Gamification.php';
@@ -490,4 +498,168 @@ function user_update_avatar(PDO $pdo, array $body): void
         return;
     }
     echo json_encode(['success' => true, 'data' => $profile]);
+}
+
+function user_register(PDO $pdo, array $body): void
+{
+    $email       = strtolower(trim($body['email'] ?? ''));
+    $password    = $body['password'] ?? '';
+    $displayName = isset($body['display_name']) ? trim($body['display_name']) : null;
+
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Email invalide']);
+        return;
+    }
+    if (strlen($password) < 8) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Mot de passe trop court (min 8 caractères)']);
+        return;
+    }
+
+    $stmt = $pdo->prepare("SELECT id FROM local_users WHERE email = ?");
+    $stmt->execute([$email]);
+    if ($stmt->fetch()) {
+        http_response_code(409);
+        echo json_encode(['success' => false, 'error' => 'Un compte existe déjà avec cet email']);
+        return;
+    }
+
+    $passwordHash = password_hash($password, PASSWORD_BCRYPT);
+    $insert = $pdo->prepare("
+        INSERT INTO local_users (email, password_hash, display_name, email_verified)
+        VALUES (?, ?, ?, FALSE)
+    ");
+    $insert->execute([
+        $email,
+        $passwordHash,
+        $displayName ?: null,
+    ]);
+    $userId = (int)$pdo->lastInsertId();
+
+    $rememberMe = !empty($body['rememberMe']);
+    $sessionToken = user_create_session($pdo, $userId, $rememberMe);
+
+    echo json_encode([
+        'success' => true,
+        'token'   => $sessionToken,
+        'data'    => ['id' => $userId, 'email' => $email],
+    ]);
+}
+
+function user_login(PDO $pdo, array $body): void
+{
+    $email    = strtolower(trim($body['email'] ?? ''));
+    $password = $body['password'] ?? '';
+
+    if (!$email || !$password) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Email et mot de passe requis']);
+        return;
+    }
+
+    $stmt = $pdo->prepare("SELECT id, email, password_hash FROM local_users WHERE email = ?");
+    $stmt->execute([$email]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$user || !password_verify($password, $user['password_hash'] ?? '')) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'error' => 'Email ou mot de passe incorrect']);
+        return;
+    }
+
+    $rememberMe   = !empty($body['rememberMe']);
+    $sessionToken = user_create_session($pdo, (int)$user['id'], $rememberMe);
+
+    echo json_encode([
+        'success' => true,
+        'token'   => $sessionToken,
+        'data'    => ['id' => (int)$user['id'], 'email' => $user['email']],
+    ]);
+}
+
+function user_logout_endpoint(PDO $pdo): void
+{
+    $user = user_require_auth($pdo);
+    user_logout($pdo, (int)$user['id']);
+    echo json_encode(['success' => true, 'message' => 'Déconnecté']);
+}
+
+function user_forgot_password(PDO $pdo, array $body): void
+{
+    $email = strtolower(trim($body['email'] ?? ''));
+
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Email invalide']);
+        return;
+    }
+
+    // Always respond success to avoid email enumeration.
+    $stmt = $pdo->prepare("SELECT id FROM local_users WHERE email = ?");
+    $stmt->execute([$email]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($user) {
+        $token = bin2hex(random_bytes(32));
+        $exp   = date('Y-m-d H:i:s', strtotime('+1 hour'));
+
+        $pdo->prepare("
+            INSERT INTO local_user_password_resets (email, token, expires_at)
+            VALUES (?, ?, ?)
+        ")->execute([$email, $token, $exp]);
+
+        $config  = getAppConfig();
+        $baseUrl = $config['url'] ?? 'https://artisans-livry.prigent.tech';
+        queuePasswordResetEmail($email, $token, $baseUrl);
+    }
+
+    echo json_encode([
+        'success' => true,
+        'message' => 'Si votre email est valide, vous recevrez un lien de réinitialisation.',
+    ]);
+}
+
+function user_reset_password(PDO $pdo, array $body): void
+{
+    $token       = $body['token'] ?? '';
+    $newPassword = $body['password'] ?? '';
+
+    if (!$token || strlen($newPassword) < 8) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Token ou mot de passe invalide']);
+        return;
+    }
+
+    $stmt = $pdo->prepare("
+        SELECT email
+        FROM local_user_password_resets
+        WHERE token = ?
+          AND expires_at > NOW()
+          AND used_at IS NULL
+        LIMIT 1
+    ");
+    $stmt->execute([$token]);
+    $reset = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$reset) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'error' => 'Lien invalide ou expiré']);
+        return;
+    }
+
+    $passwordHash = password_hash($newPassword, PASSWORD_BCRYPT);
+    $pdo->prepare("UPDATE local_users SET password_hash = ? WHERE email = ?")
+        ->execute([$passwordHash, $reset['email']]);
+
+    $pdo->prepare("
+        UPDATE local_user_password_resets
+        SET used_at = NOW()
+        WHERE token = ?
+    ")->execute([$token]);
+
+    echo json_encode([
+        'success' => true,
+        'message' => 'Votre mot de passe a été mis à jour.',
+    ]);
 }
