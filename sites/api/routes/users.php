@@ -10,6 +10,13 @@
 require_once __DIR__ . '/../lib/Mailer.php';
 require_once __DIR__ . '/../lib/UserAuth.php';
 
+$authActions = ['register', 'login', 'forgot-password', 'reset-password'];
+if (in_array($action, $authActions, true)) {
+    applyRateLimit($pdo, 'login');
+} else {
+    applyRateLimit($pdo, 'public');
+}
+
 switch ($method) {
     case 'POST':
         $body = json_decode(file_get_contents('php://input'), true) ?? [];
@@ -520,8 +527,11 @@ function user_register(PDO $pdo, array $body): void
     $stmt = $pdo->prepare("SELECT id FROM local_users WHERE email = ?");
     $stmt->execute([$email]);
     if ($stmt->fetch()) {
-        http_response_code(409);
-        echo json_encode(['success' => false, 'error' => 'Un compte existe déjà avec cet email']);
+        // Do not reveal that the account exists.
+        echo json_encode([
+            'success' => true,
+            'message' => 'Si votre email est valide, vous recevrez un lien de connexion.',
+        ]);
         return;
     }
 
@@ -601,6 +611,13 @@ function user_forgot_password(PDO $pdo, array $body): void
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($user) {
+        // Invalidate previous unused tokens before creating a new one.
+        $pdo->prepare("
+            UPDATE local_user_password_resets
+            SET used_at = NOW()
+            WHERE email = ? AND used_at IS NULL
+        ")->execute([$email]);
+
         $token = bin2hex(random_bytes(32));
         $exp   = date('Y-m-d H:i:s', strtotime('+1 hour'));
 
@@ -657,6 +674,13 @@ function user_reset_password(PDO $pdo, array $body): void
         SET used_at = NOW()
         WHERE token = ?
     ")->execute([$token]);
+
+    // After a successful reset, invalidate any other active tokens for this email.
+    $pdo->prepare("
+        UPDATE local_user_password_resets
+        SET used_at = NOW()
+        WHERE email = ? AND used_at IS NULL
+    ")->execute([$reset['email']]);
 
     echo json_encode([
         'success' => true,

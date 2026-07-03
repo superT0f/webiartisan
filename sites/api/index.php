@@ -162,7 +162,6 @@ if ($module === 'service-catalog') {
 }
 
 if ($module === 'users') {
-    applyRateLimit($pdo, 'login');
     require_once __DIR__ . '/routes/users.php';
     exit;
 }
