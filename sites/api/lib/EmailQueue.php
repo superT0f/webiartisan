@@ -24,6 +24,16 @@ function processEmailQueue(PDO $pdo, int $limit = 50): array
 
     $pdo->beginTransaction();
     try {
+        // MySQL 5.7 / MariaDB on Gandi does not support FOR UPDATE SKIP LOCKED.
+        // Use a named advisory lock to ensure only one worker runs at a time.
+        $lockStmt = $pdo->query("SELECT GET_LOCK('email_worker', 10)");
+        $lock     = $lockStmt ? $lockStmt->fetchColumn() : 0;
+        if (!$lock) {
+            $pdo->rollBack();
+            error_log('[EMAIL-WORKER] Could not acquire lock');
+            return $stats;
+        }
+
         $stmt = $pdo->prepare("
             SELECT *
             FROM email_queue
@@ -31,7 +41,7 @@ function processEmailQueue(PDO $pdo, int $limit = 50): array
               AND attempts < 5
             ORDER BY created_at ASC
             LIMIT ?
-            FOR UPDATE SKIP LOCKED
+            FOR UPDATE
         ");
         $stmt->execute([$limit]);
         $emails = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -108,8 +118,14 @@ function processEmailQueue(PDO $pdo, int $limit = 50): array
             }
         }
 
+        $pdo->query("SELECT RELEASE_LOCK('email_worker')");
         $pdo->commit();
     } catch (Throwable $e) {
+        try {
+            $pdo->query("SELECT RELEASE_LOCK('email_worker')");
+        } catch (Throwable $releaseErr) {
+            // ignore release errors
+        }
         $pdo->rollBack();
         error_log('[EMAIL-WORKER] Batch failed: ' . $e->getMessage());
         throw $e;
