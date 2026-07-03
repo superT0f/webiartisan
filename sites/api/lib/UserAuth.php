@@ -36,3 +36,33 @@ function user_require_auth(PDO $pdo): array
 
     return $user;
 }
+
+function user_generate_session_token(): string
+{
+    return bin2hex(random_bytes(32));
+}
+
+function user_create_session(PDO $pdo, int $userId, bool $rememberMe): string
+{
+    $token = user_generate_session_token();
+    $expiryDays = $rememberMe ? 365 : 30;
+    $stmt = $pdo->prepare("
+        UPDATE local_users
+        SET session_token = ?, session_exp = DATE_ADD(NOW(), INTERVAL ? DAY)
+        WHERE id = ?
+        LIMIT 1
+    ");
+    $stmt->execute([$token, $expiryDays, $userId]);
+    return $token;
+}
+
+function user_logout(PDO $pdo, int $userId): void
+{
+    $stmt = $pdo->prepare("
+        UPDATE local_users
+        SET session_token = NULL, session_exp = NULL
+        WHERE id = ?
+        LIMIT 1
+    ");
+    $stmt->execute([$userId]);
+}
