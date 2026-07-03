@@ -6,7 +6,7 @@
 function user_get_session_token(): ?string
 {
     $token = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
-    $token = str_replace('Bearer ', '', $token);
+    $token = preg_replace('/^Bearer\s+/i', '', $token);
     return $token ?: null;
 }
 

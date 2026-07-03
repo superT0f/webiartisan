@@ -577,40 +577,40 @@ function user_register(PDO $pdo, array $body): void
     $passwordHash = password_hash($password, PASSWORD_BCRYPT);
     $displayNameToStore = $displayName ? substr($displayName, 0, 80) : null;
 
-    $stmt = $pdo->prepare("SELECT id, password_hash FROM local_users WHERE email = ?");
-    $stmt->execute([$email]);
-    $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+    $pdo->beginTransaction();
+    try {
+        $stmt = $pdo->prepare("SELECT id, password_hash FROM local_users WHERE email = ? FOR UPDATE");
+        $stmt->execute([$email]);
+        $existing = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$existing) {
-        try {
-            $insert = $pdo->prepare("
+        if (!$existing) {
+            $pdo->prepare("
                 INSERT INTO local_users (email, password_hash, display_name, email_verified)
                 VALUES (?, ?, ?, FALSE)
-            ");
-            $insert->execute([
+            ")->execute([
                 $email,
                 $passwordHash,
                 $displayNameToStore,
             ]);
-        } catch (Throwable $e) {
-            if ((int)$e->getCode() !== 23000) {
-                http_response_code(500);
-                echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
-                return;
-            }
-            // Duplicate-key race: re-fetch to see if we can complete the account.
-            $stmt = $pdo->prepare("SELECT id, password_hash FROM local_users WHERE email = ?");
-            $stmt->execute([$email]);
-            $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+        } elseif (empty($existing['password_hash'])) {
+            // Complete a magic-link-only account and invalidate any active magic link.
+            $pdo->prepare("
+                UPDATE local_users
+                SET password_hash = ?,
+                    display_name = COALESCE(?, display_name),
+                    magic_token = NULL,
+                    magic_token_exp = NULL
+                WHERE email = ? AND password_hash IS NULL
+            ")->execute([$passwordHash, $displayNameToStore, $email]);
         }
-    }
+        // If the account already has a password, do nothing (do not reveal existence).
 
-    if ($existing && empty($existing['password_hash'])) {
-        $pdo->prepare("
-            UPDATE local_users
-            SET password_hash = ?, display_name = COALESCE(?, display_name)
-            WHERE email = ? AND password_hash IS NULL
-        ")->execute([$passwordHash, $displayNameToStore, $email]);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
+        return;
     }
 
     $response = ['success' => true, 'message' => $genericMessage];
@@ -639,19 +639,21 @@ function user_login(PDO $pdo, array $body): void
         $stmt->execute([$email]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        $hashToVerify = $user['password_hash'] ?? $dummyHash;
-        if (!password_verify($password, $hashToVerify)) {
-            $error = ['code' => 401, 'body' => ['success' => false, 'error' => 'Email ou mot de passe incorrect']];
-        } elseif (!$user) {
+        if (!$user || !password_verify($password, $user['password_hash'] ?? $dummyHash)) {
             $error = ['code' => 401, 'body' => ['success' => false, 'error' => 'Email ou mot de passe incorrect']];
         } else {
-            $rememberMe   = !empty($body['rememberMe']);
-            $sessionToken = user_create_session($pdo, (int)$user['id'], $rememberMe);
-            $response = [
-                'success' => true,
-                'token'   => $sessionToken,
-                'data'    => ['id' => (int)$user['id'], 'email' => $user['email']],
-            ];
+            try {
+                $rememberMe   = !empty($body['rememberMe']);
+                $sessionToken = user_create_session($pdo, (int)$user['id'], $rememberMe);
+                $response = [
+                    'success' => true,
+                    'token'   => $sessionToken,
+                    'data'    => ['id' => (int)$user['id'], 'email' => $user['email']],
+                ];
+            } catch (Throwable $e) {
+                error_log('[LOGIN-SESSION] ' . $e->getMessage());
+                $error = ['code' => 500, 'body' => ['success' => false, 'error' => 'Erreur serveur']];
+            }
         }
     }
 
@@ -696,12 +698,6 @@ function user_forgot_password(PDO $pdo, array $body): void
         $user = $lock->fetch(PDO::FETCH_ASSOC);
 
         if ($user) {
-            $pdo->prepare("
-                UPDATE local_user_password_resets
-                SET used_at = NOW()
-                WHERE email = ? AND used_at IS NULL
-            ")->execute([$email]);
-
             $pdo->prepare("
                 INSERT INTO local_user_password_resets (email, token_hash, expires_at)
                 VALUES (?, ?, ?)
