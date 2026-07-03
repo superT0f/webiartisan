@@ -720,10 +720,22 @@ function artisan_logout(PDO $pdo): void
  * Détermine l'URL du portail artisan à partir de l'origine de la requête.
  */
 function artisan_portal_url(): string {
+    $allowedOrigins = [
+        'http://localhost:8080',
+        'http://localhost:5173',
+        'http://localhost:1313',
+        'https://app.prigent.tech',
+        'https://web.prigent.tech',
+        'https://artisans-combs.prigent.tech',
+        'https://artisans-vert-saint-denis.prigent.tech',
+        'https://artisans-livry.prigent.tech',
+    ];
+
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-    if ($origin && filter_var($origin, FILTER_VALIDATE_URL)) {
+    if ($origin && in_array($origin, $allowedOrigins, true)) {
         return $origin;
     }
+
     $config = getAppConfig();
     return $config['url'] ?? 'https://artisans-livry.prigent.tech';
 }
