@@ -95,7 +95,7 @@
           <button class="btn btn-outline" @click="logout">Déconnexion</button>
         </div>
 
-        <div v-if="loading" class="skeleton" style="height: 360px; border-radius: 12px;"></div>
+        <div v-if="loading" class="skeleton skeleton-wheel"></div>
 
         <template v-else>
           <div v-if="alreadySpun" class="card result-card">
@@ -488,6 +488,7 @@ onMounted(async () => {
   cursor: pointer;
 }
 .auth-actions { text-align: right; margin-bottom: 12px; }
+.skeleton-wheel { height: 360px; border-radius: 12px; }
 .wheel-wrap { text-align: center; margin: 32px 0; }
 .wheel-container { position: relative; display: inline-block; margin-bottom: 24px; }
 .wheel-container canvas {
