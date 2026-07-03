@@ -121,7 +121,7 @@ function user_magic_link(PDO $pdo, array $body): void
         ")->execute([$tokenHash, $exp, $userId]);
 
         $pdo->commit();
-    } catch (PDOException $e) {
+    } catch (Throwable $e) {
         $pdo->rollBack();
         http_response_code(500);
         echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
@@ -239,12 +239,12 @@ function user_auth(PDO $pdo): void
 
         $pdo->prepare("
             UPDATE local_users
-            SET magic_token = NULL, magic_token_exp = NULL
+            SET magic_token = NULL, magic_token_exp = NULL, email_verified = TRUE
             WHERE id = ?
         ")->execute([$user['id']]);
 
         $pdo->commit();
-    } catch (PDOException $e) {
+    } catch (Throwable $e) {
         $pdo->rollBack();
         http_response_code(500);
         echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
@@ -573,9 +573,9 @@ function user_register(PDO $pdo, array $body): void
 
     $stmt = $pdo->prepare("SELECT id FROM local_users WHERE email = ?");
     $stmt->execute([$email]);
-    $created = !$stmt->fetch();
+    $exists = (bool) $stmt->fetch();
 
-    if ($created) {
+    if (!$exists) {
         try {
             $insert = $pdo->prepare("
                 INSERT INTO local_users (email, password_hash, display_name, email_verified)
@@ -586,14 +586,14 @@ function user_register(PDO $pdo, array $body): void
                 $passwordHash,
                 $displayNameToStore,
             ]);
-        } catch (PDOException $e) {
+        } catch (Throwable $e) {
             if ((int)$e->getCode() !== 23000) {
                 http_response_code(500);
                 echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
                 return;
             }
             // Duplicate-key race: treat as if the account already existed.
-            $created = false;
+            $exists = true;
         }
     }
 
@@ -621,8 +621,7 @@ function user_login(PDO $pdo, array $body): void
     if (!$email || !$password) {
         $error = ['code' => 400, 'body' => ['success' => false, 'error' => 'Email et mot de passe requis']];
     } else {
-        static $dummyHash = null;
-        $dummyHash ??= password_hash('dummy', PASSWORD_BCRYPT);
+        $dummyHash = '$2y$10$nJE.S3ari5fK7bx/5wTzLuAqtQF2nVkanks.m5AdkvLK3s9ity/i6';
 
         $stmt = $pdo->prepare("SELECT id, email, password_hash FROM local_users WHERE email = ?");
         $stmt->execute([$email]);
@@ -702,7 +701,7 @@ function user_forgot_password(PDO $pdo, array $body): void
             ")->execute([$email, $tokenHash, $exp]);
 
             $pdo->commit();
-        } catch (PDOException $e) {
+        } catch (Throwable $e) {
             $pdo->rollBack();
             http_response_code(500);
             echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
