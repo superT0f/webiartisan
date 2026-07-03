@@ -75,6 +75,10 @@
 
       <!-- Connected -->
       <template v-else>
+        <div class="auth-actions" style="text-align: right; margin-bottom: 12px;">
+          <button class="btn btn-outline" @click="logout">Déconnexion</button>
+        </div>
+
         <div v-if="loading" class="skeleton" style="height: 360px; border-radius: 12px;"></div>
 
         <template v-else>
@@ -125,7 +129,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import QRCode from 'qrcode'
 import {
@@ -164,6 +168,10 @@ const message = ref('')
 const messageType = ref('')
 const wheelCanvas = ref(null)
 const qrCanvas = ref(null)
+
+watch(authTab, () => {
+  message.value = ''
+})
 
 const alreadySpun = computed(() => {
   const today = new Date().toISOString().slice(0, 10)
@@ -386,10 +394,12 @@ async function logout() {
   }
 }
 
-onMounted(() => {
-  loadUser()
+onMounted(async () => {
+  await loadUser()
   loadOffers()
-  loadWins()
+  if (token.value) {
+    loadWins()
+  }
 })
 </script>
 
