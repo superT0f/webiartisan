@@ -26,6 +26,7 @@ const routes = [
   { path: '/jeux', name: 'GamesHub', component: () => import('./views/GamesHub.vue'), meta: { title: 'Jeux et bons plans' } },
   { path: '/jeu/:id', name: 'GamePlay', component: () => import('./views/GamePlay.vue'), meta: { title: 'Jouer' } },
   { path: '/profil', component: () => import('./views/UserProfile.vue'), meta: { title: 'Mon profil' } },
+  { path: '/reinitialiser', component: () => import('./views/ResetPassword.vue'), meta: { title: 'Réinitialiser le mot de passe' } },
   { path: '/personnage', component: () => import('./views/CharacterEdit.vue'), meta: { title: 'Mon personnage' } },
   { path: '/:pathMatch(.*)*', redirect: '/' }
 ]
