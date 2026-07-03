@@ -770,17 +770,18 @@ function artisan_contact(PDO $pdo, int $id, array $body): void
 </body></html>
 HTML;
 
-    $contactSent = send_html_email(
+    $queued = queueEmail(
         $artisan['email'],
         $contactSubject,
         $contactHtml,
         null,
         'WebIArtisan',
-        $email
+        $email,
+        ['type' => 'artisan_contact', 'artisan_id' => $id, 'from_email' => $email]
     );
 
-    if (!$contactSent) {
-        error_log("[CONTACT] Échec envoi email à {$artisan['email']} depuis {$email}");
+    if (!$queued) {
+        error_log("[CONTACT] Échec mise en file email à {$artisan['email']} depuis {$email}");
     }
 
     echo json_encode([
