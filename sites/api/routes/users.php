@@ -735,9 +735,9 @@ function user_reset_password(PDO $pdo, array $body): void
     $startTime = microtime(true);
 
     if (!$rawToken || strlen($newPassword) < 8) {
+        pad_user_auth_response($startTime);
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Token ou mot de passe invalide']);
-        pad_user_auth_response($startTime);
         return;
     }
 
@@ -754,9 +754,9 @@ function user_reset_password(PDO $pdo, array $body): void
 
         if ($consume->rowCount() === 0) {
             $pdo->rollBack();
+            pad_user_auth_response($startTime);
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => 'Lien invalide ou expiré']);
-            pad_user_auth_response($startTime);
             return;
         }
 
@@ -766,9 +766,9 @@ function user_reset_password(PDO $pdo, array $body): void
 
         if (!$reset) {
             $pdo->rollBack();
+            pad_user_auth_response($startTime);
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => 'Lien invalide ou expiré']);
-            pad_user_auth_response($startTime);
             return;
         }
 
@@ -776,9 +776,9 @@ function user_reset_password(PDO $pdo, array $body): void
         $lock->execute([$reset['email']]);
         if ($lock->rowCount() === 0) {
             $pdo->rollBack();
+            pad_user_auth_response($startTime);
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => 'Lien invalide ou expiré']);
-            pad_user_auth_response($startTime);
             return;
         }
 
@@ -809,9 +809,9 @@ function user_reset_password(PDO $pdo, array $body): void
         $pdo->commit();
     } catch (Throwable $e) {
         $pdo->rollBack();
+        pad_user_auth_response($startTime);
         http_response_code(500);
         echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
-        pad_user_auth_response($startTime);
         return;
     }
 
