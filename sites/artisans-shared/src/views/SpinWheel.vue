@@ -83,7 +83,7 @@
       <div v-if="message" class="auth-message" :class="messageType" role="status" aria-live="polite">{{ message }}</div>
 
       <!-- Connected -->
-      <template v-else>
+      <template v-if="token">
         <div class="auth-actions">
           <button class="btn btn-outline" @click="logout">Déconnexion</button>
         </div>
