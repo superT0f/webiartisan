@@ -8,10 +8,42 @@
       <div v-if="!token" class="auth-card card">
         <h2>Connexion</h2>
         <div class="auth-tabs" role="tablist" aria-label="Méthode de connexion">
-          <button id="tab-magic" type="button" role="tab" :aria-selected="authTab === 'magic'" aria-controls="panel-magic" :class="{ active: authTab === 'magic' }" @click="authTab = 'magic'">Lien magique</button>
-          <button id="tab-login" type="button" role="tab" :aria-selected="authTab === 'login'" aria-controls="panel-login" :class="{ active: authTab === 'login' }" @click="authTab = 'login'">Mot de passe</button>
-          <button id="tab-register" type="button" role="tab" :aria-selected="authTab === 'register'" aria-controls="panel-register" :class="{ active: authTab === 'register' }" @click="authTab = 'register'">Créer un compte</button>
-          <button id="tab-forgot" type="button" role="tab" :aria-selected="authTab === 'forgot'" aria-controls="panel-forgot" :class="{ active: authTab === 'forgot' }" @click="authTab = 'forgot'">Oublié</button>
+          <button
+            id="tab-magic"
+            type="button"
+            role="tab"
+            :aria-selected="authTab === 'magic'"
+            aria-controls="panel-magic"
+            :class="{ active: authTab === 'magic' }"
+            @click="authTab = 'magic'"
+          >Lien magique</button>
+          <button
+            id="tab-login"
+            type="button"
+            role="tab"
+            :aria-selected="authTab === 'login'"
+            aria-controls="panel-login"
+            :class="{ active: authTab === 'login' }"
+            @click="authTab = 'login'"
+          >Mot de passe</button>
+          <button
+            id="tab-register"
+            type="button"
+            role="tab"
+            :aria-selected="authTab === 'register'"
+            aria-controls="panel-register"
+            :class="{ active: authTab === 'register' }"
+            @click="authTab = 'register'"
+          >Créer un compte</button>
+          <button
+            id="tab-forgot"
+            type="button"
+            role="tab"
+            :aria-selected="authTab === 'forgot'"
+            aria-controls="panel-forgot"
+            :class="{ active: authTab === 'forgot' }"
+            @click="authTab = 'forgot'"
+          >Oublié</button>
         </div>
 
         <div v-if="authTab === 'magic'" role="tabpanel" id="panel-magic" aria-labelledby="tab-magic">
@@ -165,6 +197,25 @@ import {
   getSpinWins,
 } from '../api.js'
 
+function parisTodayIso() {
+  const d = new Date()
+  const paris = new Intl.DateTimeFormat('fr-FR', {
+    timeZone: 'Europe/Paris',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(d)
+  const part = (type) => paris.find(p => p.type === type).value
+  return `${part('year')}-${part('month')}-${part('day')}`
+}
+
+function formatLocalDate(iso) {
+  if (!iso) return '—'
+  // Append local midnight if the value is date-only to avoid UTC shift.
+  const input = iso.includes('T') ? iso : `${iso}T00:00:00`
+  return new Date(input).toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' })
+}
+
 const route = useRoute()
 const router = useRouter()
 
@@ -192,8 +243,7 @@ watch(authTab, () => {
 })
 
 const alreadySpun = computed(() => {
-  const now = new Date()
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  const today = parisTodayIso()
   return wins.value.some(w => w.spin_date === today && w.status !== 'expired')
 })
 
@@ -413,8 +463,7 @@ async function drawQr() {
 }
 
 function formatDate(iso) {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('fr-FR')
+  return formatLocalDate(iso)
 }
 
 async function logout() {
@@ -434,8 +483,8 @@ async function logout() {
 onMounted(async () => {
   await exchangeMagicLink()
   await loadUser()
-  loadOffers()
   if (token.value) {
+    loadOffers()
     loadWins()
   }
 })
