@@ -8,74 +8,90 @@
       <div v-if="!token" class="auth-card card">
         <h2>Connexion</h2>
         <div class="auth-tabs" role="tablist" aria-label="Méthode de connexion">
-          <button role="tab" :aria-selected="authTab === 'magic'" :class="{ active: authTab === 'magic' }" @click="authTab = 'magic'">Lien magique</button>
-          <button role="tab" :aria-selected="authTab === 'login'" :class="{ active: authTab === 'login' }" @click="authTab = 'login'">Mot de passe</button>
-          <button role="tab" :aria-selected="authTab === 'register'" :class="{ active: authTab === 'register' }" @click="authTab = 'register'">Créer un compte</button>
-          <button role="tab" :aria-selected="authTab === 'forgot'" :class="{ active: authTab === 'forgot' }" @click="authTab = 'forgot'">Oublié</button>
+          <button id="tab-magic" role="tab" :aria-selected="authTab === 'magic'" aria-controls="panel-magic" :class="{ active: authTab === 'magic' }" @click="authTab = 'magic'">Lien magique</button>
+          <button id="tab-login" role="tab" :aria-selected="authTab === 'login'" aria-controls="panel-login" :class="{ active: authTab === 'login' }" @click="authTab = 'login'">Mot de passe</button>
+          <button id="tab-register" role="tab" :aria-selected="authTab === 'register'" aria-controls="panel-register" :class="{ active: authTab === 'register' }" @click="authTab = 'register'">Créer un compte</button>
+          <button id="tab-forgot" role="tab" :aria-selected="authTab === 'forgot'" aria-controls="panel-forgot" :class="{ active: authTab === 'forgot' }" @click="authTab = 'forgot'">Oublié</button>
         </div>
 
-        <form v-if="authTab === 'magic'" @submit.prevent="sendMagicLink" class="auth-form">
-          <p class="text-muted">Recevez un lien magique par email pour participer.</p>
-          <input
-            v-model="email"
-            type="email"
-            class="form-input"
-            placeholder="votre@email.fr"
-            required
-            :disabled="sending"
-          />
-          <label class="form-checkbox">
-            <input v-model="rememberMe" type="checkbox" :disabled="sending" />
-            Rester connecté sur cet appareil
-          </label>
-          <button type="submit" class="btn btn-primary" :disabled="sending || !email">
-            {{ sending ? 'Envoi…' : 'Recevoir mon lien' }}
-          </button>
-        </form>
+        <div v-if="authTab === 'magic'" role="tabpanel" id="panel-magic" aria-labelledby="tab-magic">
+          <form @submit.prevent="sendMagicLink" class="auth-form">
+            <p class="text-muted">Recevez un lien magique par email pour participer.</p>
+            <label class="form-label" for="auth-email">Email</label>
+            <input
+              id="auth-email"
+              v-model="email"
+              type="email"
+              class="form-input"
+              placeholder="votre@email.fr"
+              required
+              :disabled="sending"
+            />
+            <label class="form-checkbox">
+              <input v-model="rememberMe" type="checkbox" :disabled="sending" />
+              Rester connecté sur cet appareil
+            </label>
+            <button type="submit" class="btn btn-primary" :disabled="sending || !email">
+              {{ sending ? 'Envoi…' : 'Recevoir mon lien' }}
+            </button>
+          </form>
+        </div>
 
-        <form v-if="authTab === 'login'" @submit.prevent="submitLogin" class="auth-form">
-          <p class="text-muted">Connectez-vous avec votre email et mot de passe.</p>
-          <input v-model="email" type="email" class="form-input" placeholder="votre@email.fr" required />
-          <input v-model="password" type="password" class="form-input" placeholder="Mot de passe" required />
-          <label class="form-checkbox">
-            <input v-model="rememberMe" type="checkbox" />
-            Rester connecté sur cet appareil
-          </label>
-          <button type="submit" class="btn btn-primary" :disabled="sending">
-            {{ sending ? 'Connexion…' : 'Se connecter' }}
-          </button>
-          <button type="button" class="btn btn-link" @click="authTab = 'forgot'">Mot de passe oublié ?</button>
-        </form>
+        <div v-if="authTab === 'login'" role="tabpanel" id="panel-login" aria-labelledby="tab-login">
+          <form @submit.prevent="submitLogin" class="auth-form">
+            <p class="text-muted">Connectez-vous avec votre email et mot de passe.</p>
+            <label class="form-label" for="login-email">Email</label>
+            <input id="login-email" v-model="email" type="email" class="form-input" placeholder="votre@email.fr" required />
+            <label class="form-label" for="login-password">Mot de passe</label>
+            <input id="login-password" v-model="password" type="password" class="form-input" placeholder="Mot de passe" required />
+            <label class="form-checkbox">
+              <input v-model="rememberMe" type="checkbox" />
+              Rester connecté sur cet appareil
+            </label>
+            <button type="submit" class="btn btn-primary" :disabled="sending">
+              {{ sending ? 'Connexion…' : 'Se connecter' }}
+            </button>
+            <button type="button" class="btn btn-link" @click="authTab = 'forgot'">Mot de passe oublié ?</button>
+          </form>
+        </div>
 
-        <form v-if="authTab === 'register'" @submit.prevent="submitRegister" class="auth-form">
-          <p class="text-muted">Créez un compte pour sauvegarder votre progression.</p>
-          <input v-model="email" type="email" class="form-input" placeholder="votre@email.fr" required />
-          <input v-model="displayName" type="text" class="form-input" placeholder="Pseudo (optionnel)" maxlength="80" />
-          <input v-model="password" type="password" class="form-input" placeholder="Mot de passe (min 8 caractères)" minlength="8" required />
-          <label class="form-checkbox">
-            <input v-model="rememberMe" type="checkbox" />
-            Rester connecté sur cet appareil
-          </label>
-          <button type="submit" class="btn btn-primary" :disabled="sending">
-            {{ sending ? 'Création…' : 'Créer mon compte' }}
-          </button>
-        </form>
+        <div v-if="authTab === 'register'" role="tabpanel" id="panel-register" aria-labelledby="tab-register">
+          <form @submit.prevent="submitRegister" class="auth-form">
+            <p class="text-muted">Créez un compte pour sauvegarder votre progression.</p>
+            <label class="form-label" for="register-email">Email</label>
+            <input id="register-email" v-model="email" type="email" class="form-input" placeholder="votre@email.fr" required />
+            <label class="form-label" for="register-display-name">Pseudo (optionnel)</label>
+            <input id="register-display-name" v-model="displayName" type="text" class="form-input" placeholder="Pseudo (optionnel)" maxlength="80" />
+            <label class="form-label" for="register-password">Mot de passe</label>
+            <input id="register-password" v-model="password" type="password" class="form-input" placeholder="Mot de passe (min 8 caractères)" minlength="8" required />
+            <label class="form-checkbox">
+              <input v-model="rememberMe" type="checkbox" />
+              Rester connecté sur cet appareil
+            </label>
+            <button type="submit" class="btn btn-primary" :disabled="sending">
+              {{ sending ? 'Création…' : 'Créer mon compte' }}
+            </button>
+          </form>
+        </div>
 
-        <form v-if="authTab === 'forgot'" @submit.prevent="submitForgot" class="auth-form">
-          <p class="text-muted">Recevez un lien de réinitialisation par email.</p>
-          <input v-model="email" type="email" class="form-input" placeholder="votre@email.fr" required />
-          <button type="submit" class="btn btn-primary" :disabled="sending">
-            {{ sending ? 'Envoi…' : 'Envoyer' }}
-          </button>
-          <button type="button" class="btn btn-link" @click="authTab = 'login'">Retour</button>
-        </form>
+        <div v-if="authTab === 'forgot'" role="tabpanel" id="panel-forgot" aria-labelledby="tab-forgot">
+          <form @submit.prevent="submitForgot" class="auth-form">
+            <p class="text-muted">Recevez un lien de réinitialisation par email.</p>
+            <label class="form-label" for="forgot-email">Email</label>
+            <input id="forgot-email" v-model="email" type="email" class="form-input" placeholder="votre@email.fr" required />
+            <button type="submit" class="btn btn-primary" :disabled="sending">
+              {{ sending ? 'Envoi…' : 'Envoyer' }}
+            </button>
+            <button type="button" class="btn btn-link" @click="authTab = 'login'">Retour</button>
+          </form>
+        </div>
 
-        <div v-if="message" class="auth-message" :class="messageType">{{ message }}</div>
+        <div v-if="message" class="auth-message" :class="messageType" role="alert" aria-live="polite">{{ message }}</div>
       </div>
 
       <!-- Connected -->
       <template v-else>
-        <div class="auth-actions" style="text-align: right; margin-bottom: 12px;">
+        <div class="auth-actions">
           <button class="btn btn-outline" @click="logout">Déconnexion</button>
         </div>
 
@@ -90,7 +106,7 @@
 
           <div v-else class="wheel-wrap">
             <div class="wheel-container" :class="{ spinning: spinning }">
-              <canvas ref="wheelCanvas" width="360" height="360"></canvas>
+              <canvas ref="wheelCanvas" width="360" height="360" role="img" aria-label="Roue des offres à gagner">Roue des offres à gagner</canvas>
               <div class="wheel-pointer"></div>
             </div>
             <button class="btn btn-primary btn-lg" @click="spin" :disabled="spinning || offers.length < 2">
@@ -105,7 +121,7 @@
             <p class="text-muted">{{ result.description }}</p>
             <p><strong>Artisan :</strong> {{ result.artisan_name }}</p>
             <div class="qr-wrap">
-              <canvas ref="qrCanvas"></canvas>
+              <canvas ref="qrCanvas" aria-hidden="true"></canvas>
               <div class="code">{{ result.code }}</div>
             </div>
             <p class="text-muted small">Valide jusqu'au {{ formatDate(result.expires_at) }}</p>
@@ -191,18 +207,21 @@ function setMessage(text, type = 'info') {
 }
 
 async function exchangeMagicLink() {
-  if (!route.query.token) return
+  if (!route.query.token) return true
   try {
     const res = await authUser(route.query.token, rememberMe.value)
     if (res.success && res.token) {
       setUserToken(res.token, rememberMe.value)
       token.value = res.token
       await router.replace('/roue')
+      return true
     } else {
       setMessage(res.error || 'Lien invalide', 'error')
+      return false
     }
   } catch (e) {
     setMessage('Erreur réseau.', 'error')
+    return false
   }
 }
 
@@ -297,6 +316,8 @@ async function loadUser() {
     } else {
       setMessage(res.error || 'Impossible de charger le profil.', 'error')
     }
+  } catch (e) {
+    setMessage('Erreur réseau.', 'error')
   } finally {
     loading.value = false
   }
@@ -403,11 +424,13 @@ async function logout() {
 }
 
 onMounted(async () => {
-  await exchangeMagicLink()
-  await loadUser()
-  loadOffers()
-  if (token.value) {
-    loadWins()
+  const magicOk = await exchangeMagicLink()
+  if (magicOk) {
+    await loadUser()
+    loadOffers()
+    if (token.value) {
+      loadWins()
+    }
   }
 })
 </script>
@@ -417,6 +440,7 @@ onMounted(async () => {
 .narrow { max-width: 720px; }
 .auth-card, .result-card, .wins-card { padding: 28px; margin-top: 24px; }
 .auth-form { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
+.form-label { font-weight: 500; margin-bottom: 4px; display: block; }
 .auth-tabs {
   display: flex;
   gap: 4px;
@@ -463,8 +487,13 @@ onMounted(async () => {
   height: 18px;
   cursor: pointer;
 }
+.auth-actions { text-align: right; margin-bottom: 12px; }
 .wheel-wrap { text-align: center; margin: 32px 0; }
 .wheel-container { position: relative; display: inline-block; margin-bottom: 24px; }
+.wheel-container canvas {
+  max-width: 100%;
+  height: auto;
+}
 .wheel-container.spinning canvas {
   animation: spin-anim 3s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
 }
