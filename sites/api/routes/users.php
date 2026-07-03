@@ -527,24 +527,38 @@ function user_register(PDO $pdo, array $body): void
     $stmt = $pdo->prepare("SELECT id FROM local_users WHERE email = ?");
     $stmt->execute([$email]);
     if ($stmt->fetch()) {
-        // Do not reveal that the account exists.
         echo json_encode([
             'success' => true,
-            'message' => 'Si votre email est valide, vous recevrez un lien de réinitialisation.',
+            'message' => 'Si votre email est valide, votre inscription est prise en compte.',
         ]);
         return;
     }
 
     $passwordHash = password_hash($password, PASSWORD_BCRYPT);
-    $insert = $pdo->prepare("
-        INSERT INTO local_users (email, password_hash, display_name, email_verified)
-        VALUES (?, ?, ?, FALSE)
-    ");
-    $insert->execute([
-        $email,
-        $passwordHash,
-        $displayName ?: null,
-    ]);
+    $displayNameToStore = $displayName ? substr($displayName, 0, 80) : null;
+
+    try {
+        $insert = $pdo->prepare("
+            INSERT INTO local_users (email, password_hash, display_name, email_verified)
+            VALUES (?, ?, ?, FALSE)
+        ");
+        $insert->execute([
+            $email,
+            $passwordHash,
+            $displayNameToStore,
+        ]);
+    } catch (PDOException $e) {
+        // Duplicate key race or other DB error: do not reveal account existence.
+        if ((int)$e->getCode() === 23000) {
+            echo json_encode([
+                'success' => true,
+                'message' => 'Si votre email est valide, votre inscription est prise en compte.',
+            ]);
+            return;
+        }
+        throw $e;
+    }
+
     $userId = (int)$pdo->lastInsertId();
 
     $rememberMe = !empty($body['rememberMe']);
@@ -660,27 +674,37 @@ function user_reset_password(PDO $pdo, array $body): void
     $reset = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$reset) {
-        http_response_code(401);
+        http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Lien invalide ou expiré']);
         return;
     }
 
     $passwordHash = password_hash($newPassword, PASSWORD_BCRYPT);
-    $pdo->prepare("UPDATE local_users SET password_hash = ? WHERE email = ?")
-        ->execute([$passwordHash, $reset['email']]);
 
-    $pdo->prepare("
-        UPDATE local_user_password_resets
-        SET used_at = NOW()
-        WHERE token = ?
-    ")->execute([$token]);
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare("UPDATE local_users SET password_hash = ? WHERE email = ?")
+            ->execute([$passwordHash, $reset['email']]);
 
-    // After a successful reset, invalidate any other active tokens for this email.
-    $pdo->prepare("
-        UPDATE local_user_password_resets
-        SET used_at = NOW()
-        WHERE email = ? AND used_at IS NULL
-    ")->execute([$reset['email']]);
+        $pdo->prepare("
+            UPDATE local_user_password_resets
+            SET used_at = NOW()
+            WHERE token = ?
+        ")->execute([$token]);
+
+        $pdo->prepare("
+            UPDATE local_user_password_resets
+            SET used_at = NOW()
+            WHERE email = ? AND used_at IS NULL
+        ")->execute([$reset['email']]);
+
+        $pdo->commit();
+    } catch (PDOException $e) {
+        $pdo->rollBack();
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
+        return;
+    }
 
     echo json_encode([
         'success' => true,
