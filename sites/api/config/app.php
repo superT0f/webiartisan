@@ -23,6 +23,7 @@ function getAppConfig(): array {
         'site_base_url'    => $siteBaseUrl,
         'jwt_secret'       => $env['JWT_SECRET'] ?? 'change_me_in_production',
         'mail_from'          => $env['MAIL_FROM'] ?? 'noreply@webiartisan.prigent.tech',
+        'from_name'          => $env['FROM_NAME'] ?? 'WebIArtisan',
     ];
 
     return $config;

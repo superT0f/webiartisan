@@ -89,8 +89,18 @@ function queuePasswordResetEmail(string $email, string $token, string $baseUrl):
 {
     $config    = getAppConfig();
     $fromEmail = $config['mail_from'] ?? 'noreply@webiartisan.prigent.tech';
+    $fromName  = $config['from_name'] ?? 'WebIArtisan';
 
-    $link = rtrim($baseUrl, '/') . '/reinitialiser?token=' . urlencode($token);
+    $baseUrl = rtrim($baseUrl, '/');
+    if (
+        strncasecmp($baseUrl, 'http://', 7) !== 0 &&
+        strncasecmp($baseUrl, 'https://', 8) !== 0
+    ) {
+        error_log('[QUEUE-PASSWORD-RESET] Invalid baseUrl: ' . $baseUrl);
+        return false;
+    }
+
+    $link = $baseUrl . '/reinitialiser?token=' . urlencode($token);
     $safeLink = htmlspecialchars($link, ENT_QUOTES, 'UTF-8');
 
     $subject = 'Réinitialisation de votre mot de passe WebIArtisan';
@@ -111,7 +121,7 @@ HTML;
         $subject,
         $html,
         $fromEmail,
-        'WebIArtisan',
+        $fromName,
         null,
         ['type' => 'password_reset', 'email' => $email]
     );
