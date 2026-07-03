@@ -4,6 +4,11 @@
  *
  * POST /users/magic-link        — envoie un lien magique
  * POST /users/auth?token=...    — valide le token et crée une session
+ * POST /users/register          — crée un compte avec mot de passe
+ * POST /users/login             — connexion avec mot de passe
+ * POST /users/logout            — déconnexion
+ * POST /users/forgot-password   — demande de réinitialisation
+ * POST /users/reset-password    — réinitialise le mot de passe
  * GET  /users/me                — infos utilisateur connecté
  */
 
@@ -548,7 +553,6 @@ function user_register(PDO $pdo, array $body): void
             $displayNameToStore,
         ]);
     } catch (PDOException $e) {
-        // Duplicate key race or other DB error: do not reveal account existence.
         if ((int)$e->getCode() === 23000) {
             echo json_encode([
                 'success' => true,
@@ -556,7 +560,9 @@ function user_register(PDO $pdo, array $body): void
             ]);
             return;
         }
-        throw $e;
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
+        return;
     }
 
     $userId = (int)$pdo->lastInsertId();
@@ -662,35 +668,36 @@ function user_reset_password(PDO $pdo, array $body): void
         return;
     }
 
-    $stmt = $pdo->prepare("
-        SELECT email
-        FROM local_user_password_resets
-        WHERE token = ?
-          AND expires_at > NOW()
-          AND used_at IS NULL
-        LIMIT 1
-    ");
-    $stmt->execute([$token]);
-    $reset = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$reset) {
-        http_response_code(400);
-        echo json_encode(['success' => false, 'error' => 'Lien invalide ou expiré']);
-        return;
-    }
-
-    $passwordHash = password_hash($newPassword, PASSWORD_BCRYPT);
-
     $pdo->beginTransaction();
     try {
-        $pdo->prepare("UPDATE local_users SET password_hash = ? WHERE email = ?")
-            ->execute([$passwordHash, $reset['email']]);
-
-        $pdo->prepare("
+        $consume = $pdo->prepare("
             UPDATE local_user_password_resets
             SET used_at = NOW()
-            WHERE token = ?
-        ")->execute([$token]);
+            WHERE token = ? AND used_at IS NULL AND expires_at > NOW()
+        ");
+        $consume->execute([$token]);
+
+        if ($consume->rowCount() === 0) {
+            $pdo->rollBack();
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Lien invalide ou expiré']);
+            return;
+        }
+
+        $stmt = $pdo->prepare("SELECT email FROM local_user_password_resets WHERE token = ?");
+        $stmt->execute([$token]);
+        $reset = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$reset) {
+            $pdo->rollBack();
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Lien invalide ou expiré']);
+            return;
+        }
+
+        $passwordHash = password_hash($newPassword, PASSWORD_BCRYPT);
+        $pdo->prepare("UPDATE local_users SET password_hash = ? WHERE email = ?")
+            ->execute([$passwordHash, $reset['email']]);
 
         $pdo->prepare("
             UPDATE local_user_password_resets
