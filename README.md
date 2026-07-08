@@ -67,7 +67,7 @@ L’application est accessible sur `http://localhost` et l’API sur `http://loc
 |----------|-------------|
 | `make up` | Démarre Docker Compose (nginx, php, mysql, node) |
 | `make down` | Arrête la stack |
-| `make migrate` | Exécute toutes les migrations SQL (025 → 030) |
+| `make migrate` | Exécute toutes les migrations SQL (025 → 032) |
 | `make seed` | Injecte les données de démo Livry |
 | `make dev` | Affiche les logs du serveur Vite |
 | `make build` | Compile le frontend Livry pour la production |
@@ -86,13 +86,18 @@ make test-api
 
 Le script `scripts/test-api.sh` vérifie les endpoints publics, l’authentification artisan, l’authentification consommateur, la roue, les profils utilisateurs, la gamification, les témoignages et les mini-jeux.
 
-## Authentification consommateur (magic link)
+## Authentification consommateur
 
-Les visiteurs peuvent s’authentifier sans mot de passe via un lien magique envoyé par email :
+Les visiteurs peuvent créer un compte et se connecter de plusieurs façons :
 
-- La case **"Rester connecté"** est cochée par défaut et crée un cookie `user_token` valable 365 jours.
-- Le lien magique redirige automatiquement vers la page d’origine (`/roue`, `/jeu/:id`, etc.).
-- Les artisans connectés à leur espace peuvent cliquer sur **"Jouer aux mini-jeux"** pour obtenir un compte visiteur lié et participer aux jeux comme un habitant.
+- **Magic-link** : un lien de connexion est envoyé par email.
+- **Email + mot de passe** : inscription classique avec réinitialisation de mot de passe.
+- (Phase 2 : connexion via Google OAuth.)
+
+La case **"Rester connecté"** est cochée par défaut et crée un cookie `user_token` valable 365 jours.  
+Le logout invalide le token côté serveur.
+
+Les artisans connectés à leur espace peuvent cliquer sur **"Jouer aux mini-jeux"** pour obtenir un compte visiteur lié et participer aux jeux comme un habitant.
 
 ## Déploiement production (Gandi)
 
@@ -127,6 +132,8 @@ Les migrations sont versionnées dans `sites/api/migrations/`. Pour la version c
 
 1. `sites/api/migrations/029_testimonials_services.sql`
 2. `sites/api/migrations/030_mini_games.sql`
+3. `sites/api/migrations/031_email_queue.sql`
+4. `sites/api/migrations/032_user_password_auth.sql`
 
 Ces scripts utilisent `CREATE TABLE IF NOT EXISTS` et des vérifications de colonnes, ils peuvent donc être rejoués sans danger.
 
