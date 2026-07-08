@@ -136,7 +136,7 @@ function artisan_list(PDO $pdo): void
     $city     = $_GET['city']     ?? null;
     $category = $_GET['category'] ?? null;
     $search   = $_GET['search']   ?? null;
-    $featured = isset($_GET['featured']) ? (bool)$_GET['featured'] : null;
+    $featured = isset($_GET['featured']) ? filter_var($_GET['featured'], FILTER_VALIDATE_BOOLEAN) : null;
     $limit    = min((int)($_GET['limit']  ?? 20), 100);
     $offset   = max((int)($_GET['offset'] ?? 0), 0);
 
@@ -608,7 +608,7 @@ function artisan_magic_link(PDO $pdo, array $body): void
             $artisan['status'] ?? 'n/a',
             $rememberMe ? '1' : '0'
         ));
-        echo json_encode(['success' => true, 'message' => 'Si votre email est valide, vous recevrez un lien de connexion.']);
+        echo json_encode(['success' => true, 'data' => ['message' => 'Si votre email est valide, vous recevrez un lien de connexion.']]);
         return;
     }
 
@@ -670,7 +670,7 @@ HTML;
         $redactedLink
     ));
 
-    echo json_encode(['success' => true, 'message' => 'Lien de connexion envoyé par email.']);
+    echo json_encode(['success' => true, 'data' => ['message' => 'Lien de connexion envoyé par email.']]);
 }
 
 /**
@@ -710,8 +710,7 @@ function artisan_consumer_token(PDO $pdo): void
 
     echo json_encode([
         'success' => true,
-        'token'   => $sessionToken,
-        'data'    => ['id' => (int)$userId, 'email' => $email],
+        'data'    => ['id' => (int)$userId, 'email' => $email, 'token' => $sessionToken],
     ]);
 }
 
@@ -720,7 +719,7 @@ function artisan_logout(PDO $pdo): void
     $artisan = artisan_require_auth($pdo);
     $pdo->prepare("UPDATE local_artisans SET auth_token = NULL, auth_token_exp = NULL WHERE id = ?")
         ->execute([$artisan['id']]);
-    echo json_encode(['success' => true, 'message' => 'Déconnecté']);
+    echo json_encode(['success' => true, 'data' => ['message' => 'Déconnecté']]);
 }
 
 /**

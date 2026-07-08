@@ -171,9 +171,9 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { requestMagicLink, fetchMe, updateMe, getMyProspects, getArtisanToken, setArtisanToken, removeArtisanToken, fetchArtisanConsumerToken, setUserToken } from '../api.js'
+import { requestMagicLink, fetchMe, updateMe, getMyProspects, getArtisanToken, setArtisanToken, removeArtisanToken, fetchArtisanConsumerToken, setUserToken, logoutArtisan } from '../api.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -198,38 +198,81 @@ const messageType = ref('')
 const myProspects = ref([])
 const loadingProspects = ref(false)
 const linkingConsumer = ref(false)
+let isMounted = false
+const activeControllers = new Set()
+
+function newAbortSignal() {
+  const controller = new AbortController()
+  activeControllers.add(controller)
+  return controller.signal
+}
+
+function cleanupSignal(signal) {
+  for (const controller of activeControllers) {
+    if (controller.signal === signal) {
+      activeControllers.delete(controller)
+      break
+    }
+  }
+}
+
+function abortAllPending() {
+  activeControllers.forEach(c => c.abort())
+  activeControllers.clear()
+}
 
 function setMessage(text, type = 'info') {
   message.value = text
   messageType.value = type
 }
 
-// Connexion via ?token=xxx dans l'URL
-if (route.query.token) {
-  token.value = route.query.token
-  setArtisanToken(route.query.token, rememberMe.value)
-  router.replace('/espace')
+function handleTokenFromQuery() {
+  const linkToken = Array.isArray(route.query.token) ? route.query.token[0] : route.query.token
+  if (linkToken) {
+    const linkRememberMe = route.query.rememberMe === '1' || route.query.rememberMe === 'true'
+    rememberMe.value = linkRememberMe
+    token.value = linkToken
+    artisan.value = null
+    myProspects.value = []
+    setArtisanToken(linkToken, linkRememberMe)
+    router.replace('/espace')
+    loadProfile()
+    loadMyProspects()
+    return true
+  }
+  return false
 }
 
 async function sendMagicLink() {
   sending.value = true
   message.value = ''
+  const signal = newAbortSignal()
   try {
-    const res = await requestMagicLink(email.value, rememberMe.value)
-    setMessage(res.message || 'Si votre email est valide, vous recevrez un lien de connexion.', 'success')
+    const res = await requestMagicLink(email.value, rememberMe.value, { signal })
+    if (!isMounted) return
+    if (res.success) {
+      setMessage(res.data?.message || 'Si votre email est valide, vous recevrez un lien de connexion.', 'success')
+    } else {
+      setMessage(res.error || 'Erreur lors de l\'envoi. Veuillez réessayer.', 'error')
+    }
   } catch (e) {
-    setMessage('Erreur lors de l\'envoi. Veuillez réessayer.', 'error')
+    if (!isMounted) return
+    setMessage(e.message || 'Erreur lors de l\'envoi. Veuillez réessayer.', 'error')
   } finally {
-    sending.value = false
+    cleanupSignal(signal)
+    if (isMounted) sending.value = false
   }
 }
 
 async function loadProfile() {
-  if (!token.value) return
+  if (!token.value || !isMounted) return
+  const currentToken = token.value
   loading.value = true
   message.value = ''
+  const signal = newAbortSignal()
   try {
-    const res = await fetchMe(token.value)
+    const res = await fetchMe(currentToken, { signal })
+    if (!isMounted || token.value !== currentToken) return
     if (res.success && res.data) {
       artisan.value = res.data
       Object.assign(form, {
@@ -239,27 +282,38 @@ async function loadProfile() {
         address: res.data.address || '',
         description: res.data.description || '',
       })
-    } else {
-      logout()
-      setMessage('Votre session a expiré. Veuillez vous reconnecter.', 'error')
+    } else if (token.value === currentToken) {
+      await logout()
+      if (!isMounted || token.value) return
+      setMessage(res.error || 'Votre session a expiré. Veuillez vous reconnecter.', 'error')
     }
   } catch (e) {
-    setMessage('Impossible de charger votre profil.', 'error')
+    if (isMounted && e.name !== 'AbortError' && token.value === currentToken) {
+      setMessage(e.message || 'Impossible de charger votre profil.', 'error')
+    }
   } finally {
-    loading.value = false
+    cleanupSignal(signal)
+    if (isMounted && token.value === currentToken) loading.value = false
   }
 }
 
 async function loadMyProspects() {
-  if (!token.value) return
+  if (!token.value || !isMounted) return
+  const currentToken = token.value
   loadingProspects.value = true
+  const signal = newAbortSignal()
   try {
-    const res = await getMyProspects(token.value)
-    myProspects.value = (res.data || []).filter(p => p.follow_status)
+    const res = await getMyProspects(currentToken, { signal })
+    if (isMounted && token.value === currentToken && res.success) {
+      myProspects.value = (res.data || []).filter(p => p.follow_status)
+    }
   } catch (e) {
-    console.error('Erreur chargement prospects suivis', e)
+    if (e.name !== 'AbortError') {
+      console.error('Erreur chargement prospects suivis', e)
+    }
   } finally {
-    loadingProspects.value = false
+    cleanupSignal(signal)
+    if (isMounted && token.value === currentToken) loadingProspects.value = false
   }
 }
 
@@ -274,48 +328,88 @@ const statusLabel = {
 async function saveProfile() {
   saving.value = true
   message.value = ''
+  const signal = newAbortSignal()
   try {
-    const res = await updateMe(token.value, { ...form })
+    const res = await updateMe(token.value, { ...form }, { signal })
+    if (!isMounted || !token.value) return
     if (res.success) {
       setMessage('Profil mis à jour avec succès.', 'success')
     } else {
       setMessage(res.error || 'Erreur lors de la mise à jour.', 'error')
     }
   } catch (e) {
-    setMessage('Erreur lors de la sauvegarde.', 'error')
+    if (!isMounted || !token.value) return
+    setMessage(e.message || 'Erreur lors de la sauvegarde.', 'error')
   } finally {
-    saving.value = false
+    cleanupSignal(signal)
+    if (isMounted) saving.value = false
   }
 }
 
-function logout() {
-  token.value = ''
-  artisan.value = null
-  removeArtisanToken()
-  message.value = ''
+async function logout() {
+  const currentToken = token.value
+  const signal = newAbortSignal()
+  try {
+    if (currentToken) {
+      await logoutArtisan(currentToken, { signal })
+    }
+  } catch (e) {
+    console.error('Erreur lors de la déconnexion artisan', e)
+  } finally {
+    cleanupSignal(signal)
+  }
+  if (token.value === currentToken) {
+    token.value = ''
+    artisan.value = null
+    message.value = ''
+    myProspects.value = []
+    removeArtisanToken()
+  }
 }
 
 async function playAsConsumer() {
+  if (!token.value) {
+    setMessage('Session invalide.', 'error')
+    return
+  }
   linkingConsumer.value = true
+  const signal = newAbortSignal()
   try {
-    const artisanToken = getArtisanToken()
-    const res = await fetchArtisanConsumerToken(artisanToken)
-    if (res.success && res.token) {
-      setUserToken(res.token, true)
+    const res = await fetchArtisanConsumerToken(token.value, { signal })
+    if (!isMounted || !token.value) return
+    if (res.success && res.data?.token) {
+      setUserToken(res.data.token, true)
       router.push('/jeux')
     } else {
       setMessage(res.error || 'Impossible de créer le compte joueur.', 'error')
     }
   } catch (e) {
-    setMessage('Erreur lors de la création du compte joueur.', 'error')
+    if (!isMounted || !token.value) return
+    setMessage(e.message || 'Erreur lors de la création du compte joueur.', 'error')
   } finally {
-    linkingConsumer.value = false
+    cleanupSignal(signal)
+    if (isMounted) linkingConsumer.value = false
   }
 }
 
 onMounted(() => {
-  loadProfile()
-  loadMyProspects()
+  isMounted = true
+  const consumed = handleTokenFromQuery()
+  if (token.value && !consumed) {
+    loadProfile()
+    loadMyProspects()
+  }
+})
+
+onBeforeUnmount(() => {
+  isMounted = false
+  abortAllPending()
+})
+
+watch(() => route.query.token, () => {
+  if (isMounted) {
+    handleTokenFromQuery()
+  }
 })
 </script>
 

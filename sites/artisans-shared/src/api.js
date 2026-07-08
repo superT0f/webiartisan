@@ -122,44 +122,43 @@ export function removeArtisanToken() {
   deleteCookie(ARTISAN_TOKEN_COOKIE)
 }
 
-export async function logoutArtisan(token) {
-  const res = await fetch(`${API_BASE}/artisans/logout`, {
+export async function logoutArtisan(token, options = {}) {
+  return requestJson(`${API_BASE}/artisans/logout`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'X-Artisan-Token': token,
     },
-  })
-  removeArtisanToken()
-  return res.json()
+    signal: options.signal,
+  }, 'Erreur lors de la déconnexion.')
 }
 
-export async function requestMagicLink(email, rememberMe = true) {
-  const res = await fetch(`${API_BASE}/artisans/magic-link`, {
+export async function requestMagicLink(email, rememberMe = true, options = {}) {
+  return requestJson(`${API_BASE}/artisans/magic-link`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, rememberMe }),
-  })
-  return res.json()
+    signal: options.signal,
+  }, 'Erreur lors de l\'envoi.')
 }
 
-export async function fetchMe(token) {
-  const res = await fetch(`${API_BASE}/artisans/me`, {
+export async function fetchMe(token, options = {}) {
+  return requestJson(`${API_BASE}/artisans/me`, {
     headers: { 'X-Artisan-Token': token },
-  })
-  return res.json()
+    signal: options.signal,
+  }, 'Impossible de charger votre profil.')
 }
 
-export async function updateMe(token, data) {
-  const res = await fetch(`${API_BASE}/artisans/me`, {
+export async function updateMe(token, data, options = {}) {
+  return requestJson(`${API_BASE}/artisans/me`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
       'X-Artisan-Token': token,
     },
     body: JSON.stringify(data),
-  })
-  return res.json()
+    signal: options.signal,
+  }, 'Erreur lors de la sauvegarde.')
 }
 
 // --- Prospection B2B ---------------------------------------------
@@ -177,11 +176,11 @@ export async function getProspect(id) {
   return res.json()
 }
 
-export async function getMyProspects(token) {
-  const res = await fetch(`${API_BASE}/artisans/me/prospects`, {
+export async function getMyProspects(token, options = {}) {
+  return requestJson(`${API_BASE}/artisans/me/prospects`, {
     headers: { 'X-Artisan-Token': token },
-  })
-  return res.json()
+    signal: options.signal,
+  }, 'Impossible de charger vos prospects.')
 }
 
 export async function followProspect(token, prospectId, data) {
@@ -309,12 +308,12 @@ export async function requestUserMagicLink(email, rememberMe = true, redirect = 
   return res.json()
 }
 
-export async function fetchArtisanConsumerToken(artisanToken) {
-  const res = await fetch(`${API_BASE}/artisans/me/consumer-token`, {
+export async function fetchArtisanConsumerToken(artisanToken, options = {}) {
+  return requestJson(`${API_BASE}/artisans/me/consumer-token`, {
     method: 'POST',
     headers: { 'X-Artisan-Token': artisanToken },
-  })
-  return res.json()
+    signal: options.signal,
+  }, 'Impossible de créer le compte joueur.')
 }
 
 export async function authUser(token, rememberMe = true) {
