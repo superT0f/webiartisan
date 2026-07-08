@@ -149,8 +149,9 @@ if [[ -n "$SPIN_ARTISAN_TOKEN" ]]; then
   # does not cascade (defensive against repeated runs the same day).
   if command -v docker >/dev/null 2>&1 && docker compose ps | grep -q mysql; then
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    SPIN_SESSION_HASH=$(printf '%s' 'test-session-token-12345' | sha256sum | cut -d' ' -f1)
     (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
-      -e "DELETE FROM local_spin_daily_limits WHERE user_id = 99999; DELETE FROM local_spin_wins WHERE user_id = 99999; REPLACE INTO local_users (id, email, session_token, session_exp) VALUES (99999, 'spin-user@example.com', 'test-session-token-12345', DATE_ADD(NOW(), INTERVAL 1 DAY));" >/dev/null 2>&1 || true)
+      -e "DELETE FROM local_spin_daily_limits WHERE user_id = 99999; DELETE FROM local_spin_wins WHERE user_id = 99999; REPLACE INTO local_users (id, email, session_token, session_exp) VALUES (99999, 'spin-user@example.com', '$SPIN_SESSION_HASH', DATE_ADD(NOW(), INTERVAL 1 DAY));" >/dev/null 2>&1 || true)
   fi
 
   code=$(curl -s -o /dev/null -w "%{http_code}" "${BASE_URL}/spin/offers?city=livry")
@@ -184,6 +185,7 @@ if command -v openssl >/dev/null 2>&1; then
 else
   PROFILE_USER_TOKEN="profile-$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
 fi
+PROFILE_USER_HASH=$(printf '%s' "$PROFILE_USER_TOKEN" | sha256sum | cut -d' ' -f1)
 AVATAR_DIR="$SCRIPT_DIR/../sites/api/public/avatars/neutral"
 MALE_AVATAR_DIR="$SCRIPT_DIR/../sites/api/public/avatars/male"
 UPLOAD_DIR="$SCRIPT_DIR/../sites/api/uploads/avatars"
@@ -215,7 +217,7 @@ fi
 
 if [[ "$MYSQL_AVAILABLE" -eq 1 ]]; then
   (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
-    -e "REPLACE INTO local_users (id, email, session_token, session_exp) VALUES ($TEST_USER_ID, 'profile-user@example.com', '$PROFILE_USER_TOKEN', DATE_ADD(NOW(), INTERVAL 1 DAY));" >/dev/null)
+    -e "REPLACE INTO local_users (id, email, session_token, session_exp) VALUES ($TEST_USER_ID, 'profile-user@example.com', '$PROFILE_USER_HASH', DATE_ADD(NOW(), INTERVAL 1 DAY));" >/dev/null)
 fi
 
 echo "--- Test /avatars ---"
@@ -377,10 +379,11 @@ if command -v openssl >/dev/null 2>&1; then
 else
   GAMIFICATION_TOKEN="gamification-$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
 fi
+GAMIFICATION_HASH=$(printf '%s' "$GAMIFICATION_TOKEN" | sha256sum | cut -d' ' -f1)
 
 if [[ "$MYSQL_AVAILABLE" -eq 1 ]]; then
   (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
-    -e "REPLACE INTO local_users (id, email, session_token, session_exp) VALUES ($GAMIFICATION_USER_ID, 'gamification-user@example.com', '$GAMIFICATION_TOKEN', DATE_ADD(NOW(), INTERVAL 1 DAY));" >/dev/null)
+    -e "REPLACE INTO local_users (id, email, session_token, session_exp) VALUES ($GAMIFICATION_USER_ID, 'gamification-user@example.com', '$GAMIFICATION_HASH', DATE_ADD(NOW(), INTERVAL 1 DAY));" >/dev/null)
 fi
 
 # Public events list
@@ -484,11 +487,12 @@ combined_cleanup() {
 trap combined_cleanup EXIT INT TERM
 
 TESTIMONIALS_SESSION_TOKEN=""
+TESTIMONIALS_MAGIC_HASH=$(printf '%s' "$TESTIMONIALS_MAGIC_TOKEN" | sha256sum | cut -d' ' -f1)
 if [[ "$TESTIMONIALS_MYSQL_AVAILABLE" -eq 1 ]]; then
   echo "--- Authenticated testimonials ---"
   testimonials_mysql "
     REPLACE INTO local_users (id, email, magic_token, magic_token_exp)
-    VALUES ($TESTIMONIALS_USER_ID, 'testimonials-user@example.com', '$TESTIMONIALS_MAGIC_TOKEN', DATE_ADD(NOW(), INTERVAL 1 HOUR));
+    VALUES ($TESTIMONIALS_USER_ID, 'testimonials-user@example.com', '$TESTIMONIALS_MAGIC_HASH', '2030-01-01 00:00:00');
   " >/dev/null 2>&1
 
   curl_json_status -X POST "${BASE_URL}/users/auth?token=$TESTIMONIALS_MAGIC_TOKEN" -H "Content-Type: application/json"
@@ -581,7 +585,8 @@ echo "== Consumer auth =="
 
 CONSUMER_USER_ID=999997
 CONSUMER_EMAIL="consumer-test@example.com"
-CONSUMER_MAGIC_TOKEN=""
+CONSUMER_MAGIC_TOKEN="consumer-magic-token-$CONSUMER_USER_ID"
+CONSUMER_MAGIC_HASH=$(printf '%s' "$CONSUMER_MAGIC_TOKEN" | sha256sum | cut -d' ' -f1)
 
 if command -v docker >/dev/null 2>&1 && docker compose ps | grep -q mysql; then
   (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
@@ -597,8 +602,8 @@ curl_json_status -X POST "${BASE_URL}/users/magic-link" \
 check "$LAST_HTTP_CODE" "POST /users/magic-link" "200"
 
 if [[ "$MYSQL_AVAILABLE" -eq 1 ]]; then
-  CONSUMER_MAGIC_TOKEN=$(cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
-    -N -B -e "SELECT magic_token FROM local_users WHERE email = '$CONSUMER_EMAIL' LIMIT 1" 2>/dev/null | tr -d '\r')
+  (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
+    -e "UPDATE local_users SET magic_token = '$CONSUMER_MAGIC_HASH', magic_token_exp = '2030-01-01 00:00:00' WHERE email = '$CONSUMER_EMAIL';") >/dev/null 2>&1 || true
 fi
 
 if [[ -n "$CONSUMER_MAGIC_TOKEN" ]]; then
