@@ -499,30 +499,29 @@ export async function updateUserAvatar(token, data, options = {}) {
 
 // --- Spin wheel -------------------------------------------------
 
-export async function getSpinOffers() {
-  const res = await fetch(`${API_BASE}/spin/offers?city=${CITY_SLUG}`)
-  if (!res.ok) throw new Error('Erreur chargement offres')
-  return res.json()
+export async function getSpinOffers(options = {}) {
+  return requestJson(`${API_BASE}/spin/offers?city=${CITY_SLUG}`, {
+    signal: options.signal,
+  }, 'Impossible de charger les offres.')
 }
 
-export async function postSpin(token, payload = {}) {
-  const res = await fetch(`${API_BASE}/spin`, {
+export async function postSpin(token, payload = {}, options = {}) {
+  return requestJson(`${API_BASE}/spin`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`,
     },
     body: JSON.stringify({ city_slug: CITY_SLUG, ...payload }),
-  })
-  return res.json()
+    signal: options.signal,
+  }, 'Erreur réseau.')
 }
 
-export async function getSpinWins(token) {
-  const res = await fetch(`${API_BASE}/spin/wins`, {
+export async function getSpinWins(token, options = {}) {
+  return requestJson(`${API_BASE}/spin/wins`, {
     headers: { 'Authorization': `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error('Erreur chargement gains')
-  return res.json()
+    signal: options.signal,
+  }, 'Impossible de charger vos gains.')
 }
 
 // --- Gestion artisan spin ---------------------------------------

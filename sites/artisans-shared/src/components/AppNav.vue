@@ -14,7 +14,7 @@
         <RouterLink to="/temoignages" class="nav-link">Avis</RouterLink>
         <RouterLink to="/prospection" class="nav-link">Prospection</RouterLink>
         <RouterLink to="/recettes" class="nav-link">Recettes</RouterLink>
-        <RouterLink to="/roue" class="nav-link">🎰 Roue</RouterLink>
+        <!-- <RouterLink to="/roue" class="nav-link">🎰 Roue</RouterLink> -->
         <RouterLink to="/jeux" class="nav-link">🎮 Jeux</RouterLink>
         <RouterLink to="/#services-locaux" class="nav-link" @click.prevent="scrollTo('services-locaux')">Services locaux</RouterLink>
         <RouterLink v-if="!user" to="/profil" class="nav-link">Se connecter / Mon compte</RouterLink>

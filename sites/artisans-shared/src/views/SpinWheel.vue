@@ -7,46 +7,23 @@
       <!-- Auth -->
       <div v-if="!token" class="auth-card card">
         <h2>Connexion</h2>
-        <div class="auth-tabs" role="tablist" aria-label="Méthode de connexion">
+        <div class="auth-tabs" role="tablist" aria-label="Méthode de connexion" @keydown="onTabKeydown">
           <button
-            id="tab-magic"
+            v-for="tab in tabList"
+            :key="tab.key"
+            :id="`tab-${tab.key}`"
+            ref="tabRefs"
             type="button"
             role="tab"
-            :aria-selected="authTab === 'magic'"
-            aria-controls="panel-magic"
-            :class="{ active: authTab === 'magic' }"
-            @click="authTab = 'magic'"
-          >Lien magique</button>
-          <button
-            id="tab-login"
-            type="button"
-            role="tab"
-            :aria-selected="authTab === 'login'"
-            aria-controls="panel-login"
-            :class="{ active: authTab === 'login' }"
-            @click="authTab = 'login'"
-          >Mot de passe</button>
-          <button
-            id="tab-register"
-            type="button"
-            role="tab"
-            :aria-selected="authTab === 'register'"
-            aria-controls="panel-register"
-            :class="{ active: authTab === 'register' }"
-            @click="authTab = 'register'"
-          >Créer un compte</button>
-          <button
-            id="tab-forgot"
-            type="button"
-            role="tab"
-            :aria-selected="authTab === 'forgot'"
-            aria-controls="panel-forgot"
-            :class="{ active: authTab === 'forgot' }"
-            @click="authTab = 'forgot'"
-          >Oublié</button>
+            :tabindex="authTab === tab.key ? 0 : -1"
+            :aria-selected="authTab === tab.key"
+            :aria-controls="`panel-${tab.key}`"
+            :class="{ active: authTab === tab.key }"
+            @click="setAuthTab(tab.key)"
+          >{{ tab.label }}</button>
         </div>
 
-        <div v-if="authTab === 'magic'" role="tabpanel" id="panel-magic" aria-labelledby="tab-magic">
+        <div v-show="authTab === 'magic'" role="tabpanel" id="panel-magic" aria-labelledby="tab-magic">
           <form @submit.prevent="sendMagicLink" class="auth-form">
             <p class="text-muted">Recevez un lien magique par email pour participer.</p>
             <label class="form-label" for="auth-email">Email</label>
@@ -70,11 +47,11 @@
           </form>
         </div>
 
-        <div v-if="authTab === 'login'" role="tabpanel" id="panel-login" aria-labelledby="tab-login">
+        <div v-show="authTab === 'login'" role="tabpanel" id="panel-login" aria-labelledby="tab-login">
           <form @submit.prevent="submitLogin" class="auth-form">
             <p class="text-muted">Connectez-vous avec votre email et mot de passe.</p>
             <label class="form-label" for="login-email">Email</label>
-            <input id="login-email" v-model="email" type="email" class="form-input" placeholder="votre@email.fr" autocomplete="email" required />
+            <input id="login-email" ref="loginEmailInput" v-model="email" type="email" class="form-input" placeholder="votre@email.fr" autocomplete="email" required />
             <label class="form-label" for="login-password">Mot de passe</label>
             <input id="login-password" v-model="password" type="password" class="form-input" placeholder="Mot de passe" autocomplete="current-password" required />
             <label class="form-checkbox">
@@ -84,11 +61,11 @@
             <button type="submit" class="btn btn-primary" :disabled="sending">
               {{ sending ? 'Connexion…' : 'Se connecter' }}
             </button>
-            <button type="button" class="btn btn-link" @click="authTab = 'forgot'">Mot de passe oublié ?</button>
+            <button type="button" class="btn btn-link" @click="openForgot">Mot de passe oublié ?</button>
           </form>
         </div>
 
-        <div v-if="authTab === 'register'" role="tabpanel" id="panel-register" aria-labelledby="tab-register">
+        <div v-show="authTab === 'register'" role="tabpanel" id="panel-register" aria-labelledby="tab-register">
           <form @submit.prevent="submitRegister" class="auth-form">
             <p class="text-muted">Créez un compte pour sauvegarder votre progression.</p>
             <label class="form-label" for="register-email">Email</label>
@@ -107,15 +84,15 @@
           </form>
         </div>
 
-        <div v-if="authTab === 'forgot'" role="tabpanel" id="panel-forgot" aria-labelledby="tab-forgot">
+        <div v-show="authTab === 'forgot'">
           <form @submit.prevent="submitForgot" class="auth-form">
             <p class="text-muted">Recevez un lien de réinitialisation par email.</p>
             <label class="form-label" for="forgot-email">Email</label>
-            <input id="forgot-email" v-model="email" type="email" class="form-input" placeholder="votre@email.fr" autocomplete="email" required />
+            <input id="forgot-email" ref="forgotEmailInput" v-model="email" type="email" class="form-input" placeholder="votre@email.fr" autocomplete="email" required />
             <button type="submit" class="btn btn-primary" :disabled="sending">
               {{ sending ? 'Envoi…' : 'Envoyer' }}
             </button>
-            <button type="button" class="btn btn-link" @click="authTab = 'login'">Retour</button>
+            <button type="button" class="btn btn-link" @click="backToLogin">Retour</button>
           </form>
         </div>
       </div>
@@ -128,6 +105,8 @@
           <button class="btn btn-outline" @click="logout">Déconnexion</button>
         </div>
 
+        <div class="sr-only" role="status" aria-live="polite">{{ winAnnouncement }}</div>
+
         <div v-if="loading" class="skeleton skeleton-wheel"></div>
 
         <template v-else>
@@ -139,17 +118,17 @@
 
           <div v-else class="wheel-wrap">
             <div class="wheel-container" :class="{ spinning: spinning }">
-              <canvas ref="wheelCanvas" width="360" height="360" role="img" aria-label="Roue des offres à gagner">Roue des offres à gagner</canvas>
+              <canvas ref="wheelCanvas" width="360" height="360" role="img" aria-label="Roue des offres à gagner" :style="{ transform: `rotate(${finalAngle}deg)` }">Roue des offres à gagner</canvas>
               <div class="wheel-pointer"></div>
             </div>
-            <button class="btn btn-primary btn-lg" @click="spin" :disabled="spinning || offers.length < 2">
-              {{ spinning ? 'La roue tourne…' : 'Tourner la roue' }}
+            <button class="btn btn-primary btn-lg" @click="spin" :disabled="spinning || fetchingSpin || offers.length < 2">
+              {{ fetchingSpin ? 'Chargement…' : (spinning ? 'La roue tourne…' : 'Tourner la roue') }}
             </button>
             <p v-if="offers.length < 2" class="text-muted small">Offres insuffisantes pour tourner.</p>
           </div>
 
-          <div v-if="result" class="card result-card">
-            <h2>🎁 Vous avez gagné</h2>
+          <div v-if="showResult" class="card result-card">
+            <h2 ref="resultHeading" tabindex="-1">🎁 Vous avez gagné</h2>
             <div class="offer-label">{{ result.label }}</div>
             <p class="text-muted">{{ result.description }}</p>
             <p><strong>Artisan :</strong> {{ result.artisan_name }}</p>
@@ -178,13 +157,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import QRCode from 'qrcode'
 import {
   requestUserMagicLink,
   authUser,
-  fetchUserMe,
   getUserToken,
   setUserToken,
   removeUserToken,
@@ -209,15 +187,43 @@ function parisTodayIso() {
   return `${part('year')}-${part('month')}-${part('day')}`
 }
 
+function toParisDateParts(iso) {
+  const [datePart] = String(iso).split('T')
+  const [y, m, d] = datePart.split('-').map(Number)
+  if (!y || !m || !d) return null
+  const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0))
+  return new Intl.DateTimeFormat('fr-FR', {
+    timeZone: 'Europe/Paris',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(dt)
+}
+
+function toParisIso(iso) {
+  const parts = toParisDateParts(iso)
+  if (!parts) return null
+  const part = (type) => parts.find(p => p.type === type).value
+  return `${part('year')}-${part('month')}-${part('day')}`
+}
+
 function formatLocalDate(iso) {
   if (!iso) return '—'
-  // Append local midnight if the value is date-only to avoid UTC shift.
-  const input = iso.includes('T') ? iso : `${iso}T00:00:00`
-  return new Date(input).toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' })
+  const parts = toParisDateParts(iso)
+  if (!parts) return '—'
+  const part = (type) => parts.find(p => p.type === type).value
+  return `${part('day')}/${part('month')}/${part('year')}`
 }
 
 const route = useRoute()
 const router = useRouter()
+
+const tabList = [
+  { key: 'magic', label: 'Lien magique' },
+  { key: 'login', label: 'Mot de passe' },
+  { key: 'register', label: 'Créer un compte' },
+]
+const tabRefs = ref([])
 
 const email = ref('')
 const rememberMe = ref(true)
@@ -225,26 +231,84 @@ const token = ref(getUserToken() || '')
 const authTab = ref('magic') // 'magic' | 'login' | 'register' | 'forgot'
 const password = ref('')
 const displayName = ref('')
-const user = ref(null)
 const offers = ref([])
 const wins = ref([])
-const loading = ref(false)
+const loadingOffers = ref(false)
+const loadingWins = ref(false)
+const loading = computed(() => loadingOffers.value || loadingWins.value)
 const sending = ref(false)
 const spinning = ref(false)
+const fetchingSpin = ref(false)
 const result = ref(null)
 const message = ref('')
 const messageType = ref('')
 const wheelCanvas = ref(null)
 const qrCanvas = ref(null)
+const finalAngle = ref(0)
+const winAnnouncement = ref('')
+const showResult = ref(false)
+const loginEmailInput = ref(null)
+const forgotEmailInput = ref(null)
+const resultHeading = ref(null)
+let spinTimeout = null
 
 watch(authTab, () => {
   message.value = ''
   messageType.value = ''
 })
 
+function setAuthTab(key) {
+  authTab.value = key
+  const idx = tabList.findIndex(t => t.key === key)
+  const el = tabRefs.value[idx]
+  if (el) el.focus()
+}
+
+function openForgot() {
+  authTab.value = 'forgot'
+  nextTick(() => {
+    forgotEmailInput.value?.focus()
+  })
+}
+
+function backToLogin() {
+  authTab.value = 'login'
+  nextTick(() => {
+    loginEmailInput.value?.focus()
+  })
+}
+
+function onTabKeydown(e) {
+  if (e.target.getAttribute('role') !== 'tab') return
+  const keys = tabList.map(t => t.key)
+  let idx = keys.indexOf(authTab.value)
+  if (idx < 0) return
+  switch (e.key) {
+    case 'ArrowLeft':
+      idx = (idx - 1 + keys.length) % keys.length
+      break
+    case 'ArrowRight':
+      idx = (idx + 1) % keys.length
+      break
+    case 'Home':
+      idx = 0
+      break
+    case 'End':
+      idx = keys.length - 1
+      break
+    default:
+      return
+  }
+  e.preventDefault()
+  setAuthTab(keys[idx])
+}
+
 const alreadySpun = computed(() => {
   const today = parisTodayIso()
-  return wins.value.some(w => w.spin_date === today && w.status !== 'expired')
+  return wins.value.some(w => {
+    const spinDate = toParisIso(w.spin_date)
+    return spinDate === today && w.status !== 'expired'
+  })
 })
 
 const statusLabel = {
@@ -298,7 +362,7 @@ async function submitLogin() {
     if (res.success && res.token) {
       setUserToken(res.token, rememberMe.value)
       token.value = res.token
-      await loadUser()
+      await router.replace('/roue')
       await loadOffers()
       await loadWins()
     } else {
@@ -326,7 +390,7 @@ async function submitRegister() {
         if (loginRes.success && loginRes.token) {
           setUserToken(loginRes.token, rememberMe.value)
           token.value = loginRes.token
-          await loadUser()
+          await router.replace('/roue')
           await loadOffers()
           await loadWins()
           return
@@ -359,68 +423,101 @@ async function submitForgot() {
   }
 }
 
-async function loadUser() {
-  if (!token.value) return
-  loading.value = true
-  try {
-    const res = await fetchUserMe(token.value)
-    if (res.success) {
-      user.value = res.data
-    } else if (res.status === 401) {
-      await logout()
-      setMessage('Session expirée.', 'error')
-    } else {
-      setMessage(res.error || 'Impossible de charger le profil.', 'error')
-    }
-  } catch (e) {
-    setMessage('Erreur réseau.', 'error')
-  } finally {
-    loading.value = false
-  }
-}
-
 async function loadOffers() {
+  if (!token.value) return
+  loadingOffers.value = true
   try {
     const res = await getSpinOffers()
+    if (!res.success) {
+      if (res.status === 401) {
+        await logout()
+      }
+      setMessage(res.error || 'Impossible de charger les offres.', 'error')
+      return
+    }
     offers.value = res.data || []
+    await nextTick()
     drawWheel()
   } catch (e) {
     console.error('Erreur chargement offres', e)
     setMessage('Impossible de charger les offres.', 'error')
+  } finally {
+    loadingOffers.value = false
   }
 }
 
 async function loadWins() {
   if (!token.value) return
+  loadingWins.value = true
   try {
     const res = await getSpinWins(token.value)
+    if (!res.success) {
+      if (res.status === 401) {
+        await logout()
+      }
+      setMessage(res.error || 'Impossible de charger vos gains.', 'error')
+      return
+    }
     wins.value = res.data || []
   } catch (e) {
     console.error('Erreur chargement gains', e)
     setMessage('Impossible de charger vos gains.', 'error')
+  } finally {
+    loadingWins.value = false
   }
 }
 
 async function spin() {
-  if (spinning.value || alreadySpun.value || offers.value.length < 2) return
-  spinning.value = true
+  if (!token.value || fetchingSpin.value || spinning.value || alreadySpun.value || offers.value.length < 2) return
+  fetchingSpin.value = true
   result.value = null
-  let success = false
+  showResult.value = false
+  winAnnouncement.value = ''
   try {
     const res = await postSpin(token.value, {})
-    if (res.success) {
-      result.value = res.data
-      await loadWins()
-      await nextTick()
-      drawQr()
-      success = true
+    if (!res.success && res.status === 401) {
+      await logout()
+      setMessage('Session expirée. Veuillez vous reconnecter.', 'error')
+      return
+    }
+    if (res.success && res.data && res.data.offer_id != null) {
+      const idx = offers.value.findIndex(o => o.id === res.data.offer_id)
+      if (idx < 0) {
+        setMessage('Résultat inconnu.', 'error')
+        return
+      }
+      const offer = offers.value[idx]
+      result.value = { ...offer, ...res.data }
+      const sliceDeg = 360 / offers.value.length
+      finalAngle.value = 1800 - (idx * sliceDeg + sliceDeg / 2)
+      if (wheelCanvas.value) {
+        wheelCanvas.value.style.setProperty('--final-angle', `${finalAngle.value}deg`)
+      }
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      const spinDuration = reducedMotion ? 50 : 3000
+      spinTimeout = setTimeout(async () => {
+        try {
+          await loadWins()
+          if (!token.value || !result.value) return
+          showResult.value = true
+          await nextTick()
+          resultHeading.value?.focus()
+          await drawQr()
+          winAnnouncement.value = `Vous avez gagné : ${result.value.label}`
+        } catch (qrErr) {
+          console.error('Erreur génération QR', qrErr)
+        } finally {
+          spinning.value = false
+        }
+      }, spinDuration)
+      spinning.value = true
     } else {
       setMessage(res.error || 'Erreur lors du spin', 'error')
     }
   } catch (e) {
     setMessage('Erreur réseau.', 'error')
   } finally {
-    spinning.value = false
+    fetchingSpin.value = false
   }
 }
 
@@ -451,6 +548,8 @@ function drawWheel() {
     ctx.fillStyle = '#fff'
     ctx.font = 'bold 13px sans-serif'
     ctx.textAlign = 'right'
+    ctx.shadowColor = 'rgba(0,0,0,0.45)'
+    ctx.shadowBlur = 3
     const text = offer.label.length > 18 ? offer.label.slice(0, 18) + '…' : offer.label
     ctx.fillText(text, r - 16, 5)
     ctx.restore()
@@ -469,8 +568,6 @@ function formatDate(iso) {
 async function logout() {
   const currentToken = token.value
   token.value = ''
-  user.value = null
-  removeUserToken()
   if (currentToken) {
     try {
       await logoutUser(currentToken)
@@ -478,14 +575,32 @@ async function logout() {
       console.error('Erreur lors de la déconnexion', e)
     }
   }
+  removeUserToken()
+  offers.value = []
+  wins.value = []
+  result.value = null
+  showResult.value = false
+  winAnnouncement.value = ''
+  finalAngle.value = 0
+  email.value = ''
+  password.value = ''
+  displayName.value = ''
+  message.value = ''
+  messageType.value = ''
 }
 
 onMounted(async () => {
   await exchangeMagicLink()
-  await loadUser()
   if (token.value) {
-    loadOffers()
-    loadWins()
+    await loadOffers()
+    await loadWins()
+  }
+})
+
+onBeforeUnmount(() => {
+  if (spinTimeout) {
+    clearTimeout(spinTimeout)
+    spinTimeout = null
   }
 })
 </script>
@@ -552,10 +667,17 @@ onMounted(async () => {
 }
 .wheel-container.spinning canvas {
   animation: spin-anim 3s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+  --final-angle: 1800deg;
 }
 @keyframes spin-anim {
   from { transform: rotate(0deg); }
-  to { transform: rotate(1800deg); }
+  to { transform: rotate(var(--final-angle)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wheel-container.spinning canvas {
+    animation: none;
+    transform: rotate(var(--final-angle));
+  }
 }
 .wheel-pointer {
   position: absolute;
@@ -577,8 +699,19 @@ onMounted(async () => {
 .status-claimed { background: #E8F5E9; color: #2E7D32; }
 .status-expired { background: #FFEBEE; color: #C62828; }
 .auth-message { margin-top: 16px; padding: 12px; border-radius: 8px; }
-.auth-message.is-empty { visibility: hidden; min-height: 0; padding: 0; margin: 0; }
+.auth-message.is-empty { opacity: 0; height: 0; overflow: hidden; padding: 0; margin: 0; }
 .auth-message.success { background: #e6f4ea; color: #1e7e34; }
 .auth-message.error { background: #fdecea; color: #c5221f; }
 .auth-message.info { background: #e8f0fe; color: #1967d2; }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 </style>
