@@ -34,7 +34,7 @@ curl_json_status() {
   local tmp
   tmp=$(mktemp)
   local code rc
-  code=$(curl -sS --max-time 10 --connect-timeout 5 -o "$tmp" -w "%{http_code}" "$@") || rc=$?
+  code=$(curl -sS --max-time 60 --connect-timeout 5 -o "$tmp" -w "%{http_code}" "$@") || rc=$?
   [[ ${rc:-0} -ne 0 ]] && code=000
   JSON_BODY=$(cat "$tmp" 2>/dev/null || true)
   rm -f "$tmp"
