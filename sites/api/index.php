@@ -196,6 +196,12 @@ if ($module === 'gamification') {
     exit;
 }
 
+if ($module === 'subscription') {
+    applyRateLimit($pdo, 'login');
+    require_once __DIR__ . '/routes/subscriptions.php';
+    exit;
+}
+
 // Route to the correct module
 $routeFile = __DIR__ . "/routes/{$module}.php";
 
