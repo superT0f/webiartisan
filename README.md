@@ -67,7 +67,7 @@ L’application est accessible sur `http://localhost` et l’API sur `http://loc
 |----------|-------------|
 | `make up` | Démarre Docker Compose (nginx, php, mysql, node) |
 | `make down` | Arrête la stack |
-| `make migrate` | Exécute toutes les migrations SQL (025 → 032) |
+| `make migrate` | Exécute toutes les migrations SQL (025 → 033) |
 | `make seed` | Injecte les données de démo Livry |
 | `make dev` | Affiche les logs du serveur Vite |
 | `make build` | Compile le frontend Livry pour la production |
@@ -134,6 +134,7 @@ Les migrations sont versionnées dans `sites/api/migrations/`. Pour la version c
 2. `sites/api/migrations/030_mini_games.sql`
 3. `sites/api/migrations/031_email_queue.sql`
 4. `sites/api/migrations/032_user_password_auth.sql`
+5. `sites/api/migrations/033_artisan_premium.sql`
 
 Ces scripts utilisent `CREATE TABLE IF NOT EXISTS` et des vérifications de colonnes, ils peuvent donc être rejoués sans danger.
 
@@ -156,9 +157,10 @@ Ces scripts utilisent `CREATE TABLE IF NOT EXISTS` et des vérifications de colo
 
 Copiez `.env.example` vers `.env` et ajustez les variables selon votre environnement :
 
-- `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASS`
+- `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`
 - `VITE_API_URL`, `VITE_CITY_SLUG`, `VITE_CITY_NAME`, `VITE_CITY_LAT`, `VITE_CITY_LNG`, `VITE_CITY_CP`
 - Clés Stripe (`STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`)
+- Identifiant de prix Stripe Premium (`STRIPE_PREMIUM_MONTHLY_PRICE_ID`)
 - Secret JWT (`JWT_SECRET`)
 
 ## Licence
