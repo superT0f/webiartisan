@@ -128,7 +128,7 @@ curl -s "${BASE_URL}/artisans/register" -X POST -H 'Content-Type: application/js
 if command -v docker >/dev/null 2>&1 && docker compose ps | grep -q mysql; then
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
-    -e "UPDATE local_artisans SET status='active' WHERE email='spin-artisan@example.com';" >/dev/null 2>&1 || true)
+    -e "UPDATE local_artisans SET status='active', plan='premium' WHERE email='spin-artisan@example.com';" >/dev/null 2>&1 || true)
 fi
 
 SPIN_ARTISAN_TOKEN=$(curl -s -X POST "${BASE_URL}/artisans/login" -H 'Content-Type: application/json' \
