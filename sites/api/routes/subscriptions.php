@@ -8,6 +8,7 @@ const SUBSCRIPTION_RETURN_URLS = [
 ];
 
 $artisan = artisan_require_auth($pdo);
+$body = json_decode(file_get_contents('php://input'), true) ?? [];
 
 if ($method !== 'POST' && $method !== 'GET') {
     http_response_code(405);
