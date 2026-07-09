@@ -34,11 +34,13 @@ if ($existing->fetch()) {
     return;
 }
 
+$artisanId = resolveArtisanIdForEvent($pdo, $event);
+
 $pdo->prepare("
     INSERT INTO artisan_subscription_events (artisan_id, stripe_event_id, event_type, payload)
     VALUES (?, ?, ?, ?)
 ")->execute([
-    0,
+    $artisanId,
     $eventId,
     $event->type,
     json_encode($event->data->object->toArray()),
@@ -55,6 +57,26 @@ switch ($event->type) {
 }
 
 echo json_encode(['received' => true]);
+
+function resolveArtisanIdForEvent(PDO $pdo, \Stripe\Event $event): int
+{
+    $object = $event->data->object;
+
+    switch ($event->type) {
+        case 'checkout.session.completed':
+            $metadata = $object->metadata->toArray();
+            return (int)($metadata['artisan_id'] ?? 0);
+
+        case 'customer.subscription.updated':
+        case 'customer.subscription.deleted':
+            $stmt = $pdo->prepare("SELECT id FROM local_artisans WHERE stripe_subscription_id = ?");
+            $stmt->execute([$object->id]);
+            $artisan = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $artisan ? (int)$artisan['id'] : 0;
+    }
+
+    return 0;
+}
 
 function handleCheckoutSessionCompleted(PDO $pdo, \Stripe\Checkout\Session $session): void
 {
