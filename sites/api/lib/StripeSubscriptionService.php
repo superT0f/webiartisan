@@ -13,11 +13,13 @@ class StripeSubscriptionService
         $this->webhookSecret = $_ENV['STRIPE_WEBHOOK_SECRET'] ?? '';
         $this->monthlyPriceId = $_ENV['STRIPE_PREMIUM_MONTHLY_PRICE_ID'] ?? '';
 
-        if (!$this->secretKey || !$this->monthlyPriceId) {
-            throw new RuntimeException('Stripe configuration missing');
+        if (!$this->secretKey && !$this->webhookSecret) {
+            throw new RuntimeException('Stripe configuration missing: STRIPE_SECRET_KEY or STRIPE_WEBHOOK_SECRET is required');
         }
 
-        \Stripe\Stripe::setApiKey($this->secretKey);
+        if ($this->secretKey) {
+            \Stripe\Stripe::setApiKey($this->secretKey);
+        }
     }
 
     public function createCheckoutSession(array $artisan, string $returnUrl): string
@@ -29,6 +31,10 @@ class StripeSubscriptionService
         ];
         if (!in_array($returnUrl, $allowed, true)) {
             throw new InvalidArgumentException('Invalid return URL');
+        }
+
+        if (!$this->monthlyPriceId) {
+            throw new RuntimeException('Stripe configuration missing: STRIPE_PREMIUM_MONTHLY_PRICE_ID is required');
         }
 
         $successUrl = rtrim($returnUrl, '/') . '?subscription=success&session_id={CHECKOUT_SESSION_ID}';
