@@ -18,17 +18,25 @@ function loadEnv(string $path): array {
     return $env;
 }
 
+function envOrDefault(string $key, string $default): string {
+    if (isset($_ENV[$key]) && $_ENV[$key] !== '') return $_ENV[$key];
+    if (isset($_SERVER[$key]) && $_SERVER[$key] !== '') return $_SERVER[$key];
+    $value = getenv($key);
+    return ($value !== false && $value !== '') ? $value : $default;
+}
+
 function getDatabase(): PDO {
     static $pdo = null;
     if ($pdo !== null) return $pdo;
 
-    $host    = $_ENV['DB_HOST'] ?? 'mysql';
-    $db      = $_ENV['DB_NAME'] ?? 'webiartisan';
-    $user    = $_ENV['DB_USER'] ?? 'webiartisan';
-    $pass    = $_ENV['DB_PASS'] ?? 'webiartisan_dev';
+    $host    = envOrDefault('DB_HOST', 'mysql');
+    $port    = envOrDefault('DB_PORT', '3306');
+    $db      = envOrDefault('DB_NAME', 'webiartisan');
+    $user    = envOrDefault('DB_USER', 'webiartisan');
+    $pass    = envOrDefault('DB_PASS', 'webiartisan_dev');
     $charset = 'utf8mb4';
 
-    $dsn = "mysql:host=$host;dbname=$db;charset=$charset";
+    $dsn = "mysql:host=$host;port=$port;dbname=$db;charset=$charset";
     $options = [
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,

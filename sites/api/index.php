@@ -51,9 +51,16 @@ require_once __DIR__ . '/middleware/RateLimit.php';
 // Load environment variables globally (docker-compose env vars take precedence)
 $env = loadEnv(__DIR__ . '/.env');
 foreach ($env as $key => $value) {
-    if (!isset($_ENV[$key])) {
-        $_ENV[$key] = $value;
+    if (isset($_ENV[$key]) && $_ENV[$key] !== '') {
+        continue;
     }
+    if (isset($_SERVER[$key]) && $_SERVER[$key] !== '') {
+        continue;
+    }
+    if (getenv($key) !== false && getenv($key) !== '') {
+        continue;
+    }
+    $_ENV[$key] = $value;
 }
 
 // Database connection used by rate limiting and route files
