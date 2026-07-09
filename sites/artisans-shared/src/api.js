@@ -133,6 +133,34 @@ export async function logoutArtisan(token, options = {}) {
   }, 'Erreur lors de la déconnexion.')
 }
 
+export async function createSubscriptionCheckout(returnUrl) {
+  return requestJson(`${API_BASE}/subscription/checkout`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Artisan-Token': getArtisanToken(),
+    },
+    body: JSON.stringify({ return_url: returnUrl }),
+  }, 'Erreur lors de la création du paiement.')
+}
+
+export async function getSubscriptionStatus() {
+  return requestJson(`${API_BASE}/subscription/status`, {
+    headers: { 'X-Artisan-Token': getArtisanToken() },
+  }, 'Impossible de charger votre abonnement.')
+}
+
+export async function createSubscriptionPortal(returnUrl) {
+  return requestJson(`${API_BASE}/subscription/portal`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Artisan-Token': getArtisanToken(),
+    },
+    body: JSON.stringify({ return_url: returnUrl }),
+  }, 'Erreur lors de l\'ouverture du portail.')
+}
+
 export async function requestMagicLink(email, rememberMe = true, options = {}) {
   return requestJson(`${API_BASE}/artisans/magic-link`, {
     method: 'POST',
