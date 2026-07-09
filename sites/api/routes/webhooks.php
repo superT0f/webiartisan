@@ -93,7 +93,7 @@ function handleSubscriptionUpdated(PDO $pdo, \Stripe\Subscription $subscription)
     $artisan = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$artisan) return;
 
-    $plan = $subscription->status === 'active' ? 'premium' : 'free';
+    $plan = in_array($subscription->status, ['active', 'trialing'], true) ? 'premium' : 'free';
 
     $pdo->prepare("
         UPDATE local_artisans
