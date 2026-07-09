@@ -642,6 +642,43 @@ export function todayIndex() {
   return (new Date().getDay() + 6) % 7
 }
 
+// --- Administration ------------------------------------------------
+
+export async function fetchAdminArtisans(token, options = {}) {
+  return requestJson(`${API_BASE}/admin/artisans`, {
+    headers: { 'X-Artisan-Token': token },
+    signal: options.signal,
+  }, 'Impossible de charger les artisans.')
+}
+
+export async function activateArtisan(token, id, options = {}) {
+  return requestJson(`${API_BASE}/admin/artisans/${id}/activate`, {
+    method: 'POST',
+    headers: { 'X-Artisan-Token': token },
+    signal: options.signal,
+  }, 'Erreur lors de l\'activation.')
+}
+
+export async function suspendArtisan(token, id, options = {}) {
+  return requestJson(`${API_BASE}/admin/artisans/${id}/suspend`, {
+    method: 'POST',
+    headers: { 'X-Artisan-Token': token },
+    signal: options.signal,
+  }, 'Erreur lors de la suspension.')
+}
+
+export async function setArtisanPlan(token, id, plan, options = {}) {
+  return requestJson(`${API_BASE}/admin/artisans/${id}/set-plan`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Artisan-Token': token,
+    },
+    body: JSON.stringify({ plan }),
+    signal: options.signal,
+  }, 'Erreur lors du changement de plan.')
+}
+
 // --- Témoignages ---------------------------------------------------
 
 export async function fetchTestimonials(filters = {}) {

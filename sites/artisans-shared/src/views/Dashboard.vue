@@ -42,6 +42,22 @@
         <button class="btn btn-outline" @click="logout">Se déconnecter</button>
       </div>
 
+      <section v-if="artisan?.is_admin === 1" class="dashboard-section card admin-card">
+        <div class="section-title">
+          <h2>Administration</h2>
+          <span class="badge badge-red">Admin</span>
+        </div>
+        <div class="prospect-list">
+          <RouterLink to="/espace/admin" class="prospect-mini">
+            <div>
+              <strong>Gérer les artisans</strong>
+              <span class="text-muted small">Activer, suspendre et modifier les plans</span>
+            </div>
+            <span class="badge badge-green">Ouvrir</span>
+          </RouterLink>
+        </div>
+      </section>
+
       <section class="dashboard-section card premium-card" :class="{ 'premium-active': isPremium }">
         <div class="section-title">
           <h2>Abonnement</h2>
@@ -642,6 +658,7 @@ watch(() => route.query.token, () => {
 
 .premium-card { border-left: 4px solid var(--c-gold); }
 .premium-card.premium-active { border-left-color: var(--c-green); }
+.admin-card { border-left: 4px solid #B71C1C; }
 .premium-content {
   display: flex;
   flex-direction: column;
