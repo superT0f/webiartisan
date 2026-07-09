@@ -18,6 +18,7 @@
 require_once __DIR__ . '/../lib/Mailer.php';
 require_once __DIR__ . '/../lib/Games.php';
 require_once __DIR__ . '/../lib/Gamification.php';
+require_once __DIR__ . '/../lib/ArtisanAuth.php';
 
 switch ($method) {
 
@@ -865,46 +866,6 @@ function artisan_add_review(PDO $pdo, int $id, array $body): void
         'success' => true,
         'message' => 'Merci pour votre avis ! Il sera publié après modération.',
     ]);
-}
-
-/**
- * Récupère le token artisan depuis les en-têtes.
- */
-function artisan_get_token(): ?string
-{
-    $token = $_SERVER['HTTP_X_ARTISAN_TOKEN'] ?? ($_SERVER['HTTP_AUTHORIZATION'] ?? '');
-    $token = str_replace('Bearer ', '', $token);
-    return $token ?: null;
-}
-
-/**
- * Résout l'artisan authentifié depuis son token.
- */
-function artisan_require_auth(PDO $pdo): array
-{
-    $token = artisan_get_token();
-    if (!$token) {
-        http_response_code(401);
-        echo json_encode(['success' => false, 'error' => 'Authentification requise']);
-        exit;
-    }
-
-    $stmt = $pdo->prepare("
-        SELECT id, company_name, email, is_admin
-        FROM local_artisans
-        WHERE auth_token = ? AND auth_token_exp > NOW()
-        LIMIT 1
-    ");
-    $stmt->execute([$token]);
-    $artisan = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$artisan) {
-        http_response_code(401);
-        echo json_encode(['success' => false, 'error' => 'Session invalide']);
-        exit;
-    }
-
-    return $artisan;
 }
 
 /**

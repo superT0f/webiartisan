@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../lib/StripeSubscriptionService.php';
+require_once __DIR__ . '/../lib/ArtisanAuth.php';
 
 const SUBSCRIPTION_RETURN_URLS = [
     'https://artisans-livry.prigent.tech/espace',
@@ -25,34 +26,6 @@ if ($action === 'checkout' && $method === 'POST') {
 } else {
     http_response_code(404);
     echo json_encode(['success' => false, 'error' => 'Endpoint inconnu']);
-}
-
-function artisan_require_auth(PDO $pdo): array
-{
-    $token = $_SERVER['HTTP_X_ARTISAN_TOKEN'] ?? ($_SERVER['HTTP_AUTHORIZATION'] ?? '');
-    $token = str_replace('Bearer ', '', $token);
-    if (!$token) {
-        http_response_code(401);
-        echo json_encode(['success' => false, 'error' => 'Authentification requise']);
-        exit;
-    }
-
-    $stmt = $pdo->prepare("
-        SELECT id, company_name, email, plan, subscription_status, subscription_period_end, stripe_customer_id
-        FROM local_artisans
-        WHERE auth_token = ? AND auth_token_exp > NOW()
-        LIMIT 1
-    ");
-    $stmt->execute([$token]);
-    $artisan = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$artisan) {
-        http_response_code(401);
-        echo json_encode(['success' => false, 'error' => 'Session invalide']);
-        exit;
-    }
-
-    return $artisan;
 }
 
 function handleSubscriptionCheckout(PDO $pdo, array $artisan, array $body): void
