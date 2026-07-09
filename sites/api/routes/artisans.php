@@ -1203,6 +1203,12 @@ function artisan_create_spin_offer(PDO $pdo, array $body): void
 {
     $artisan = artisan_require_auth($pdo);
 
+    if (!artisanIsPremium($pdo, (int)$artisan['id'])) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Cette fonctionnalité nécessite l\'abonnement Premium']);
+        return;
+    }
+
     $label       = trim($body['label'] ?? '');
     $description = trim($body['description'] ?? '');
     $stockTotal  = (int)($body['stock_total'] ?? 0);
@@ -1449,12 +1455,14 @@ function artisan_create_service(PDO $pdo, array $body): void
     }
 
     // Enforce free-tier limit (5 active services)
-    $countStmt = $pdo->prepare("SELECT COUNT(*) FROM local_services WHERE artisan_id = ? AND is_active = 1");
-    $countStmt->execute([$artisanId]);
-    if ((int)$countStmt->fetchColumn() >= 5) {
-        http_response_code(403);
-        echo json_encode(['success' => false, 'error' => 'Limite de 5 services atteinte']);
-        return;
+    if (!artisanIsPremium($pdo, $artisanId)) {
+        $countStmt = $pdo->prepare("SELECT COUNT(*) FROM local_services WHERE artisan_id = ? AND is_active = 1");
+        $countStmt->execute([$artisanId]);
+        if ((int)$countStmt->fetchColumn() >= FREE_TIER_MAX_ACTIVE_SERVICES) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Limite de 5 services atteinte']);
+            return;
+        }
     }
 
     $pdo->prepare("
@@ -1486,10 +1494,10 @@ function artisan_update_service(PDO $pdo, int $serviceId, array $body): void
     $allowed = ['name', 'description', 'price_range', 'duration', 'is_active', 'sort_order', 'service_catalog_id'];
 
     // Enforce free-tier active limit when activating a service
-    if (array_key_exists('is_active', $body) && (int)$body['is_active'] === 1 && !(bool)$service['is_active']) {
+    if (!artisanIsPremium($pdo, $artisanId) && array_key_exists('is_active', $body) && (int)$body['is_active'] === 1 && !(bool)$service['is_active']) {
         $countStmt = $pdo->prepare("SELECT COUNT(*) FROM local_services WHERE artisan_id = ? AND is_active = 1 AND id != ?");
         $countStmt->execute([$artisanId, $serviceId]);
-        if ((int)$countStmt->fetchColumn() >= 5) {
+        if ((int)$countStmt->fetchColumn() >= FREE_TIER_MAX_ACTIVE_SERVICES) {
             http_response_code(403);
             echo json_encode(['success' => false, 'error' => 'Limite de 5 services actifs atteinte']);
             return;
@@ -1614,7 +1622,7 @@ function artisan_create_game(PDO $pdo, array $body): void
         return;
     }
 
-    if ((bool)$type['is_premium']) {
+    if ((bool)$type['is_premium'] && !artisanIsPremium($pdo, $artisanId)) {
         http_response_code(403);
         echo json_encode(['success' => false, 'error' => 'Type de jeu premium']);
         return;

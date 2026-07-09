@@ -6,9 +6,21 @@
 require_once __DIR__ . '/UserAuth.php';
 
 const FREE_TIER_MAX_ACTIVE_GAMES = 2;
+const FREE_TIER_MAX_ACTIVE_SERVICES = 5;
+
+function artisanIsPremium(PDO $pdo, int $artisanId): bool
+{
+    $stmt = $pdo->prepare("SELECT plan FROM local_artisans WHERE id = ?");
+    $stmt->execute([$artisanId]);
+    return $stmt->fetchColumn() === 'premium';
+}
 
 function games_can_artisan_create(PDO $pdo, int $artisanId): bool
 {
+    if (artisanIsPremium($pdo, $artisanId)) {
+        return true;
+    }
+
     $stmt = $pdo->prepare("
         SELECT COUNT(*) FROM local_game_instances
         WHERE artisan_id = ? AND is_active = 1

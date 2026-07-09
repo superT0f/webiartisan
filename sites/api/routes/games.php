@@ -167,12 +167,6 @@ function games_play(PDO $pdo, int $id, array $body): void
         return;
     }
 
-    if ((bool)$instance['is_premium']) {
-        http_response_code(403);
-        echo json_encode(['success' => false, 'error' => 'Ce jeu est réservé aux artisans premium']);
-        return;
-    }
-
     if (!games_instance_is_playable($instance)) {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Ce jeu n\'est pas actif']);
