@@ -3,7 +3,7 @@
     <span class="freemium-banner__badge">Gratuit</span>
     <span class="freemium-banner__message">{{ message }}</span>
     <button type="button" class="freemium-banner__cta" @click="$emit('upgrade')">
-      Passer premium
+      {{ upgradeLabel }}
     </button>
   </div>
 </template>
@@ -11,6 +11,7 @@
 <script setup>
 defineProps({
   message: { type: String, default: 'Passez à la version premium pour débloquer plus de fonctionnalités.' },
+  upgradeLabel: { type: String, default: 'Passer premium' },
 })
 defineEmits(['upgrade'])
 </script>

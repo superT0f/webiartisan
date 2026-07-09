@@ -25,14 +25,27 @@
         <FreemiumLimitBanner
           v-if="activeCount >= 2"
           message="Limite de 2 jeux actifs atteinte en version gratuite."
+          @upgrade="startCheckout"
         />
+
+        <div v-if="!isPremium && !loadingSubscription" class="upgrade-cta">
+          <p class="text-muted">
+            Passez Premium pour débloquer les types de jeux avancés et plus de fonctionnalités.
+          </p>
+          <button type="button" class="btn btn-gold" @click="startCheckout" :disabled="subscribing">
+            {{ subscribing ? 'Redirection…' : 'Passer Premium' }}
+          </button>
+        </div>
 
         <form @submit.prevent="createGame" class="game-form">
           <div class="form-group">
             <label for="game_type">Type de jeu</label>
             <select id="game_type" v-model="newGame.game_type_key" class="form-input" required>
-              <option v-for="t in freeTypes" :key="t.key" :value="t.key">{{ t.label_fr }}</option>
+              <option v-for="t in availableTypes" :key="t.key" :value="t.key">{{ t.label_fr }}</option>
             </select>
+            <span v-if="!isPremium" class="premium-note">
+              Version gratuite : types de jeux limités.
+            </span>
           </div>
 
           <div class="form-group">
@@ -97,7 +110,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { fetchGameTypes, fetchMyGames, createArtisanGame, updateArtisanGame, deleteArtisanGame } from '../../api.js'
+import { fetchGameTypes, fetchMyGames, createArtisanGame, updateArtisanGame, deleteArtisanGame, getSubscriptionStatus, createSubscriptionCheckout } from '../../api.js'
 import FreemiumLimitBanner from '../../components/FreemiumLimitBanner.vue'
 
 const props = defineProps({
@@ -112,6 +125,9 @@ const optionsInput = ref('')
 const saving = ref(false)
 const error = ref('')
 const success = ref('')
+const subscribing = ref(false)
+const subscriptionStatus = ref(null)
+const loadingSubscription = ref(false)
 const newGame = ref({
   game_type_key: 'coupon',
   title: '',
@@ -119,22 +135,54 @@ const newGame = ref({
   config: {},
 })
 
-const freeTypes = computed(() => types.value.filter(t => !t.is_premium))
+const isPremium = computed(() => subscriptionStatus.value?.plan === 'premium')
+const availableTypes = computed(() =>
+  isPremium.value ? types.value : types.value.filter(t => !t.is_premium)
+)
 const activeCount = computed(() => games.value.filter(g => g.is_active).length)
 
 async function load() {
   if (!artisanToken.value) return
   error.value = ''
+  loadingSubscription.value = true
   try {
-    const [tRes, gRes] = await Promise.all([
+    const [tRes, gRes, sRes] = await Promise.all([
       fetchGameTypes(),
       fetchMyGames(artisanToken.value),
+      getSubscriptionStatus(),
     ])
     types.value = tRes.data || []
     games.value = gRes.data || []
+    if (sRes.success && sRes.data) {
+      subscriptionStatus.value = sRes.data
+    }
+    if (availableTypes.value.length && !availableTypes.value.find(t => t.key === newGame.value.game_type_key)) {
+      newGame.value.game_type_key = availableTypes.value[0].key
+    }
   } catch (e) {
     console.error('Erreur chargement jeux', e)
     error.value = 'Impossible de charger vos jeux.'
+  } finally {
+    loadingSubscription.value = false
+  }
+}
+
+async function startCheckout() {
+  subscribing.value = true
+  error.value = ''
+  success.value = ''
+  try {
+    const res = await createSubscriptionCheckout(window.location.origin + '/artisan/jeux')
+    if (res.success && res.data?.url) {
+      window.location.href = res.data.url
+    } else {
+      error.value = res.error || 'Impossible de démarrer le paiement.'
+      subscribing.value = false
+    }
+  } catch (e) {
+    console.error('Erreur checkout', e)
+    error.value = 'Erreur lors du paiement.'
+    subscribing.value = false
   }
 }
 
@@ -305,6 +353,23 @@ onMounted(load)
   font-weight: 600;
   color: var(--c-text-2);
 }
+
+.premium-note {
+  font-size: 0.8rem;
+  color: var(--c-text-3);
+}
+
+.upgrade-cta {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+  background: #FFF8E1;
+  border: 1px solid #FFE082;
+  border-radius: var(--r-md);
+}
+.upgrade-cta p { margin: 0; }
 
 @media (max-width: 600px) {
   .game-actions { flex-direction: column; }

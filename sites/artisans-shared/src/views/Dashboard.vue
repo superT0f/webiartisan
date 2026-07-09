@@ -42,6 +42,34 @@
         <button class="btn btn-outline" @click="logout">Se déconnecter</button>
       </div>
 
+      <section class="dashboard-section card premium-card" :class="{ 'premium-active': isPremium }">
+        <div class="section-title">
+          <h2>Abonnement</h2>
+          <span v-if="isPremium" class="badge badge-gold">Premium actif</span>
+          <span v-else class="badge badge-grey">Gratuit</span>
+        </div>
+        <div v-if="loadingSubscription" class="skeleton" style="height: 60px; border-radius: 12px;"></div>
+        <div v-else-if="isPremium" class="premium-content">
+          <p class="text-muted">
+            Vous bénéficiez de toutes les fonctionnalités premium.
+            <span v-if="subscriptionStatus?.subscription_period_end">
+              Prochain renouvellement le {{ formatPeriodEnd(subscriptionStatus.subscription_period_end) }}.
+            </span>
+          </p>
+          <button type="button" class="btn btn-outline" @click="openPortal" :disabled="subscribing">
+            Gérer mon abonnement
+          </button>
+        </div>
+        <div v-else class="premium-content">
+          <p class="text-muted">
+            Passez Premium pour débloquer les mini-jeux avancés, la roue des artisans et plus de services.
+          </p>
+          <button type="button" class="btn btn-gold" @click="startCheckout" :disabled="subscribing">
+            {{ subscribing ? 'Redirection…' : 'Passer Premium — 2,99 €/mois' }}
+          </button>
+        </div>
+      </section>
+
       <section class="dashboard-section card">
         <div class="section-title">
           <h2>Roue des artisans</h2>
@@ -171,9 +199,9 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { requestMagicLink, fetchMe, updateMe, getMyProspects, getArtisanToken, setArtisanToken, removeArtisanToken, fetchArtisanConsumerToken, setUserToken, logoutArtisan } from '../api.js'
+import { requestMagicLink, fetchMe, updateMe, getMyProspects, getArtisanToken, setArtisanToken, removeArtisanToken, fetchArtisanConsumerToken, setUserToken, logoutArtisan, getSubscriptionStatus, createSubscriptionCheckout, createSubscriptionPortal } from '../api.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -198,8 +226,15 @@ const messageType = ref('')
 const myProspects = ref([])
 const loadingProspects = ref(false)
 const linkingConsumer = ref(false)
+const subscriptionStatus = ref(null)
+const loadingSubscription = ref(false)
+const subscribing = ref(false)
 let isMounted = false
 const activeControllers = new Set()
+
+const isPremium = computed(() =>
+  subscriptionStatus.value?.plan === 'premium' || artisan.value?.plan === 'premium'
+)
 
 function newAbortSignal() {
   const controller = new AbortController()
@@ -294,6 +329,68 @@ async function loadProfile() {
   } finally {
     cleanupSignal(signal)
     if (isMounted && token.value === currentToken) loading.value = false
+  }
+}
+
+async function loadSubscription() {
+  if (!token.value || !isMounted) return
+  const currentToken = token.value
+  loadingSubscription.value = true
+  const signal = newAbortSignal()
+  try {
+    const res = await getSubscriptionStatus({ signal })
+    if (!isMounted || token.value !== currentToken) return
+    if (res.success && res.data) {
+      subscriptionStatus.value = res.data
+    }
+  } catch (e) {
+    if (e.name !== 'AbortError') {
+      console.error('Erreur chargement abonnement', e)
+    }
+  } finally {
+    cleanupSignal(signal)
+    if (isMounted && token.value === currentToken) loadingSubscription.value = false
+  }
+}
+
+function formatPeriodEnd(date) {
+  if (!date) return ''
+  const d = new Date(date)
+  if (isNaN(d.getTime())) return ''
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+async function startCheckout() {
+  subscribing.value = true
+  message.value = ''
+  try {
+    const res = await createSubscriptionCheckout(window.location.origin + '/espace')
+    if (res.success && res.data?.url) {
+      window.location.href = res.data.url
+    } else {
+      setMessage(res.error || 'Impossible de démarrer le paiement.', 'error')
+      subscribing.value = false
+    }
+  } catch (e) {
+    setMessage(e.message || 'Erreur lors du paiement.', 'error')
+    subscribing.value = false
+  }
+}
+
+async function openPortal() {
+  subscribing.value = true
+  message.value = ''
+  try {
+    const res = await createSubscriptionPortal(window.location.origin + '/espace')
+    if (res.success && res.data?.url) {
+      window.location.href = res.data.url
+    } else {
+      setMessage(res.error || 'Impossible d\'ouvrir le portail.', 'error')
+      subscribing.value = false
+    }
+  } catch (e) {
+    setMessage(e.message || 'Erreur lors de l\'ouverture du portail.', 'error')
+    subscribing.value = false
   }
 }
 
@@ -398,6 +495,7 @@ onMounted(() => {
   if (token.value && !consumed) {
     loadProfile()
     loadMyProspects()
+    loadSubscription()
   }
 })
 
@@ -541,6 +639,15 @@ watch(() => route.query.token, () => {
   padding: 60px 20px;
 }
 .empty-icon { font-size: 3rem; margin-bottom: 16px; }
+
+.premium-card { border-left: 4px solid var(--c-gold); }
+.premium-card.premium-active { border-left-color: var(--c-green); }
+.premium-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.premium-content p { margin: 0; }
 
 @media (max-width: 600px) {
   .form-row { grid-template-columns: 1fr; }

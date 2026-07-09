@@ -133,7 +133,7 @@ export async function logoutArtisan(token, options = {}) {
   }, 'Erreur lors de la déconnexion.')
 }
 
-export async function createSubscriptionCheckout(returnUrl) {
+export async function createSubscriptionCheckout(returnUrl, options = {}) {
   return requestJson(`${API_BASE}/subscription/checkout`, {
     method: 'POST',
     headers: {
@@ -141,16 +141,18 @@ export async function createSubscriptionCheckout(returnUrl) {
       'X-Artisan-Token': getArtisanToken(),
     },
     body: JSON.stringify({ return_url: returnUrl }),
+    signal: options.signal,
   }, 'Erreur lors de la création du paiement.')
 }
 
-export async function getSubscriptionStatus() {
+export async function getSubscriptionStatus(options = {}) {
   return requestJson(`${API_BASE}/subscription/status`, {
     headers: { 'X-Artisan-Token': getArtisanToken() },
+    signal: options.signal,
   }, 'Impossible de charger votre abonnement.')
 }
 
-export async function createSubscriptionPortal(returnUrl) {
+export async function createSubscriptionPortal(returnUrl, options = {}) {
   return requestJson(`${API_BASE}/subscription/portal`, {
     method: 'POST',
     headers: {
@@ -158,6 +160,7 @@ export async function createSubscriptionPortal(returnUrl) {
       'X-Artisan-Token': getArtisanToken(),
     },
     body: JSON.stringify({ return_url: returnUrl }),
+    signal: options.signal,
   }, 'Erreur lors de l\'ouverture du portail.')
 }
 
