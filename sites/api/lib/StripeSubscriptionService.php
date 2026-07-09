@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../config/app.php';
 
 class StripeSubscriptionService
 {
@@ -24,11 +25,7 @@ class StripeSubscriptionService
 
     public function createCheckoutSession(array $artisan, string $returnUrl): string
     {
-        $allowed = [
-            'https://artisans-livry.prigent.tech/espace',
-            'https://artisans-combs.prigent.tech/espace',
-            'https://artisans-vert-saint-denis.prigent.tech/espace',
-        ];
+        $allowed = getAppConfig()['subscription_return_urls'];
         if (!in_array($returnUrl, $allowed, true)) {
             throw new InvalidArgumentException('Invalid return URL');
         }
@@ -60,11 +57,7 @@ class StripeSubscriptionService
 
     public function createPortalSession(string $customerId, string $returnUrl): string
     {
-        $allowed = [
-            'https://artisans-livry.prigent.tech/espace',
-            'https://artisans-combs.prigent.tech/espace',
-            'https://artisans-vert-saint-denis.prigent.tech/espace',
-        ];
+        $allowed = getAppConfig()['subscription_return_urls'];
         if (!in_array($returnUrl, $allowed, true)) {
             throw new InvalidArgumentException('Invalid return URL');
         }

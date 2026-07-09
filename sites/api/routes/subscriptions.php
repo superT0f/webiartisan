@@ -2,12 +2,6 @@
 require_once __DIR__ . '/../lib/StripeSubscriptionService.php';
 require_once __DIR__ . '/../lib/ArtisanAuth.php';
 
-const SUBSCRIPTION_RETURN_URLS = [
-    'https://artisans-livry.prigent.tech/espace',
-    'https://artisans-combs.prigent.tech/espace',
-    'https://artisans-vert-saint-denis.prigent.tech/espace',
-];
-
 $artisan = artisan_require_auth($pdo);
 $body = json_decode(file_get_contents('php://input'), true) ?? [];
 
@@ -31,7 +25,7 @@ if ($action === 'checkout' && $method === 'POST') {
 function handleSubscriptionCheckout(PDO $pdo, array $artisan, array $body): void
 {
     $returnUrl = $body['return_url'] ?? ($_SERVER['HTTP_ORIGIN'] ?? '') . '/espace';
-    if (!in_array($returnUrl, SUBSCRIPTION_RETURN_URLS, true)) {
+    if (!in_array($returnUrl, getAppConfig()['subscription_return_urls'], true)) {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'URL de retour invalide']);
         return;
@@ -57,7 +51,7 @@ function handleSubscriptionPortal(PDO $pdo, array $artisan, array $body): void
     }
 
     $returnUrl = $body['return_url'] ?? ($_SERVER['HTTP_ORIGIN'] ?? '') . '/espace';
-    if (!in_array($returnUrl, SUBSCRIPTION_RETURN_URLS, true)) {
+    if (!in_array($returnUrl, getAppConfig()['subscription_return_urls'], true)) {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'URL de retour invalide']);
         return;

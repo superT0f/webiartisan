@@ -24,6 +24,11 @@ function getAppConfig(): array {
         'jwt_secret'       => $env['JWT_SECRET'] ?? 'change_me_in_production',
         'mail_from'          => $env['MAIL_FROM'] ?? 'noreply@webiartisan.prigent.tech',
         'from_name'          => $env['FROM_NAME'] ?? 'WebIArtisan',
+        'subscription_return_urls' => [
+            'https://artisans-livry.prigent.tech/espace',
+            'https://artisans-combs.prigent.tech/espace',
+            'https://artisans-vert-saint-denis.prigent.tech/espace',
+        ],
     ];
 
     return $config;
