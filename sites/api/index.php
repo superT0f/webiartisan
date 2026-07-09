@@ -202,6 +202,12 @@ if ($module === 'subscription') {
     exit;
 }
 
+if ($module === 'admin') {
+    applyRateLimit($pdo, 'login');
+    require_once __DIR__ . '/routes/admin.php';
+    exit;
+}
+
 if ($module === 'webhooks' && $action === 'stripe') {
     require_once __DIR__ . '/routes/webhooks.php';
     exit;
