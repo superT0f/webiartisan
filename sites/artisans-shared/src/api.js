@@ -44,14 +44,8 @@ export async function fetchCityPois() {
   return res.json()
 }
 
-export async function fetchWeather() {
-  // Open-Meteo — coordonnées configurées par ville
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${CITY_LAT}&longitude=${CITY_LNG}` +
-              '&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m' +
-              '&daily=temperature_2m_max,temperature_2m_min,weather_code' +
-              '&timezone=Europe%2FParis&forecast_days=4'
-  const res = await fetch(url)
-  if (!res.ok) throw new Error('Météo indisponible')
+export async function fetchWeather(lat, lng) {
+  const res = await fetch(`${API_BASE}/weather?lat=${lat}&lng=${lng}`)
   return res.json()
 }
 

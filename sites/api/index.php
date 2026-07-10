@@ -220,6 +220,12 @@ if ($module === 'webhooks' && $action === 'stripe') {
     exit;
 }
 
+if ($module === 'weather') {
+    applyRateLimit($pdo, 'public');
+    require_once __DIR__ . '/routes/weather.php';
+    exit;
+}
+
 // Route to the correct module
 $routeFile = __DIR__ . "/routes/{$module}.php";
 
