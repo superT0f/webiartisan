@@ -1,6 +1,6 @@
 .PHONY: help up down migrate seed build dev test-api push-api push-app push-livry build-combs push-combs build-vsd push-vsd deploy-all
 
-APP_VERSION := $(shell node -p "require('./package.json').version" 2>/dev/null || echo 1.1.0)
+APP_VERSION := $(shell cat .version 2>/dev/null || echo 2.0.1)
 
 help:
 	@echo "WebiArtisan — Multi-villes"
