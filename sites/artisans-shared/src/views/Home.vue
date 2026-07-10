@@ -51,14 +51,13 @@
 
     <!-- Widget météo flottant -->
     <div class="weather-widget" v-if="weather">
-      <div class="weather-emoji">{{ weatherInfo(weather.current.weather_code).emoji }}</div>
+      <div class="weather-emoji">{{ weatherInfo(weather.weathercode).emoji }}</div>
       <div class="weather-info">
-        <span class="weather-temp">{{ Math.round(weather.current.temperature_2m) }}°C</span>
-        <span class="weather-label">{{ weatherInfo(weather.current.weather_code).label }}</span>
+        <span class="weather-temp">{{ Math.round(weather.temperature) }}°C</span>
+        <span class="weather-label">{{ weatherInfo(weather.weathercode).label }}</span>
       </div>
       <div class="weather-extras">
-        <span>💧 {{ weather.current.relative_humidity_2m }}%</span>
-        <span>🌬️ {{ Math.round(weather.current.wind_speed_10m) }} km/h</span>
+        <span>🌬️ {{ Math.round(weather.windspeed) }} km/h</span>
       </div>
     </div>
   </section>
@@ -197,26 +196,6 @@
       </div>
 
       <div class="services-grid">
-        <!-- MÉTÉO 4 jours -->
-        <div class="service-card wide" id="meteo">
-          <div class="service-header">
-            <span class="service-icon">🌤️</span>
-            <div>
-              <h3>Météo locale</h3>
-              <p class="text-muted">{{ CITY_NAME }} · {{ todayFormatted }}</p>
-            </div>
-          </div>
-          <div v-if="weather" class="weather-days">
-            <div v-for="(day, i) in weather.daily.time.slice(0,4)" :key="day" class="weather-day" :class="{ today: i === 0 }">
-              <span class="wday-label">{{ i === 0 ? 'Auj.' : shortDay(day) }}</span>
-              <span class="wday-emoji">{{ weatherInfo(weather.daily.weather_code[i]).emoji }}</span>
-              <span class="wday-max">{{ Math.round(weather.daily.temperature_2m_max[i]) }}°</span>
-              <span class="wday-min">{{ Math.round(weather.daily.temperature_2m_min[i]) }}°</span>
-            </div>
-          </div>
-          <div v-else class="skeleton" style="height:80px; border-radius:12px;"></div>
-        </div>
-
         <!-- POI horaires -->
         <template v-if="pois.length">
           <div
@@ -412,12 +391,6 @@ function todaySchedule(schedules) {
   })
 }
 
-// --- Météo ---
-const todayFormatted = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
-function shortDay(dateStr) {
-  return new Date(dateStr).toLocaleDateString('fr-FR', { weekday: 'short' })
-}
-
 // --- Valeurs ---
 const values = [
   { icon: '📍', label: '100% Local',     text: 'Uniquement des artisans de ' + CITY_NAME + ' et ses alentours. Pas de résultats nationaux ou payants.' },
@@ -454,7 +427,8 @@ onMounted(async () => {
     })(),
     (async () => {
       try {
-        weather.value = await fetchWeather()
+        const res = await fetchWeather(CITY_LAT, CITY_LNG)
+        weather.value = res.data || null
       } catch { weather.value = null }
     })(),
   ])
