@@ -1,12 +1,23 @@
 <?php
 /**
  * WebIArtisan API — Route : Admin
- * Endpoints réservés aux administrateurs pour gérer les artisans.
+ * Endpoints réservés aux administrateurs pour gérer les artisans,
+ * les POI locaux et leurs horaires.
  *
  * GET  /admin/artisans              — Liste des artisans
  * POST /admin/artisans/{id}/activate — Activer un artisan
  * POST /admin/artisans/{id}/suspend  — Suspendre un artisan
  * POST /admin/artisans/{id}/set-plan — Définir le plan free/premium
+ *
+ * GET    /admin/pois                — Liste des POI de la ville admin
+ * GET    /admin/pois/{id}           — Détail d'un POI
+ * POST   /admin/pois                — Créer un POI
+ * PUT    /admin/pois/{id}           — Modifier un POI
+ * DELETE /admin/pois/{id}           — Supprimer un POI
+ *
+ * POST   /admin/pois/{id}/schedules — Ajouter un horaire à un POI
+ * PUT    /admin/schedules/{id}      — Modifier un horaire
+ * DELETE /admin/schedules/{id}      — Supprimer un horaire
  */
 
 require_once __DIR__ . '/../lib/ArtisanAuth.php';
@@ -29,6 +40,10 @@ if ($method === 'GET' && $action === 'artisans' && $param === null) {
     admin_suspend_artisan($pdo, (int)$param);
 } elseif ($method === 'POST' && $action === 'artisans' && is_numeric($param) && $subAction === 'set-plan') {
     admin_set_artisan_plan($pdo, (int)$param);
+} elseif ($action === 'pois') {
+    admin_pois_router($pdo, $method, $param);
+} elseif ($action === 'schedules') {
+    admin_schedules_router($pdo, $method, $param);
 } else {
     http_response_code(404);
     echo json_encode(['success' => false, 'error' => 'Endpoint inconnu']);
@@ -100,4 +115,309 @@ function admin_set_artisan_plan(PDO $pdo, int $id): void
         'message' => "Plan mis à jour : $plan",
         'affected' => $stmt->rowCount(),
     ]);
+}
+
+/* =============================================================
+ * POI Admin
+ * ============================================================= */
+
+function admin_current_city_id(PDO $pdo, array $artisan): int
+{
+    $stmt = $pdo->prepare("SELECT id FROM local_cities WHERE id = ? LIMIT 1");
+    $stmt->execute([$artisan['city_id']]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Ville admin invalide']);
+        exit;
+    }
+    return (int)$row['id'];
+}
+
+function admin_validate_poi_type(string $type): bool
+{
+    $allowed = ['mairie', 'piscine', 'tabac', 'supermarche', 'restaurant', 'cafe', 'pharmacie', 'boulangerie', 'coiffeur', 'plombier', 'jardinier', 'autre'];
+    return in_array($type, $allowed, true);
+}
+
+function admin_pois_router(PDO $pdo, string $method, ?string $param): void
+{
+    global $artisan;
+    $cityId = admin_current_city_id($pdo, $artisan);
+
+    if ($method === 'GET' && $param === null) {
+        admin_list_pois($pdo, $cityId);
+    } elseif ($method === 'GET' && is_numeric($param)) {
+        admin_get_poi($pdo, $cityId, (int)$param);
+    } elseif ($method === 'POST' && $param === null) {
+        admin_create_poi($pdo, $cityId);
+    } elseif ($method === 'PUT' && is_numeric($param)) {
+        admin_update_poi($pdo, $cityId, (int)$param);
+    } elseif ($method === 'DELETE' && is_numeric($param)) {
+        admin_delete_poi($pdo, $cityId, (int)$param);
+    } else {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Endpoint POI inconnu']);
+    }
+}
+
+function admin_list_pois(PDO $pdo, int $cityId): void
+{
+    $stmt = $pdo->prepare("SELECT * FROM local_pois WHERE city_id = ? ORDER BY sort_order, name");
+    $stmt->execute([$cityId]);
+    $pois = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $scheduleStmt = $pdo->prepare("SELECT * FROM local_schedules WHERE poi_id = ? ORDER BY day_of_week");
+    foreach ($pois as &$poi) {
+        $scheduleStmt->execute([$poi['id']]);
+        $poi['schedules'] = $scheduleStmt->fetchAll(PDO::FETCH_ASSOC);
+        if ($poi['meta']) {
+            $poi['meta'] = json_decode($poi['meta'], true);
+        }
+    }
+    unset($poi);
+
+    echo json_encode(['success' => true, 'data' => $pois]);
+}
+
+function admin_get_poi(PDO $pdo, int $cityId, int $id): void
+{
+    $stmt = $pdo->prepare("SELECT * FROM local_pois WHERE id = ? AND city_id = ? LIMIT 1");
+    $stmt->execute([$id, $cityId]);
+    $poi = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$poi) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'POI non trouvé']);
+        return;
+    }
+
+    $scheduleStmt = $pdo->prepare("SELECT * FROM local_schedules WHERE poi_id = ? ORDER BY day_of_week");
+    $scheduleStmt->execute([$id]);
+    $poi['schedules'] = $scheduleStmt->fetchAll(PDO::FETCH_ASSOC);
+    if ($poi['meta']) {
+        $poi['meta'] = json_decode($poi['meta'], true);
+    }
+
+    echo json_encode(['success' => true, 'data' => $poi]);
+}
+
+function admin_create_poi(PDO $pdo, int $cityId): void
+{
+    $body = json_decode(file_get_contents('php://input'), true) ?? [];
+    $errors = admin_validate_poi_body($body);
+    if ($errors) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => $errors[0]]);
+        return;
+    }
+
+    $stmt = $pdo->prepare("INSERT INTO local_pois
+        (city_id, type, name, address, phone, website, email, latitude, longitude, description, meta, is_active, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->execute([
+        $cityId,
+        $body['type'],
+        trim($body['name']),
+        $body['address'] ?? null,
+        $body['phone'] ?? null,
+        $body['website'] ?? null,
+        $body['email'] ?? null,
+        $body['latitude'] ?? null,
+        $body['longitude'] ?? null,
+        $body['description'] ?? null,
+        isset($body['meta']) ? json_encode($body['meta']) : null,
+        $body['is_active'] ?? 1,
+        $body['sort_order'] ?? 0,
+    ]);
+
+    echo json_encode(['success' => true, 'data' => ['id' => (int)$pdo->lastInsertId()]]);
+}
+
+function admin_update_poi(PDO $pdo, int $cityId, int $id): void
+{
+    $body = json_decode(file_get_contents('php://input'), true) ?? [];
+    $errors = admin_validate_poi_body($body, false);
+    if ($errors) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => $errors[0]]);
+        return;
+    }
+
+    $fields = [];
+    $values = [];
+    $map = [
+        'type' => 'type',
+        'name' => 'name',
+        'address' => 'address',
+        'phone' => 'phone',
+        'website' => 'website',
+        'email' => 'email',
+        'latitude' => 'latitude',
+        'longitude' => 'longitude',
+        'description' => 'description',
+        'is_active' => 'is_active',
+        'sort_order' => 'sort_order',
+    ];
+    foreach ($map as $key => $col) {
+        if (array_key_exists($key, $body)) {
+            $fields[] = "$col = ?";
+            $values[] = $body[$key] === '' ? null : $body[$key];
+        }
+    }
+    if (array_key_exists('meta', $body)) {
+        $fields[] = "meta = ?";
+        $values[] = $body['meta'] === null ? null : json_encode($body['meta']);
+    }
+    if (!$fields) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Aucune donnée à mettre à jour']);
+        return;
+    }
+    $values[] = $id;
+    $values[] = $cityId;
+
+    $stmt = $pdo->prepare("UPDATE local_pois SET " . implode(', ', $fields) . " WHERE id = ? AND city_id = ?");
+    $stmt->execute($values);
+
+    echo json_encode(['success' => true, 'affected' => $stmt->rowCount()]);
+}
+
+function admin_delete_poi(PDO $pdo, int $cityId, int $id): void
+{
+    $pdo->prepare("DELETE FROM local_schedules WHERE poi_id = ?")->execute([$id]);
+    $stmt = $pdo->prepare("DELETE FROM local_pois WHERE id = ? AND city_id = ?");
+    $stmt->execute([$id, $cityId]);
+
+    echo json_encode(['success' => true, 'affected' => $stmt->rowCount()]);
+}
+
+function admin_validate_poi_body(array $body, bool $requireName = true): array
+{
+    $errors = [];
+    if ($requireName && empty(trim($body['name'] ?? ''))) {
+        $errors[] = 'Le nom est requis';
+    }
+    if ($requireName && empty($body['type'])) {
+        $errors[] = 'Le type est requis';
+    }
+    if (!empty($body['type']) && !admin_validate_poi_type($body['type'])) {
+        $errors[] = 'Type de POI invalide';
+    }
+    if (isset($body['latitude']) && ($body['latitude'] < -90 || $body['latitude'] > 90)) {
+        $errors[] = 'Latitude invalide';
+    }
+    if (isset($body['longitude']) && ($body['longitude'] < -180 || $body['longitude'] > 180)) {
+        $errors[] = 'Longitude invalide';
+    }
+    if (isset($body['name']) && mb_strlen($body['name']) > 255) {
+        $errors[] = 'Nom trop long (max 255)';
+    }
+    return $errors;
+}
+
+/* =============================================================
+ * Schedules Admin
+ * ============================================================= */
+
+function admin_schedules_router(PDO $pdo, string $method, ?string $param): void
+{
+    global $artisan;
+    $cityId = admin_current_city_id($pdo, $artisan);
+
+    if ($method === 'POST' && $param === null) {
+        admin_create_schedule($pdo, $cityId);
+    } elseif ($method === 'PUT' && is_numeric($param)) {
+        admin_update_schedule($pdo, $cityId, (int)$param);
+    } elseif ($method === 'DELETE' && is_numeric($param)) {
+        admin_delete_schedule($pdo, $cityId, (int)$param);
+    } else {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Endpoint schedule inconnu']);
+    }
+}
+
+function admin_create_schedule(PDO $pdo, int $cityId): void
+{
+    $body = json_decode(file_get_contents('php://input'), true) ?? [];
+    $poiId = (int)($body['poi_id'] ?? 0);
+
+    if (!$poiId || !isset($body['day_of_week']) || $body['day_of_week'] < 0 || $body['day_of_week'] > 6) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'poi_id ou day_of_week invalide']);
+        return;
+    }
+
+    $check = $pdo->prepare("SELECT id FROM local_pois WHERE id = ? AND city_id = ? LIMIT 1");
+    $check->execute([$poiId, $cityId]);
+    if (!$check->fetch()) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'POI non trouvé dans cette ville']);
+        return;
+    }
+
+    $stmt = $pdo->prepare("INSERT INTO local_schedules
+        (poi_id, day_of_week, open_time, close_time, break_start, break_end, is_closed)
+        VALUES (?, ?, ?, ?, ?, ?, ?)");
+    $stmt->execute([
+        $poiId,
+        $body['day_of_week'],
+        $body['open_time'] ?? null,
+        $body['close_time'] ?? null,
+        $body['break_start'] ?? null,
+        $body['break_end'] ?? null,
+        $body['is_closed'] ?? 0,
+    ]);
+
+    echo json_encode(['success' => true, 'data' => ['id' => (int)$pdo->lastInsertId()]]);
+}
+
+function admin_update_schedule(PDO $pdo, int $cityId, int $id): void
+{
+    $body = json_decode(file_get_contents('php://input'), true) ?? [];
+
+    $check = $pdo->prepare("SELECT s.id FROM local_schedules s JOIN local_pois p ON s.poi_id = p.id WHERE s.id = ? AND p.city_id = ? LIMIT 1");
+    $check->execute([$id, $cityId]);
+    if (!$check->fetch()) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Horaire non trouvé']);
+        return;
+    }
+
+    $fields = [];
+    $values = [];
+    $map = ['day_of_week' => 'day_of_week', 'open_time' => 'open_time', 'close_time' => 'close_time', 'break_start' => 'break_start', 'break_end' => 'break_end', 'is_closed' => 'is_closed'];
+    foreach ($map as $key => $col) {
+        if (array_key_exists($key, $body)) {
+            $fields[] = "$col = ?";
+            $values[] = $body[$key];
+        }
+    }
+    if (!$fields) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Aucune donnée à mettre à jour']);
+        return;
+    }
+    $values[] = $id;
+
+    $stmt = $pdo->prepare("UPDATE local_schedules SET " . implode(', ', $fields) . " WHERE id = ?");
+    $stmt->execute($values);
+
+    echo json_encode(['success' => true, 'affected' => $stmt->rowCount()]);
+}
+
+function admin_delete_schedule(PDO $pdo, int $cityId, int $id): void
+{
+    $check = $pdo->prepare("SELECT s.id FROM local_schedules s JOIN local_pois p ON s.poi_id = p.id WHERE s.id = ? AND p.city_id = ? LIMIT 1");
+    $check->execute([$id, $cityId]);
+    if (!$check->fetch()) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Horaire non trouvé']);
+        return;
+    }
+
+    $stmt = $pdo->prepare("DELETE FROM local_schedules WHERE id = ?");
+    $stmt->execute([$id]);
+
+    echo json_encode(['success' => true, 'affected' => $stmt->rowCount()]);
 }
