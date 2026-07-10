@@ -12,4 +12,4 @@ RewriteRule ^gestion$ / [R=301,L]
 # Fallback vers la page de sélection de ville
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^ index.html [L]
+RewriteRule ^ index.php [L]
