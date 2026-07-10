@@ -1,4 +1,4 @@
-.PHONY: help up down migrate seed build dev test-api push-api push-livry build-combs push-combs build-vsd push-vsd deploy-all
+.PHONY: help up down migrate seed build dev test-api push-api push-app push-livry build-combs push-combs build-vsd push-vsd deploy-all
 
 APP_VERSION := $(shell node -p "require('./package.json').version" 2>/dev/null || echo 1.1.0)
 
@@ -12,6 +12,7 @@ help:
 	@echo "  make build           Build frontend for Livry"
 	@echo "  make test-api        Run API smoke tests"
 	@echo "  make push-api        Push API PHP to Gandi"
+	@echo "  make push-app        Deploy app.prigent.tech landing page"
 	@echo "  make push-livry      Deploy Livry to Gandi"
 	@echo "  make build-combs     Build Combs-la-Ville frontend"
 	@echo "  make push-combs      Deploy Combs-la-Ville to Gandi"
@@ -53,6 +54,9 @@ test-api:
 
 push-api:
 	@$(MAKE) -C sites/api push
+
+push-app:
+	@$(MAKE) -C sites/app-landing push
 
 push-livry:
 	@VITE_APP_VERSION=$(APP_VERSION) $(MAKE) -C sites/webiartisan-livry push
