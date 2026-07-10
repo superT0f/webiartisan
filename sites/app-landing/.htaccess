@@ -1,0 +1,15 @@
+RewriteEngine On
+
+# Anciennes routes de la PWA Mediavault redirigées vers la landing page
+RewriteRule ^login$ / [R=301,L]
+RewriteRule ^register$ / [R=301,L]
+RewriteRule ^dashboard$ / [R=301,L]
+RewriteRule ^brand$ / [R=301,L]
+RewriteRule ^website$ / [R=301,L]
+RewriteRule ^mobile$ / [R=301,L]
+RewriteRule ^gestion$ / [R=301,L]
+
+# Fallback vers la page de sélection de ville
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [L]
