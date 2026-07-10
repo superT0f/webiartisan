@@ -122,7 +122,7 @@ Contrat de message JS (cf. section suivante).
 
 ```js
 FlutterBridge.postMessage(JSON.stringify({
-  type: 'getPosition',
+  action: 'getPosition',
   callbackId: 'uuid-123',
   payload: {
     accuracy: 'best',        // best | medium | low
@@ -134,7 +134,7 @@ FlutterBridge.postMessage(JSON.stringify({
 
 ```js
 FlutterBridge.postMessage(JSON.stringify({
-  type: 'watchPosition',
+  action: 'watchPosition',
   callbackId: 'uuid-456',
   payload: {
     accuracy: 'best',
@@ -145,16 +145,17 @@ FlutterBridge.postMessage(JSON.stringify({
 
 ```js
 FlutterBridge.postMessage(JSON.stringify({
-  type: 'cancelWatchPosition',
+  action: 'cancelWatchPosition',
   callbackId: 'uuid-456',
 }));
 ```
 
 ### Réponse Flutter → JS
 
+Le WebView existant appelle `window.onBiometricResponse(callbackId, data)`. On conserve ce mécanisme partagé.
+
 ```js
-window.flutterReceiveMessage(JSON.stringify({
-  callbackId: 'uuid-123',
+window.onBiometricResponse('uuid-123', {
   success: true,
   data: {
     latitude: 48.664,
@@ -165,18 +166,17 @@ window.flutterReceiveMessage(JSON.stringify({
     speed: 0.0,
     timestamp: '2026-07-10T16:00:00Z',
   }
-}));
+});
 ```
 
 En cas d'erreur :
 
 ```js
-window.flutterReceiveMessage(JSON.stringify({
-  callbackId: 'uuid-123',
+window.onBiometricResponse('uuid-123', {
   success: false,
   error: 'permission_denied', // service_disabled | timeout | permission_denied | unknown
   message: '...',
-}));
+});
 ```
 
 ## Permissions Android
@@ -199,20 +199,20 @@ export function getPosition(options = {}) {
   return new Promise((resolve, reject) => {
     const callbackId = generateId();
     pending[callbackId] = { resolve, reject };
-    FlutterBridge.postMessage(JSON.stringify({ type: 'getPosition', callbackId, payload: options }));
+    FlutterBridge.postMessage(JSON.stringify({ action: 'getPosition', callbackId, payload: options }));
   });
 }
 
 export function watchPosition(callback, options = {}) {
   const callbackId = generateId();
   watchers[callbackId] = callback;
-  FlutterBridge.postMessage(JSON.stringify({ type: 'watchPosition', callbackId, payload: options }));
+  FlutterBridge.postMessage(JSON.stringify({ action: 'watchPosition', callbackId, payload: options }));
   return callbackId;
 }
 
 export function clearWatch(callbackId) {
   delete watchers[callbackId];
-  FlutterBridge.postMessage(JSON.stringify({ type: 'cancelWatchPosition', callbackId }));
+  FlutterBridge.postMessage(JSON.stringify({ action: 'cancelWatchPosition', callbackId }));
 }
 ```
 

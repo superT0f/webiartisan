@@ -4,7 +4,7 @@
 
 **Goal:** Remplacer le bridge GPS natif custom de l'app Flutter par un service robuste basé sur `geolocator` + `permission_handler`, exposant au WebView un contrat JS pour `getPosition`, `watchPosition` et `cancelWatchPosition`, avec filtrage de précision, timeout et fallback réseau.
 
-**Architecture:** Un `LocationService` Dart singleton encapsule `geolocator` et `permission_handler`. Le `WebViewScreen` route les messages du `JavaScriptChannel` `FlutterBridge` vers ce service. Les positions sont renvoyées au web via `evaluateJavascript` en appelant `window.flutterReceiveMessage`. Le côté web reçoit un helper JS qui expose `getPosition()` (Promise) et `watchPosition()`.
+**Architecture:** Un `LocationService` Dart singleton encapsule `geolocator` et `permission_handler`. Le `WebViewScreen` route les messages du `JavaScriptChannel` `FlutterBridge` vers ce service. Les positions sont renvoyées au web via `runJavaScript` en appelant `window.onBiometricResponse(callbackId, data)` (fonction de réponse bridge existante, partagée avec la biométrie). Le côté web reçoit un helper JS qui expose `getPosition()` (Promise) et `watchPosition()`.
 
 **Tech Stack:** Flutter, geolocator ^13.0.0, permission_handler ^11.0.0, Kotlin (cleanup), JavaScript bridge.
 
@@ -536,18 +536,20 @@ LocationAccuracy _parseLocationAccuracy(String value) {
 }
 ```
 
-- [ ] **Step 5: Vérifier que `_sendResponse` appelle `evaluateJavascript` avec `window.flutterReceiveMessage(...)`**
+- [ ] **Step 5: Vérifier que `_sendResponse` appelle `runJavaScript` avec `window.onBiometricResponse(...)`**
 
-Le code existant doit ressembler à :
+Le code existant ressemble à :
 
 ```dart
-void _sendResponse(String callbackId, Map<String, dynamic> data) {
-  final json = jsonEncode({'callbackId': callbackId, ...data});
-  _controller?.evaluateJavascript("window.flutterReceiveMessage($json)");
+void _sendResponse(String? callbackId, Map<String, dynamic> data) {
+  if (callbackId == null) return;
+  final jsonResponse = json.encode(data);
+  _controller.runJavaScript(
+      'window.onBiometricResponse("$callbackId", $jsonResponse)');
 }
 ```
 
-S'il n'existe pas, l'ajouter.
+Conserver ce mécanisme existant.
 
 - [ ] **Step 6: Commit**
 
@@ -612,7 +614,7 @@ git commit -m "refactor(android): remove custom native location bridge"
 - Create: `/mnt/c/Users/user/code/webiartisan.new/sites/artisans-shared/src/utils/flutterBridge.js`
 
 **Interfaces:**
-- Consumes: `FlutterBridge.postMessage` (natif) et `window.flutterReceiveMessage` (natif)
+- Consumes: `FlutterBridge.postMessage` (natif) et `window.onBiometricResponse` (natif)
 - Produces: `getPosition()`, `watchPosition()`, `clearWatch()`
 
 - [ ] **Step 1: Écrire le helper**
@@ -637,7 +639,7 @@ function sendMessage(type, payload) {
       return;
     }
 
-    FlutterBridge.postMessage(JSON.stringify({ type, callbackId, payload }));
+    FlutterBridge.postMessage(JSON.stringify({ action: type, callbackId, payload }));
   });
 }
 
@@ -659,7 +661,7 @@ export function watchPosition(callback, options = {}) {
   }
 
   FlutterBridge.postMessage(JSON.stringify({
-    type: 'watchPosition',
+    action: 'watchPosition',
     callbackId,
     payload: {
       accuracy: options.accuracy || 'best',
@@ -675,22 +677,19 @@ export function clearWatch(callbackId) {
 
   if (typeof FlutterBridge !== 'undefined' && FlutterBridge.postMessage) {
     FlutterBridge.postMessage(JSON.stringify({
-      type: 'cancelWatchPosition',
+      action: 'cancelWatchPosition',
       callbackId,
     }));
   }
 }
 
-window.flutterReceiveMessage = function (rawMessage) {
-  let message;
-  try {
-    message = typeof rawMessage === 'string' ? JSON.parse(rawMessage) : rawMessage;
-  } catch (e) {
-    console.error('[flutterBridge] message invalide', rawMessage);
+window.onBiometricResponse = function (callbackId, response) {
+  if (!response || typeof response !== 'object') {
+    console.error('[flutterBridge] réponse invalide', response);
     return;
   }
 
-  const { callbackId, success, data, error, message: errorMessage } = message;
+  const { success, data, error, message: errorMessage } = response;
 
   // Watchers
   if (watchers.has(callbackId)) {
