@@ -8,8 +8,8 @@
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
--- Date du backup
-SET @backup_suffix = DATE_FORMAT(NOW(), '_backup_%Y%m%d');
+-- Date du backup (inclut l'heure pour éviter les collisions si relancé le même jour)
+SET @backup_suffix = DATE_FORMAT(NOW(), '_backup_%Y%m%d_%H%i%s');
 
 -- Vérification : afficher le nombre de lignes concernées
 SELECT 'POI' AS table_name, COUNT(*) AS rows_to_delete FROM local_pois WHERE city_id = 1
@@ -75,9 +75,11 @@ WHERE r.city_id = 1;
 
 DELETE FROM local_recipes WHERE city_id = 1;
 
-DELETE sw FROM local_spin_wins sw
-JOIN local_spin_offers so ON sw.offer_id = so.id
-WHERE so.artisan_id IN (SELECT id FROM local_artisans WHERE city_id = 1);
+DELETE FROM local_spin_wins
+WHERE offer_id IN (
+    SELECT id FROM local_spin_offers
+    WHERE artisan_id IN (SELECT id FROM local_artisans WHERE city_id = 1)
+);
 
 DELETE FROM local_spin_offers WHERE artisan_id IN (
     SELECT id FROM local_artisans WHERE city_id = 1
