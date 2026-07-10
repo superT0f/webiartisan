@@ -37,6 +37,7 @@ migrate:
 	@docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan < sites/api/migrations/031_email_queue.sql
 	@docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan < sites/api/migrations/032_user_password_auth.sql
 	@docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan < sites/api/migrations/033_artisan_premium.sql
+	@docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan < sites/api/migrations/034_flutter_auth_codes.sql
 	@echo "✅ Migrations applied"
 
 seed:

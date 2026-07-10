@@ -298,6 +298,20 @@ export function notifyAuthChanged() {
   authEvents.dispatchEvent(new Event('change'))
 }
 
+/**
+ * Envoie un message au conteneur Flutter via le JavaScriptChannel FlutterBridge.
+ * Nécessite que l'application Flutter ait enregistré le channel `FlutterBridge`.
+ */
+export function postMessageToFlutter(action, payload = null) {
+  if (typeof window !== 'undefined' && window.FlutterBridge && typeof window.FlutterBridge.postMessage === 'function') {
+    try {
+      window.FlutterBridge.postMessage(JSON.stringify({ action, payload }))
+    } catch (e) {
+      // Ignorer silencieusement si le bridge n'est pas disponible (navigateur web classique)
+    }
+  }
+}
+
 export function getUserToken() {
   return localStorage.getItem(USER_TOKEN_KEY) || getCookie(USER_TOKEN_COOKIE) || ''
 }
@@ -372,6 +386,7 @@ export async function logoutUser(token) {
     headers: { Authorization: `Bearer ${token}` },
   })
   removeUserToken()
+  postMessageToFlutter('logout')
   return res.json()
 }
 

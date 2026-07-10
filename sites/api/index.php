@@ -125,6 +125,13 @@ $method = $_SERVER['REQUEST_METHOD'];
 // Route map
 
 if ($module === 'auth') {
+    $flutterActions = ['login', 'send-code', 'verify-code', 'villes'];
+    if (in_array($action, $flutterActions, true)) {
+        applyRateLimit($pdo, 'login');
+        require_once __DIR__ . '/routes/flutter-auth.php';
+        exit;
+    }
+
     $sensitiveActions = ['lookup', 'request-code', 'verify-code', 'register', 'biometric-login', 'sso-verify'];
     applyRateLimit($pdo, in_array($action, $sensitiveActions, true) ? 'login' : 'public');
     $auth = new Auth();
