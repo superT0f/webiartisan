@@ -5,6 +5,7 @@ import './style.css'
 
 const routes = [
   { path: '/', component: () => import('./views/Home.vue'), meta: { title: 'Artisans de ' + import.meta.env.VITE_CITY_NAME } },
+  { path: '/carte', name: 'Map', component: () => import('./views/MapView.vue'), meta: { title: 'Carte des artisans' } },
   { path: '/artisan/:id', component: () => import('./views/Artisan.vue'), meta: { title: 'Fiche artisan' } },
   { path: '/temoignages', name: 'Testimonials', component: () => import('./views/Testimonials.vue'), meta: { title: 'Avis et recommandations locales' } },
   { path: '/inscrire', component: () => import('./views/Register.vue'), meta: { title: 'Inscrire mon entreprise' } },
