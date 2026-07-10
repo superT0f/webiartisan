@@ -1,6 +1,7 @@
 .PHONY: dev build push clean install
 
-VITE_APP_VERSION ?= 1.1.0
+APP_VERSION := $(shell cat ../../.version 2>/dev/null || echo 2.0.1)
+export VITE_APP_VERSION := $(APP_VERSION)
 
 dev:
 	npm run dev
