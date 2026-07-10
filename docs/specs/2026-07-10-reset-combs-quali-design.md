@@ -112,13 +112,36 @@ Ajoutés dans `sites/api/routes/admin.php`, protégés par `artisan_require_admi
 - Cible : `_blank`
 - Déploiement sur les 3 sites ville après rebuild.
 
+## Version dans le footer
+
+**Principe** : une seule source de vérité pour la version web, alignée sur l'app Android Flutter (`pubspec.yaml` : `version: 2.0.1+55`).
+
+**Source de vérité** : fichier `.version` à la racine du projet contenant `2.0.1`.
+
+**Build** :
+- Les Makefiles des sites ville (`sites/webiartisan-*/Makefile`) lisent `.version` :
+  ```makefile
+  APP_VERSION := $(shell cat ../../.version 2>/dev/null || echo 2.0.1)
+  VITE_APP_VERSION := $(APP_VERSION)
+  ```
+- Cette variable est injectée dans le build Vite (`VITE_APP_VERSION=$(VITE_APP_VERSION)`).
+
+**Affichage** :
+- Le footer de `sites/artisans-shared` affiche `"v{import.meta.env.VITE_APP_VERSION}"` à côté du lien Android.
+- Exemple : `v2.0.1 — Installer l'app Android`.
+
+**Gestion des versions** :
+- `make bump-patch`, `make bump-minor`, `make bump-major` à la racine (inspirés de `/home/tof/code/mediavault/Makefile`) mettent à jour `.version` et `pubspec.yaml` de l'app Flutter.
+- Le build number Flutter (`+55`) est incrémenté indépendamment lors des releases Android.
+
 ## Livrables
 
 1. `scripts/reset-combs-quali.sql`
 2. `scripts/seed-combs-quali.sql`
 3. Modifications dans `sites/api/routes/admin.php`
 4. Modifications dans le footer de `sites/artisans-shared`
-5. Rebuild et déploiement des 3 villes
+5. Fichier `.version` à la racine et mise à jour des Makefiles des villes
+6. Rebuild et déploiement des 3 villes
 
 ## Sécurité
 
