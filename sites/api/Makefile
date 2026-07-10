@@ -41,7 +41,6 @@ push:
 		--exclude='php_errors.log' \
 		--exclude='uploads/' \
 		--exclude='public/' \
-		--exclude='vendor/' \
 		--exclude='webiartisan-api.conf' \
 		--exclude='Makefile' \
 		--exclude='production' \
@@ -66,7 +65,6 @@ status:
 		--exclude='.gitignore' \
 		--exclude='php_errors.log' \
 		--exclude='uploads/' \
-		--exclude='vendor/' \
 		--exclude='webiartisan-api.conf' \
 		--exclude='Makefile' \
 		--exclude='production' \

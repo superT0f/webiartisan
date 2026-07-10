@@ -14,6 +14,7 @@
 
 require_once __DIR__ . '/../lib/Mailer.php';
 require_once __DIR__ . '/../lib/UserAuth.php';
+require_once __DIR__ . '/../lib/AppLogger.php';
 
 const USER_AUTH_TIMING_TARGET_MS = 400;
 
@@ -83,7 +84,10 @@ switch ($method) {
 function user_magic_link(PDO $pdo, array $body): void
 {
     $email = strtolower(trim($body['email'] ?? ''));
+    app_log('info', '[USER-MAGIC-LINK] start', ['email' => $email, 'rememberMe' => !empty($body['rememberMe'])]);
+
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        app_log('warning', '[USER-MAGIC-LINK] invalid email', ['email' => $email]);
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Email invalide']);
         return;
@@ -133,6 +137,7 @@ function user_magic_link(PDO $pdo, array $body): void
         $pdo->commit();
     } catch (Throwable $e) {
         $pdo->rollBack();
+        app_log('error', '[USER-MAGIC-LINK] database error', ['email' => $email, 'error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
         http_response_code(500);
         echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
         return;
@@ -205,6 +210,7 @@ HTML;
     // Pad response time to prevent email enumeration via timing.
     pad_user_auth_response($startTime);
 
+    app_log('info', '[USER-MAGIC-LINK] success', ['email' => $email, 'user_id' => $userId, 'queued' => $queued ? '1' : '0']);
     echo json_encode([
         'success' => true,
         'message' => 'Si votre email est valide, vous recevrez un lien de connexion.',
@@ -214,7 +220,9 @@ HTML;
 function user_auth(PDO $pdo): void
 {
     $rawToken = $_GET['token'] ?? '';
+    app_log('info', '[USER-AUTH] start', ['has_token' => !empty($rawToken)]);
     if (!$rawToken) {
+        app_log('warning', '[USER-AUTH] missing token');
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Token manquant']);
         return;
@@ -235,6 +243,7 @@ function user_auth(PDO $pdo): void
 
         if (!$user) {
             $pdo->rollBack();
+            app_log('warning', '[USER-AUTH] invalid or expired token');
             http_response_code(401);
             echo json_encode(['success' => false, 'error' => 'Lien invalide ou expiré']);
             return;
@@ -252,6 +261,7 @@ function user_auth(PDO $pdo): void
         $pdo->commit();
     } catch (Throwable $e) {
         $pdo->rollBack();
+        app_log('error', '[USER-AUTH] database error', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
         http_response_code(500);
         echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
         return;
@@ -261,9 +271,10 @@ function user_auth(PDO $pdo): void
         require_once __DIR__ . '/../lib/Gamification.php';
         gamificationUpdateStreak($pdo, (int)$user['id']);
     } catch (Throwable $e) {
-        error_log('[AUTH-STREAK] ' . $e->getMessage());
+        app_log('warning', '[USER-AUTH] streak update failed', ['user_id' => (int)$user['id'], 'error' => $e->getMessage()]);
     }
 
+    app_log('info', '[USER-AUTH] success', ['user_id' => (int)$user['id'], 'email' => $user['email']]);
     echo json_encode([
         'success' => true,
         'token'   => $sessionToken,
@@ -560,12 +571,16 @@ function user_register(PDO $pdo, array $body): void
     $password    = $body['password'] ?? '';
     $displayName = isset($body['display_name']) ? trim($body['display_name']) : null;
 
+    app_log('info', '[USER-REGISTER] start', ['email' => $email, 'has_password' => !empty($password), 'has_display_name' => !empty($displayName)]);
+
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        app_log('warning', '[USER-REGISTER] validation failed: invalid email', ['email' => $email]);
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Email invalide']);
         return;
     }
     if (strlen($password) < 8) {
+        app_log('warning', '[USER-REGISTER] validation failed: password too short', ['email' => $email]);
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Mot de passe trop court (min 8 caractères)']);
         return;
@@ -584,6 +599,7 @@ function user_register(PDO $pdo, array $body): void
         $existing = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$existing) {
+            app_log('info', '[USER-REGISTER] creating new user', ['email' => $email]);
             $pdo->prepare("
                 INSERT INTO local_users (email, password_hash, display_name, email_verified)
                 VALUES (?, ?, ?, FALSE)
@@ -593,6 +609,7 @@ function user_register(PDO $pdo, array $body): void
                 $displayNameToStore,
             ]);
         } elseif (empty($existing['password_hash'])) {
+            app_log('info', '[USER-REGISTER] completing magic-link account', ['email' => $email, 'user_id' => (int)$existing['id']]);
             // Complete a magic-link-only account and invalidate any active magic link.
             $pdo->prepare("
                 UPDATE local_users
@@ -602,12 +619,15 @@ function user_register(PDO $pdo, array $body): void
                     magic_token_exp = NULL
                 WHERE email = ? AND password_hash IS NULL
             ")->execute([$passwordHash, $displayNameToStore, $email]);
+        } else {
+            app_log('info', '[USER-REGISTER] account already has password, silent success', ['email' => $email, 'user_id' => (int)$existing['id']]);
         }
         // If the account already has a password, do nothing (do not reveal existence).
 
         $pdo->commit();
     } catch (Throwable $e) {
         $pdo->rollBack();
+        app_log('error', '[USER-REGISTER] database error', ['email' => $email, 'error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
         http_response_code(500);
         echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
         return;
@@ -618,6 +638,7 @@ function user_register(PDO $pdo, array $body): void
     // Pad response time to prevent email enumeration via timing.
     pad_user_auth_response($startTime);
 
+    app_log('info', '[USER-REGISTER] success', ['email' => $email]);
     echo json_encode($response);
 }
 
@@ -626,20 +647,36 @@ function user_login(PDO $pdo, array $body): void
     $email    = strtolower(trim($body['email'] ?? ''));
     $password = $body['password'] ?? '';
 
+    app_log('info', '[USER-LOGIN] start', ['email' => $email, 'has_password' => !empty($password), 'rememberMe' => !empty($body['rememberMe'])]);
+
     $startTime = microtime(true);
     $error = null;
     $response = null;
 
     if (!$email || !$password) {
+        app_log('warning', '[USER-LOGIN] validation failed: missing fields', ['email' => $email]);
         $error = ['code' => 400, 'body' => ['success' => false, 'error' => 'Email et mot de passe requis']];
     } else {
         $dummyHash = '$2y$10$nJE.S3ari5fK7bx/5wTzLuAqtQF2nVkanks.m5AdkvLK3s9ity/i6';
 
-        $stmt = $pdo->prepare("SELECT id, email, password_hash FROM local_users WHERE email = ?");
-        $stmt->execute([$email]);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        try {
+            $stmt = $pdo->prepare("SELECT id, email, password_hash FROM local_users WHERE email = ?");
+            $stmt->execute([$email]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) {
+            app_log('error', '[USER-LOGIN] database query failed', ['email' => $email, 'error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            $error = ['code' => 500, 'body' => ['success' => false, 'error' => 'Erreur serveur']];
+            pad_user_auth_response($startTime);
+            http_response_code($error['code']);
+            echo json_encode($error['body']);
+            return;
+        }
 
-        if (!$user || !password_verify($password, $user['password_hash'] ?? $dummyHash)) {
+        if (!$user) {
+            app_log('info', '[USER-LOGIN] user not found', ['email' => $email]);
+            $error = ['code' => 401, 'body' => ['success' => false, 'error' => 'Email ou mot de passe incorrect']];
+        } elseif (!password_verify($password, $user['password_hash'] ?? $dummyHash)) {
+            app_log('info', '[USER-LOGIN] password mismatch', ['email' => $email, 'user_id' => (int)$user['id'], 'has_password_hash' => !empty($user['password_hash'])]);
             $error = ['code' => 401, 'body' => ['success' => false, 'error' => 'Email ou mot de passe incorrect']];
         } else {
             try {
@@ -650,8 +687,9 @@ function user_login(PDO $pdo, array $body): void
                     'token'   => $sessionToken,
                     'data'    => ['id' => (int)$user['id'], 'email' => $user['email']],
                 ];
+                app_log('info', '[USER-LOGIN] success', ['email' => $email, 'user_id' => (int)$user['id']]);
             } catch (Throwable $e) {
-                error_log('[LOGIN-SESSION] ' . $e->getMessage());
+                app_log('error', '[USER-LOGIN] session creation failed', ['email' => $email, 'user_id' => (int)$user['id'], 'error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
                 $error = ['code' => 500, 'body' => ['success' => false, 'error' => 'Erreur serveur']];
             }
         }

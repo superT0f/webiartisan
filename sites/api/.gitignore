@@ -2,5 +2,9 @@
 uploads/avatars/*
 !uploads/avatars/.gitkeep
 
+# Logs applicatifs
+storage/logs/*
+!storage/logs/.gitkeep
+
 # Lien/local de déploiement Gandi
 production
