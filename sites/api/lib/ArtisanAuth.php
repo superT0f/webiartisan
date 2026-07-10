@@ -20,7 +20,7 @@ function artisan_require_auth(PDO $pdo): array
     }
 
     $stmt = $pdo->prepare("
-        SELECT id, company_name, email, is_admin, plan, subscription_status, subscription_period_end, stripe_customer_id
+        SELECT id, city_id, company_name, email, is_admin, plan, subscription_status, subscription_period_end, stripe_customer_id
         FROM local_artisans
         WHERE auth_token = ? AND auth_token_exp > NOW()
         LIMIT 1
