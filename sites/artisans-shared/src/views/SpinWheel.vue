@@ -608,27 +608,38 @@ onBeforeUnmount(() => {
 <style scoped>
 .spin-view { min-height: 60vh; }
 .narrow { max-width: 720px; }
-.auth-card, .result-card, .wins-card { padding: 28px; margin-top: 24px; }
-.auth-form { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
-.form-label { font-weight: 500; margin-bottom: 4px; display: block; }
+.auth-card, .result-card, .wins-card { padding: 32px; margin-top: 24px; }
+.auth-card h2 { font-size: 1.6rem; margin-bottom: 8px; }
+.auth-form { display: flex; flex-direction: column; gap: 18px; margin-top: 20px; }
+.auth-form .form-label { font-weight: 600; margin-bottom: 6px; display: block; font-size: 1.05rem; }
+.auth-form .form-input {
+  font-size: 1.05rem;
+  padding: 14px 16px;
+  min-height: 48px;
+}
+.auth-form .btn {
+  font-size: 1.05rem;
+  padding: 14px 20px;
+  min-height: 50px;
+}
 .auth-tabs {
   display: flex;
-  gap: 4px;
-  margin: 16px 0;
+  gap: 8px;
+  margin: 20px 0 24px;
   border-bottom: 1px solid var(--c-border);
-  padding-bottom: 8px;
+  padding-bottom: 10px;
   overflow-x: auto;
 }
 .auth-tabs button {
   flex: 1 0 auto;
-  min-width: 80px;
-  padding: 10px 8px;
+  min-width: 90px;
+  padding: 14px 12px;
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
   cursor: pointer;
-  font-weight: 500;
-  font-size: 0.9rem;
+  font-weight: 600;
+  font-size: 1rem;
   color: var(--c-text-muted);
   white-space: nowrap;
 }
@@ -648,14 +659,25 @@ onBeforeUnmount(() => {
 .form-checkbox {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.9rem;
+  gap: 10px;
+  font-size: 1rem;
   cursor: pointer;
+  padding: 4px 0;
 }
 .form-checkbox input {
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
   cursor: pointer;
+}
+.btn-link {
+  background: transparent;
+  border: none;
+  color: var(--c-primary);
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 8px 0;
+  margin-top: 4px;
+  font-size: 0.95rem;
 }
 .auth-actions { text-align: right; margin-bottom: 12px; }
 .skeleton-wheel { height: 360px; border-radius: 12px; }
