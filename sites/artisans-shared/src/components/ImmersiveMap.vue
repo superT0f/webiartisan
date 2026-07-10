@@ -1,13 +1,14 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue'
-import { Map, NavigationControl, GeolocateControl, Marker } from 'maplibre-gl'
+import { Map, NavigationControl, GeolocateControl, Marker, Popup } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useMapStyle } from '../composables/useMapStyle.js'
 
 const props = defineProps({
   center: { type: Array, default: () => [49.1081, -0.7658] },
   zoom: { type: Number, default: 14 },
-  artisans: { type: Array, default: () => [] }
+  artisans: { type: Array, default: () => [] },
+  pois: { type: Array, default: () => [] }
 })
 
 const emit = defineEmits(['select'])
@@ -31,7 +32,7 @@ onMounted(async () => {
     'bottom-right'
   )
 
-  map.value.on('load', renderArtisans)
+  map.value.on('load', renderMarkers)
 })
 
 onUnmounted(() => {
@@ -39,9 +40,10 @@ onUnmounted(() => {
   map.value?.remove()
 })
 
-watch(() => props.artisans, renderArtisans, { deep: true })
+watch(() => props.artisans, renderMarkers, { deep: true })
+watch(() => props.pois, renderMarkers, { deep: true })
 
-function renderArtisans() {
+function renderMarkers() {
   if (!map.value) return
   markers.forEach(m => m.remove())
   markers.length = 0
@@ -58,6 +60,23 @@ function renderArtisans() {
       .addTo(map.value)
     markers.push(marker)
   })
+
+  props.pois.forEach(p => {
+    if (!p.latitude || !p.longitude) return
+    const el = document.createElement('div')
+    el.className = 'poi-marker'
+    el.innerHTML = `<span>${poiIcon(p.type)}</span>`
+
+    const popup = new Popup({ offset: 16 }).setHTML(
+      `<strong>${p.name}</strong><br><span style="color:#666">${p.address || ''}</span>`
+    )
+
+    const marker = new Marker({ element: el, anchor: 'bottom' })
+      .setLngLat([parseFloat(p.longitude), parseFloat(p.latitude)])
+      .setPopup(popup)
+      .addTo(map.value)
+    markers.push(marker)
+  })
 }
 
 function categoryIcon(slug) {
@@ -70,6 +89,16 @@ function categoryIcon(slug) {
     default: '🏪'
   }
   return map[slug] || map.default
+}
+
+function poiIcon(type) {
+  const icons = {
+    mairie: '🏛️', piscine: '🏊', bibliotheque: '📚', mediatheque: '📚',
+    cinema: '🎬', dechetterie: '♻️', poste: '📬', supermarche: '🛒',
+    transport: '🚌', ecole: '🏫', hopital: '🏥', pharmacie: '💊',
+    parc: '🌳', eglise: '⛪', autre: '📍'
+  }
+  return icons[type] || '📍'
 }
 </script>
 
@@ -99,5 +128,20 @@ function categoryIcon(slug) {
 :deep(.artisan-marker span) {
   transform: rotate(45deg);
   font-size: 1.2rem;
+}
+:deep(.poi-marker) {
+  width: 34px;
+  height: 34px;
+  background: #1a73e8;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  cursor: pointer;
+}
+:deep(.poi-marker span) {
+  font-size: 1rem;
 }
 </style>

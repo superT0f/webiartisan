@@ -1,30 +1,82 @@
 <template>
   <div class="container section dashboard">
-    <!-- État non connecté : formulaire de lien magique -->
+    <!-- État non connecté : formulaire de lien magique ou mot de passe -->
     <template v-if="!token">
       <div class="auth-card">
         <h1>Espace artisan</h1>
-        <p class="text-muted">Recevez un lien de connexion sécurisé par email.</p>
 
-        <form @submit.prevent="sendMagicLink" class="auth-form">
-          <label for="email">Adresse email</label>
-          <input
-            id="email"
-            v-model="email"
-            type="email"
-            class="form-input"
-            placeholder="votre@email.fr"
-            required
-            :disabled="sending"
-          />
-          <label class="form-checkbox">
-            <input v-model="rememberMe" type="checkbox" :disabled="sending" />
-            Rester connecté sur cet appareil
-          </label>
-          <button type="submit" class="btn btn-primary" :disabled="sending || !email">
-            {{ sending ? 'Envoi…' : 'Recevoir mon lien' }}
-          </button>
-        </form>
+        <div class="auth-tabs" role="tablist" aria-label="Méthode de connexion">
+          <button
+            type="button"
+            role="tab"
+            :class="{ active: authTab === 'magic' }"
+            @click="authTab = 'magic'"
+          >Lien magique</button>
+          <button
+            type="button"
+            role="tab"
+            :class="{ active: authTab === 'password' }"
+            @click="authTab = 'password'"
+          >Mot de passe</button>
+        </div>
+
+        <div v-show="authTab === 'magic'" class="auth-form">
+          <p class="text-muted">Recevez un lien de connexion sécurisé par email.</p>
+          <form @submit.prevent="sendMagicLink">
+            <label for="email">Adresse email</label>
+            <input
+              id="email"
+              v-model="email"
+              type="email"
+              class="form-input"
+              placeholder="votre@email.fr"
+              required
+              :disabled="sending"
+            />
+            <label class="form-checkbox">
+              <input v-model="rememberMe" type="checkbox" :disabled="sending" />
+              Rester connecté sur cet appareil
+            </label>
+            <button type="submit" class="btn btn-primary" :disabled="sending || !email">
+              {{ sending ? 'Envoi…' : 'Recevoir mon lien' }}
+            </button>
+          </form>
+        </div>
+
+        <div v-show="authTab === 'password'" class="auth-form">
+          <p class="text-muted">Connectez-vous avec votre email et mot de passe.</p>
+          <form @submit.prevent="submitPasswordLogin">
+            <label for="login-email">Adresse email</label>
+            <input
+              id="login-email"
+              v-model="email"
+              type="email"
+              class="form-input"
+              placeholder="votre@email.fr"
+              autocomplete="email"
+              required
+              :disabled="sending"
+            />
+            <label for="login-password">Mot de passe</label>
+            <input
+              id="login-password"
+              v-model="password"
+              type="password"
+              class="form-input"
+              placeholder="Mot de passe"
+              autocomplete="current-password"
+              required
+              :disabled="sending"
+            />
+            <label class="form-checkbox">
+              <input v-model="rememberMe" type="checkbox" :disabled="sending" />
+              Rester connecté sur cet appareil
+            </label>
+            <button type="submit" class="btn btn-primary" :disabled="sending || !email || !password">
+              {{ sending ? 'Connexion…' : 'Se connecter' }}
+            </button>
+          </form>
+        </div>
 
         <div v-if="message" class="auth-message" :class="messageType">
           {{ message }}
@@ -217,14 +269,16 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { requestMagicLink, fetchMe, updateMe, getMyProspects, getArtisanToken, setArtisanToken, removeArtisanToken, fetchArtisanConsumerToken, setUserToken, logoutArtisan, getSubscriptionStatus, createSubscriptionCheckout, createSubscriptionPortal } from '../api.js'
+import { requestMagicLink, loginArtisan, fetchMe, updateMe, getMyProspects, getArtisanToken, setArtisanToken, removeArtisanToken, fetchArtisanConsumerToken, setUserToken, logoutArtisan, getSubscriptionStatus, createSubscriptionCheckout, createSubscriptionPortal } from '../api.js'
 
 const route = useRoute()
 const router = useRouter()
 
 const token = ref(getArtisanToken())
 const email = ref('')
+const password = ref('')
 const rememberMe = ref(true)
+const authTab = ref('magic')
 const artisan = ref(null)
 const form = reactive({
   company_name: '',
@@ -311,6 +365,29 @@ async function sendMagicLink() {
     setMessage(e.message || 'Erreur lors de l\'envoi. Veuillez réessayer.', 'error')
   } finally {
     cleanupSignal(signal)
+    if (isMounted) sending.value = false
+  }
+}
+
+async function submitPasswordLogin() {
+  sending.value = true
+  message.value = ''
+  try {
+    const res = await loginArtisan({ email: email.value, password: password.value, rememberMe: rememberMe.value })
+    if (!isMounted) return
+    if (res.success && res.token) {
+      setArtisanToken(res.token, rememberMe.value)
+      token.value = res.token
+      await router.replace('/espace')
+      loadProfile()
+      loadMyProspects()
+    } else {
+      setMessage(res.error || 'Email ou mot de passe incorrect.', 'error')
+    }
+  } catch (e) {
+    if (!isMounted) return
+    setMessage(e.message || 'Erreur lors de la connexion.', 'error')
+  } finally {
     if (isMounted) sending.value = false
   }
 }

@@ -534,6 +534,8 @@ function artisan_login(PDO $pdo, array $body): void
     $email    = strtolower(trim($body['email'] ?? ''));
     $password = $body['password'] ?? '';
 
+    error_log("[AUTH-LOGIN] email=$email provided=" . ($email && $password ? 'yes' : 'no'));
+
     if (!$email || !$password) {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Email et mot de passe requis']);
@@ -549,6 +551,11 @@ function artisan_login(PDO $pdo, array $body): void
     ");
     $stmt->execute([$email]);
     $artisan = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    $found = $artisan ? 'yes' : 'no';
+    $hashPresent = !empty($artisan['password_hash']) ? 'yes' : 'no';
+    $passwordOk = $artisan && !empty($artisan['password_hash']) && password_verify($password, $artisan['password_hash']);
+    error_log("[AUTH-LOGIN] email=$email found=$found hash_present=$hashPresent password_ok=" . ($passwordOk ? 'yes' : 'no') . " status=" . ($artisan['status'] ?? 'n/a'));
 
     if (!$artisan || !password_verify($password, $artisan['password_hash'] ?? '')) {
         http_response_code(401);

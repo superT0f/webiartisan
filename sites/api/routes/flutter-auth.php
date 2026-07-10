@@ -113,21 +113,97 @@ function flutter_login(PDO $pdo, array $body): void
     }
 
     $dummyHash = '$2y$10$nJE.S3ari5fK7bx/5wTzLuAqtQF2nVkanks.m5AdkvLK3s9ity/i6';
+    $authenticatedUser = null;
+    $authSource = null;
+    $artisanData = null;
 
+    // 1. Essayer un compte visiteur classique
     try {
         $stmt = $pdo->prepare("SELECT id, email, password_hash, display_name FROM local_users WHERE email = ?");
         $stmt->execute([$email]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($user && password_verify($password, $user['password_hash'] ?? $dummyHash)) {
+            $authenticatedUser = $user;
+            $authSource = 'user';
+        }
     } catch (Throwable $e) {
-        app_log('error', '[FLUTTER-AUTH] login db error', ['email' => $email, 'error' => $e->getMessage()]);
+        app_log('error', '[FLUTTER-AUTH] login user db error', ['email' => $email, 'error' => $e->getMessage()]);
         pad_flutter_auth_response($startTime);
         http_response_code(500);
         echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
         return;
     }
 
-    if (!$user || !password_verify($password, $user['password_hash'] ?? $dummyHash)) {
-        app_log('info', '[FLUTTER-AUTH] login invalid credentials', ['email' => $email, 'found' => $user ? 'yes' : 'no']);
+    // 2. Sinon, essayer un compte artisan actif et lier/recréer un compte visiteur
+    if (!$authenticatedUser) {
+        try {
+            $stmt = $pdo->prepare("
+                SELECT a.id, a.email, a.password_hash, a.company_name, a.status,
+                       a.email_verified, a.is_admin, c.slug AS city_slug
+                FROM local_artisans a
+                JOIN local_cities c ON c.id = a.city_id
+                WHERE a.email = ?
+            ");
+            $stmt->execute([$email]);
+            $artisan = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($artisan
+                && !empty($artisan['password_hash'])
+                && password_verify($password, $artisan['password_hash'])
+                && $artisan['status'] === 'active'
+            ) {
+                // Générer un token artisan longue durée pour le bridge vers l'espace web
+                $artisanToken = bin2hex(random_bytes(32));
+                $artisanTokenExp = date('Y-m-d H:i:s', $rememberMe ? strtotime('+365 days') : strtotime('+30 days'));
+                $pdo->prepare("UPDATE local_artisans SET auth_token = ?, auth_token_exp = ? WHERE id = ?")
+                    ->execute([$artisanToken, $artisanTokenExp, $artisan['id']]);
+
+                $userStmt = $pdo->prepare("SELECT id, email, display_name FROM local_users WHERE email = ?");
+                $userStmt->execute([$email]);
+                $existingUser = $userStmt->fetch(PDO::FETCH_ASSOC);
+
+                if ($existingUser) {
+                    if (empty($existingUser['display_name']) && !empty($artisan['company_name'])) {
+                        $pdo->prepare("UPDATE local_users SET display_name = ? WHERE id = ?")
+                            ->execute([$artisan['company_name'], $existingUser['id']]);
+                        $existingUser['display_name'] = $artisan['company_name'];
+                    }
+                    $authenticatedUser = $existingUser;
+                } else {
+                    $insert = $pdo->prepare("INSERT INTO local_users (email, display_name, email_verified) VALUES (?, ?, ?)");
+                    $insert->execute([
+                        $email,
+                        $artisan['company_name'],
+                        (int)(bool)$artisan['email_verified'],
+                    ]);
+                    $newUserId = (int)$pdo->lastInsertId();
+                    $authenticatedUser = [
+                        'id'           => $newUserId,
+                        'email'        => $email,
+                        'display_name' => $artisan['company_name'],
+                    ];
+                }
+                $authSource = 'artisan';
+                $artisanData = [
+                    'id'           => (int)$artisan['id'],
+                    'company_name' => $artisan['company_name'],
+                    'city_slug'    => $artisan['city_slug'],
+                    'is_admin'     => (bool)$artisan['is_admin'],
+                    'token'        => $artisanToken,
+                ];
+            }
+        } catch (Throwable $e) {
+            app_log('error', '[FLUTTER-AUTH] login artisan fallback db error', ['email' => $email, 'error' => $e->getMessage()]);
+            pad_flutter_auth_response($startTime);
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
+            return;
+        }
+    }
+
+    if (!$authenticatedUser) {
+        app_log('info', '[FLUTTER-AUTH] login invalid credentials', ['email' => $email]);
         pad_flutter_auth_response($startTime);
         http_response_code(401);
         echo json_encode(['success' => false, 'error' => 'Email ou mot de passe incorrect']);
@@ -135,7 +211,7 @@ function flutter_login(PDO $pdo, array $body): void
     }
 
     try {
-        $sessionToken = user_create_session($pdo, (int)$user['id'], $rememberMe);
+        $sessionToken = user_create_session($pdo, (int)$authenticatedUser['id'], $rememberMe);
     } catch (Throwable $e) {
         app_log('error', '[FLUTTER-AUTH] login session error', ['email' => $email, 'error' => $e->getMessage()]);
         pad_flutter_auth_response($startTime);
@@ -144,12 +220,18 @@ function flutter_login(PDO $pdo, array $body): void
         return;
     }
 
-    app_log('info', '[FLUTTER-AUTH] login success', ['email' => $email, 'user_id' => (int)$user['id']]);
+    app_log('info', '[FLUTTER-AUTH] login success', [
+        'email'     => $email,
+        'user_id'   => (int)$authenticatedUser['id'],
+        'source'    => $authSource,
+        'artisan_id'=> $artisanData['id'] ?? null,
+    ]);
     pad_flutter_auth_response($startTime);
     echo json_encode([
         'success' => true,
         'token'   => $sessionToken,
-        'data'    => format_flutter_user_response($user),
+        'data'    => format_flutter_user_response($authenticatedUser),
+        'artisan' => $artisanData,
     ]);
 }
 

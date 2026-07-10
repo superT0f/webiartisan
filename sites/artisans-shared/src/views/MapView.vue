@@ -3,18 +3,23 @@ import { ref, onMounted } from 'vue'
 import ImmersiveMap from '../components/ImmersiveMap.vue'
 import ArtisanSheet from '../components/ArtisanSheet.vue'
 import MapWeatherBadge from '../components/MapWeatherBadge.vue'
-import { fetchArtisans, CITY_LAT, CITY_LNG } from '../api.js'
+import { fetchArtisans, fetchCityPois, CITY_LAT, CITY_LNG } from '../api.js'
 import { useWeather } from '../composables/useWeather.js'
 
 const artisans = ref([])
+const pois = ref([])
 const selected = ref(null)
 const loading = ref(true)
 const { weather, load: loadWeather } = useWeather(CITY_LAT, CITY_LNG)
 
 onMounted(async () => {
   await loadWeather()
-  const res = await fetchArtisans({ limit: 200 })
-  artisans.value = res.data || []
+  const [artRes, poiRes] = await Promise.all([
+    fetchArtisans({ limit: 200 }),
+    fetchCityPois(),
+  ])
+  artisans.value = artRes.data || []
+  pois.value = poiRes.data || []
   loading.value = false
 })
 
@@ -29,7 +34,7 @@ function navigate(artisan) {
 
 <template>
   <div class="map-view">
-    <ImmersiveMap :artisans="artisans" @select="openSheet" />
+    <ImmersiveMap :artisans="artisans" :pois="pois" @select="openSheet" />
     <MapWeatherBadge :weather="weather" />
     <ArtisanSheet :artisan="selected" @close="closeSheet" @navigate="navigate" />
   </div>

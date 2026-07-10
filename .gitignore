@@ -30,3 +30,8 @@ archives/
 docs/superpowers/
 sites/api/.env.production
 .nodes.md
+
+# Database dumps (local debug exports)
+dump.sql
+data/webiartisan.sql/
+data/webiartisan.sql.zip

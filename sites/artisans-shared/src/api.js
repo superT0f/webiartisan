@@ -167,6 +167,15 @@ export async function requestMagicLink(email, rememberMe = true, options = {}) {
   }, 'Erreur lors de l\'envoi.')
 }
 
+export async function loginArtisan(data) {
+  const res = await fetch(`${API_BASE}/artisans/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  return res.json()
+}
+
 export async function fetchMe(token, options = {}) {
   return requestJson(`${API_BASE}/artisans/me`, {
     headers: { 'X-Artisan-Token': token },
