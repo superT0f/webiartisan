@@ -50,7 +50,10 @@
       </div>
 
       <div class="footer-bottom">
-        <span>© {{ year }} WebiArtisan · {{ CITY_NAME }} · {{ CITY_CP }} · v{{ APP_VERSION }}</span>
+        <span>
+          © {{ year }} WebiArtisan · {{ CITY_NAME }} · {{ CITY_CP }} · v{{ APP_VERSION }}
+          · <a class="app-link" href="https://appdistribution.firebase.dev/i/1297b31002780ac2" target="_blank" rel="noopener">📱 Installer l'app Android ↗</a>
+        </span>
         <span>Fait avec ❤️ en Seine-et-Marne</span>
       </div>
     </div>
@@ -117,6 +120,12 @@ const year = new Date().getFullYear()
   transition: color 0.2s;
 }
 .footer-col ul li a:hover { color: var(--c-gold); }
+.app-link {
+  color: var(--c-gold);
+  text-decoration: underline;
+  margin-left: 4px;
+}
+.app-link:hover { color: white; }
 .footer-bottom {
   display: flex;
   justify-content: space-between;
