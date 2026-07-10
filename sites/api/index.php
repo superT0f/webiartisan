@@ -124,6 +124,14 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 // Route map
 
+if ($module === 'auth') {
+    $sensitiveActions = ['lookup', 'request-code', 'verify-code', 'register', 'biometric-login', 'sso-verify'];
+    applyRateLimit($pdo, in_array($action, $sensitiveActions, true) ? 'login' : 'public');
+    $auth = new Auth();
+    require_once __DIR__ . '/routes/auth.php';
+    exit;
+}
+
 // Routes publiques artisans locaux (pas d'auth requise pour lecture)
 if ($module === 'cities') {
     applyRateLimit($pdo, 'public');
