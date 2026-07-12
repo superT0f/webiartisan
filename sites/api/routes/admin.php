@@ -42,6 +42,12 @@ if ($method === 'GET' && $action === 'artisans' && $param === null) {
     admin_suspend_artisan($pdo, (int)$param);
 } elseif ($method === 'POST' && $action === 'artisans' && is_numeric($param) && $subAction === 'set-plan') {
     admin_set_artisan_plan($pdo, (int)$param);
+} elseif ($method === 'POST' && $action === 'artisans' && is_numeric($param) && $subAction === 'reset-password') {
+    admin_reset_artisan_password($pdo, (int)$param);
+} elseif ($method === 'POST' && $action === 'artisans' && is_numeric($param) && $subAction === 'force-password') {
+    admin_force_artisan_password($pdo, (int)$param);
+} elseif ($method === 'POST' && $action === 'artisans' && is_numeric($param) && $subAction === 'set-subscription-status') {
+    admin_set_artisan_subscription_status($pdo, (int)$param);
 } elseif ($action === 'pois') {
     admin_pois_router($pdo, $method, $param);
 } elseif ($action === 'schedules') {
@@ -115,6 +121,126 @@ function admin_set_artisan_plan(PDO $pdo, int $id): void
     echo json_encode([
         'success' => true,
         'message' => "Plan mis à jour : $plan",
+        'affected' => $stmt->rowCount(),
+    ]);
+}
+
+/**
+ * POST /admin/artisans/{id}/reset-password — Envoie un lien de connexion magique
+ */
+function admin_reset_artisan_password(PDO $pdo, int $id): void
+{
+    $stmt = $pdo->prepare("SELECT id, company_name, email, status FROM local_artisans WHERE id = ?");
+    $stmt->execute([$id]);
+    $artisan = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$artisan) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Artisan non trouvé']);
+        return;
+    }
+
+    if ($artisan['status'] !== 'active') {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Le compte doit être actif pour recevoir un lien']);
+        return;
+    }
+
+    $token = bin2hex(random_bytes(32));
+    $exp = date('Y-m-d H:i:s', strtotime('+1 hour'));
+
+    $pdo->prepare("UPDATE local_artisans SET auth_token = ?, auth_token_exp = ? WHERE id = ?")
+        ->execute([$token, $exp, $id]);
+
+    $config = getAppConfig();
+    $fromEmail = $config['mail_from'] ?? 'noreply@webiartisan.prigent.tech';
+    $portalUrl = artisan_portal_url();
+    $link = rtrim($portalUrl, '/') . '/espace?token=' . urlencode($token);
+
+    $safeCompany = htmlspecialchars($artisan['company_name'], ENT_QUOTES, 'UTF-8');
+    $safeLink = htmlspecialchars($link, ENT_QUOTES, 'UTF-8');
+
+    $subject = 'Votre lien de connexion WebIArtisan';
+    $html = <<<HTML
+<!DOCTYPE html>
+<html><body style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #1a1a2e;">Bonjour {$safeCompany},</h2>
+  <p>Un administrateur vous a envoyé un lien pour accéder à votre espace artisan :</p>
+  <div style="text-align: center; margin: 24px 0;">
+    <a href="{$safeLink}" style="display: inline-block; background: #1a1a2e; color: #fff; padding: 14px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">Me connecter</a>
+  </div>
+  <p style="color: #888; font-size: 13px;">Ce lien est valable 1 heure. Si vous ne l'avez pas demandé, contactez-nous.</p>
+</body></html>
+HTML;
+
+    $queued = queueEmail(
+        $artisan['email'],
+        $subject,
+        $html,
+        $fromEmail,
+        'WebIArtisan',
+        null,
+        ['type' => 'admin_reset_password', 'artisan_id' => $id]
+    );
+
+    echo json_encode([
+        'success' => true,
+        'message' => $queued ? 'Lien de connexion envoyé par email' : 'Lien généré mais échec de l\'envoi email',
+        'queued' => $queued,
+    ]);
+}
+
+/**
+ * POST /admin/artisans/{id}/force-password — Force un nouveau mot de passe
+ */
+function admin_force_artisan_password(PDO $pdo, int $id): void
+{
+    $body = json_decode(file_get_contents('php://input'), true) ?? [];
+    $password = $body['password'] ?? '';
+
+    if (strlen($password) < 8) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Mot de passe trop court (min 8 caractères)']);
+        return;
+    }
+
+    $hash = password_hash($password, PASSWORD_BCRYPT);
+    $stmt = $pdo->prepare("UPDATE local_artisans SET password_hash = ? WHERE id = ?");
+    $stmt->execute([$hash, $id]);
+
+    if ($stmt->rowCount() === 0) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Artisan non trouvé']);
+        return;
+    }
+
+    echo json_encode([
+        'success' => true,
+        'message' => 'Mot de passe mis à jour',
+    ]);
+}
+
+/**
+ * POST /admin/artisans/{id}/set-subscription-status — Met à jour le statut d'abonnement
+ */
+function admin_set_artisan_subscription_status(PDO $pdo, int $id): void
+{
+    $body = json_decode(file_get_contents('php://input'), true) ?? [];
+    $allowedStatuses = ['active', 'canceled', 'past_due', 'unpaid', 'trialing', 'incomplete', null];
+    $status = in_array($body['status'] ?? null, $allowedStatuses, true) ? $body['status'] : null;
+
+    if ($status === null && !array_key_exists('status', $body)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Statut invalide']);
+        return;
+    }
+
+    $stmt = $pdo->prepare("UPDATE local_artisans SET subscription_status = ? WHERE id = ?");
+    $stmt->execute([$status, $id]);
+
+    echo json_encode([
+        'success' => true,
+        'message' => 'Statut d\'abonnement mis à jour',
         'affected' => $stmt->rowCount(),
     ]);
 }

@@ -6,7 +6,10 @@
           <h1>Administration</h1>
           <p class="text-muted">Gérez les artisans et leurs abonnements.</p>
         </div>
-        <RouterLink to="/espace" class="btn btn-outline btn-sm">Retour à mon espace</RouterLink>
+        <div class="header-actions">
+          <RouterLink to="/espace/admin/comptes" class="btn btn-primary btn-sm">Gestion des comptes</RouterLink>
+          <RouterLink to="/espace" class="btn btn-outline btn-sm">Retour à mon espace</RouterLink>
+        </div>
       </div>
 
       <div v-if="!token" class="auth-card card">
@@ -228,6 +231,7 @@ onMounted(() => {
 <style scoped>
 .admin-dashboard-view { min-height: 60vh; }
 .section-header { align-items: flex-start; gap: 16px; margin-bottom: 24px; }
+.header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
 .auth-card {
   max-width: 420px;

@@ -22,6 +22,7 @@ const routes = [
   { path: '/espace/admin', component: () => import('./views/AdminDashboard.vue'), meta: { title: 'Administration' } },
   { path: '/espace/admin/artisans/:id', component: () => import('./views/AdminArtisanEdit.vue'), meta: { title: 'Modifier un artisan' } },
   { path: '/espace/admin/pois', component: () => import('./views/AdminPois.vue'), meta: { title: 'Gestion des POI' } },
+  { path: '/espace/admin/comptes', component: () => import('./views/AdminAccounts.vue'), meta: { title: 'Gestion des comptes' } },
   { path: '/espace/spin-offers', component: () => import('./views/SpinOffers.vue'), meta: { title: 'Mes offres roue' } },
   { path: '/espace/spin-wins',   component: () => import('./views/SpinWins.vue'),   meta: { title: 'Validation des gains' } },
   { path: '/flyers', component: () => import('./views/Flyer.vue'), meta: { title: 'Imprimer les flyers / plaquettes' } },

@@ -751,6 +751,38 @@ export async function setArtisanPlan(token, id, plan, options = {}) {
   }, 'Erreur lors du changement de plan.')
 }
 
+export async function resetArtisanPassword(token, id, options = {}) {
+  return requestJson(`${API_BASE}/admin/artisans/${id}/reset-password`, {
+    method: 'POST',
+    headers: { 'X-Artisan-Token': token },
+    signal: options.signal,
+  }, 'Erreur lors de l\'envoi du lien.')
+}
+
+export async function forceArtisanPassword(token, id, password, options = {}) {
+  return requestJson(`${API_BASE}/admin/artisans/${id}/force-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Artisan-Token': token,
+    },
+    body: JSON.stringify({ password }),
+    signal: options.signal,
+  }, 'Erreur lors du forçage du mot de passe.')
+}
+
+export async function setArtisanSubscriptionStatus(token, id, status, options = {}) {
+  return requestJson(`${API_BASE}/admin/artisans/${id}/set-subscription-status`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Artisan-Token': token,
+    },
+    body: JSON.stringify({ status }),
+    signal: options.signal,
+  }, 'Erreur lors du changement de statut.')
+}
+
 export async function updateAdminArtisan(token, id, data, options = {}) {
   return requestJson(`${API_BASE}/admin/artisans/${id}`, {
     method: 'PUT',
