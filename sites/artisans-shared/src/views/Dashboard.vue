@@ -392,6 +392,9 @@ async function submitPasswordLogin() {
     if (res.success && res.token) {
       setArtisanToken(res.token, rememberMe.value)
       token.value = res.token
+      if (res.userToken) {
+        setUserToken(res.userToken, rememberMe.value)
+      }
       await router.replace('/espace')
       loadProfile()
       loadMyProspects()
@@ -424,6 +427,10 @@ async function loadProfile() {
         address: res.data.address || '',
         description: res.data.description || '',
       })
+      // Lier automatiquement le compte consommateur
+      if (res.userToken) {
+        setUserToken(res.userToken, true)
+      }
     } else if (token.value === currentToken) {
       await logout()
       if (!isMounted || token.value) return

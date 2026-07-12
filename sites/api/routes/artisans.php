@@ -19,6 +19,7 @@ require_once __DIR__ . '/../lib/Mailer.php';
 require_once __DIR__ . '/../lib/Games.php';
 require_once __DIR__ . '/../lib/Gamification.php';
 require_once __DIR__ . '/../lib/ArtisanAuth.php';
+require_once __DIR__ . '/../lib/UserAuth.php';
 
 switch ($method) {
 
@@ -127,6 +128,48 @@ switch ($method) {
 // ===================================================================
 // Fonctions
 // ===================================================================
+
+/**
+ * Récupère ou crée le compte consommateur lié à un artisan.
+ * Met à jour local_artisans.user_id si nécessaire.
+ * Retourne l'ID utilisateur ou null en cas d'erreur.
+ */
+function artisan_ensure_user(PDO $pdo, int $artisanId, string $email, string $displayName): ?int
+{
+    if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        return null;
+    }
+
+    $email = strtolower($email);
+
+    // Utilisateur déjà lié ?
+    $stmt = $pdo->prepare("SELECT user_id FROM local_artisans WHERE id = ?");
+    $stmt->execute([$artisanId]);
+    $existingUserId = $stmt->fetchColumn();
+
+    if ($existingUserId) {
+        return (int)$existingUserId;
+    }
+
+    // Rechercher un utilisateur existant avec le même email
+    $stmt = $pdo->prepare("SELECT id FROM local_users WHERE email = ?");
+    $stmt->execute([$email]);
+    $userId = $stmt->fetchColumn();
+
+    if (!$userId) {
+        $insert = $pdo->prepare("INSERT INTO local_users (email, display_name) VALUES (?, ?)");
+        $insert->execute([$email, $displayName]);
+        $userId = (int)$pdo->lastInsertId();
+    } else {
+        $userId = (int)$userId;
+    }
+
+    // Lier l'artisan
+    $pdo->prepare("UPDATE local_artisans SET user_id = ? WHERE id = ?")
+        ->execute([$userId, $artisanId]);
+
+    return $userId;
+}
 
 /**
  * GET /artisans — Liste publique
@@ -498,6 +541,9 @@ function artisan_register(PDO $pdo, array $body): void
     ]);
     $artisanId = (int)$pdo->lastInsertId();
 
+    // Créer automatiquement le compte consommateur lié
+    artisan_ensure_user($pdo, $artisanId, $email, trim($body['company_name']));
+
     // Services optionnels
     if (!empty($body['services']) && is_array($body['services'])) {
         $svcStmt = $pdo->prepare("
@@ -578,9 +624,14 @@ function artisan_login(PDO $pdo, array $body): void
     $pdo->prepare("UPDATE local_artisans SET auth_token = ?, auth_token_exp = ? WHERE id = ?")
         ->execute([$token, $exp, $artisan['id']]);
 
+    // Garantir un compte consommateur lié et créer sa session
+    $userId = artisan_ensure_user($pdo, (int)$artisan['id'], $email, $artisan['company_name']);
+    $userToken = $userId ? user_create_session($pdo, $userId, $rememberMe) : null;
+
     echo json_encode([
         'success' => true,
         'token'   => $token,
+        'userToken' => $userToken,
         'data'    => [
             'id'           => $artisan['id'],
             'company_name' => $artisan['company_name'],
@@ -710,11 +761,7 @@ function artisan_consumer_token(PDO $pdo): void
         $userId = (int)$pdo->lastInsertId();
     }
 
-    $sessionToken = bin2hex(random_bytes(32));
-    $sessionExp = date('Y-m-d H:i:s', strtotime('+365 days'));
-
-    $pdo->prepare("UPDATE local_users SET session_token = ?, session_exp = ? WHERE id = ?")
-        ->execute([$sessionToken, $sessionExp, $userId]);
+    $sessionToken = user_create_session($pdo, $userId, true);
 
     echo json_encode([
         'success' => true,
@@ -937,7 +984,15 @@ function artisan_me(PDO $pdo): void
     $artisan['rating_avg']     = (float)$artisan['rating_avg'];
     $artisan['rating_count']   = (int)$artisan['rating_count'];
 
-    echo json_encode(['success' => true, 'data' => $artisan]);
+    // Garantir un compte consommateur lié et créer sa session
+    $userId = artisan_ensure_user($pdo, (int)$artisan['id'], $artisan['email'], $artisan['company_name']);
+    $userToken = $userId ? user_create_session($pdo, $userId, true) : null;
+
+    echo json_encode([
+        'success' => true,
+        'data' => $artisan,
+        'userToken' => $userToken,
+    ]);
 }
 
 /**
