@@ -11,15 +11,17 @@
 
       <div class="nav-links">
         <RouterLink to="/" class="nav-link">Annuaire</RouterLink>
-        <RouterLink to="/carte" class="nav-link">🗺️ Carte</RouterLink>
+        <RouterLink to="/carte" class="nav-link nav-link-featured">🗺️ Carte des artisans</RouterLink>
         <RouterLink to="/temoignages" class="nav-link">Avis</RouterLink>
         <RouterLink to="/prospection" class="nav-link">Prospection</RouterLink>
-        <RouterLink to="/recettes" class="nav-link">Recettes</RouterLink>
-        <!-- <RouterLink to="/roue" class="nav-link">🎰 Roue</RouterLink> -->
         <RouterLink to="/jeux" class="nav-link">🎮 Jeux</RouterLink>
         <RouterLink to="/#services-locaux" class="nav-link" @click.prevent="scrollTo('services-locaux')">Services locaux</RouterLink>
         <RouterLink v-if="!user" to="/profil" class="nav-link">Se connecter / Mon compte</RouterLink>
         <RouterLink to="/espace" class="nav-link">Mon espace</RouterLink>
+        <RouterLink v-if="isAdmin" to="/espace/admin" class="nav-admin-badge">
+          🛡️ Admin
+        </RouterLink>
+
         <RouterLink to="/inscrire" class="btn btn-primary btn-sm">
           <span>+ Inscrire mon entreprise</span>
         </RouterLink>
@@ -42,16 +44,15 @@
     <Transition name="slide-down">
       <div v-if="menuOpen" class="nav-mobile" @click="menuOpen = false">
         <RouterLink to="/" class="nav-mobile-link">🏠 Annuaire des artisans</RouterLink>
-        <RouterLink to="/carte" class="nav-mobile-link">🗺️ Carte des artisans</RouterLink>
+        <RouterLink to="/carte" class="nav-mobile-link nav-link-featured">🗺️ Carte des artisans</RouterLink>
         <RouterLink to="/temoignages" class="nav-mobile-link">💬 Avis locaux</RouterLink>
         <RouterLink to="/prospection" class="nav-mobile-link">🎯 Prospection</RouterLink>
-        <RouterLink to="/recettes" class="nav-mobile-link">🍳 Recettes</RouterLink>
-        <RouterLink to="/roue" class="nav-mobile-link">🎰 La roue</RouterLink>
         <RouterLink to="/jeux" class="nav-mobile-link">🎮 Jeux</RouterLink>
         <a href="/#meteo" class="nav-mobile-link">🌤️ Météo locale</a>
         <a href="/#services-locaux" class="nav-mobile-link">🏙️ Services locaux</a>
         <RouterLink v-if="!user" to="/profil" class="nav-mobile-link">👤 Se connecter / Mon compte</RouterLink>
         <RouterLink to="/espace" class="nav-mobile-link">🔐 Mon espace</RouterLink>
+        <RouterLink v-if="isAdmin" to="/espace/admin" class="nav-mobile-link nav-link-featured">🛡️ Administration</RouterLink>
         <RouterLink v-if="user" to="/profil" class="nav-mobile-link">👤 Mon profil (Lv.{{ user.level }})</RouterLink>
         <RouterLink to="/inscrire" class="btn btn-primary" style="margin: 12px 20px;">
           + Inscrire mon entreprise
@@ -64,14 +65,16 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { CITY_NAME, getUserToken, fetchUserMe, removeUserToken, resolveAvatarUrl, authEvents } from '../api.js'
+import { CITY_NAME, getUserToken, getArtisanToken, fetchUserMe, fetchMe, removeUserToken, resolveAvatarUrl, authEvents } from '../api.js'
 
 const router = useRouter()
 const scrolled   = ref(false)
 const menuOpen   = ref(false)
 const user = ref(null)
+const artisan = ref(null)
 
 const avatarUrl = computed(() => resolveAvatarUrl(user.value?.avatar_url))
+const isAdmin = computed(() => artisan.value?.is_admin === 1 || artisan.value?.is_admin === true)
 
 function onScroll() { scrolled.value = window.scrollY > 20 }
 function scrollTo(id) {
@@ -86,31 +89,45 @@ async function loadUser() {
   const token = getUserToken()
   if (!token) {
     user.value = null
-    return
-  }
+  } else {
+    abortController?.abort()
+    abortController = new AbortController()
 
-  abortController?.abort()
-  abortController = new AbortController()
-
-  try {
-    const res = await fetchUserMe(token, { signal: abortController.signal })
-    if (!isMounted) return
-    if (res.success) {
-      user.value = res.data
-    } else if (res.error === 'AbortError') {
-      return
-    } else if (res.status === 401) {
-      console.warn('User token invalid or expired')
-      removeUserToken()
-      user.value = null
-    } else {
-      console.warn('Failed to load user profile', res.error || res)
+    try {
+      const res = await fetchUserMe(token, { signal: abortController.signal })
+      if (!isMounted) return
+      if (res.success) {
+        user.value = res.data
+      } else if (res.error === 'AbortError') {
+        return
+      } else if (res.status === 401) {
+        console.warn('User token invalid or expired')
+        removeUserToken()
+        user.value = null
+      } else {
+        console.warn('Failed to load user profile', res.error || res)
+        user.value = null
+      }
+    } catch (e) {
+      if (!isMounted || e.name === 'AbortError') return
+      console.warn('Failed to load user profile', e)
       user.value = null
     }
-  } catch (e) {
-    if (!isMounted || e.name === 'AbortError') return
-    console.warn('Failed to load user profile', e)
-    user.value = null
+  }
+
+  // Charger le profil artisan (pour badge admin et accès rapide)
+  const artisanToken = getArtisanToken()
+  if (artisanToken) {
+    try {
+      const res = await fetchMe(artisanToken)
+      if (isMounted && res.success) {
+        artisan.value = res.data
+      }
+    } catch (e) {
+      console.warn('Failed to load artisan profile for nav', e)
+    }
+  } else {
+    artisan.value = null
   }
 }
 
@@ -176,6 +193,34 @@ function goToProfile() {
   transition: color 0.2s;
 }
 .nav-link:hover { color: var(--c-green); }
+
+.nav-link-featured {
+  background: rgba(45, 106, 79, 0.1);
+  color: var(--c-green) !important;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(45, 106, 79, 0.2);
+}
+.nav-link-featured:hover {
+  background: rgba(45, 106, 79, 0.18);
+}
+
+.nav-admin-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #B71C1C;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 999px;
+  text-decoration: none;
+}
+.nav-admin-badge:hover {
+  background: #9b1515;
+  color: #fff;
+}
 
 .nav-profile {
   display: flex;

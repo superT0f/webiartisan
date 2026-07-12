@@ -20,7 +20,7 @@
       <template v-else>
         <FreemiumLimitBanner
           v-if="premiumGames.length"
-          message="Passez premium pour débloquer la roue, les quiz, le bingo et les rébus."
+          message="Passez premium pour débloquer les quiz, le bingo et les rébus."
         />
 
         <h2>Jeux gratuits</h2>

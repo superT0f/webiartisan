@@ -67,10 +67,15 @@
     <div class="container">
       <div class="section-header text-center">
         <div class="section-eyebrow">🗺️ {{ CITY_NAME }}</div>
-        <h2>Carte de la ville</h2>
-        <p class="text-muted">Localisez-vous et explorez les alentours</p>
+        <h2>Carte des artisans et services</h2>
+        <p class="text-muted">Localisez les artisans et services publics près de chez vous</p>
       </div>
-      <div id="osm-map" style="height: 400px; border-radius: var(--r-lg); overflow: hidden; margin-top: 16px;"></div>
+      <div class="map-wrapper">
+        <div id="osm-map" style="height: 400px; border-radius: var(--r-lg); overflow: hidden; margin-top: 16px;"></div>
+        <RouterLink to="/carte" class="map-fullscreen-btn btn btn-primary">
+          Voir la carte plein écran
+        </RouterLink>
+      </div>
     </div>
   </section>
 
@@ -318,7 +323,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { fetchArtisans, fetchCategories, fetchCityPois, fetchWeather,
   weatherInfo, DAYS, formatTime, todayIndex,
   CITY_NAME, CITY_CP, CITY_SLUG, CITY_LAT, CITY_LNG
@@ -336,6 +341,13 @@ const loadingPois      = ref(true)
 const selectedCategory = ref('')
 const searchQuery      = ref('')
 const sortBy           = ref('featured')
+const map              = ref(null)
+const artisanMarkers   = ref([])
+const poiMarkers       = ref([])
+
+watch(selectedCategory, () => {
+  renderHomeMapMarkers()
+})
 
 const stats = computed(() => ({
   artisans:   artisans.value.length,
@@ -434,30 +446,66 @@ onMounted(async () => {
   ])
 
   // Init OpenStreetMap
-  const map = L.map('osm-map').setView([CITY_LAT, CITY_LNG], 14)
+  map.value = L.map('osm-map').setView([CITY_LAT, CITY_LNG], 14)
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-  }).addTo(map)
-  L.marker([CITY_LAT, CITY_LNG]).addTo(map)
+  }).addTo(map.value)
+  L.marker([CITY_LAT, CITY_LNG]).addTo(map.value)
     .bindPopup(`<b>${CITY_NAME}</b><br/>Centre ville`)
     .openPopup()
 
-  // Marqueurs artisans
+  renderHomeMapMarkers()
+})
+
+function renderHomeMapMarkers() {
+  if (!map.value) return
+
+  // Nettoyer les marqueurs existants
+  artisanMarkers.value.forEach(m => map.value.removeLayer(m))
+  poiMarkers.value.forEach(m => map.value.removeLayer(m))
+  artisanMarkers.value = []
+  poiMarkers.value = []
+
+  // Marqueurs artisans (filtrés par catégorie si sélectionnée)
   artisans.value.forEach(a => {
     if (a.latitude == null || a.longitude == null) return
+    if (selectedCategory.value && a.category_slug !== selectedCategory.value) return
+
     const color = a.category_color || '#2D6A4F'
-    L.circleMarker([parseFloat(a.latitude), parseFloat(a.longitude)], {
-      radius: 8,
+    const marker = L.circleMarker([parseFloat(a.latitude), parseFloat(a.longitude)], {
+      radius: 9,
       fillColor: color,
       color: '#fff',
       weight: 2,
       opacity: 1,
       fillOpacity: 0.9,
     })
-      .addTo(map)
-      .bindPopup(`<a href="#/artisan/${a.id}" style="color:${color};font-weight:600;">${a.company_name}</a>`)
+      .addTo(map.value)
+      .bindPopup(`
+        <div style="font-family:inherit;min-width:160px;">
+          <strong style="display:block;margin-bottom:4px;">${a.company_name}</strong>
+          <span style="display:block;font-size:0.8rem;color:#666;margin-bottom:6px;">${a.category_name || 'Artisan'}</span>
+          <a href="#/artisan/${a.id}" style="display:inline-block;background:${color};color:#fff;padding:5px 10px;border-radius:6px;text-decoration:none;font-size:0.8rem;font-weight:600;">Voir la fiche</a>
+        </div>
+      `)
+    artisanMarkers.value.push(marker)
   })
-})
+
+  // Marqueurs POI
+  pois.value.forEach(p => {
+    if (p.latitude == null || p.longitude == null) return
+    const marker = L.marker([parseFloat(p.latitude), parseFloat(p.longitude)])
+      .addTo(map.value)
+      .bindPopup(`
+        <div style="font-family:inherit;min-width:160px;">
+          <strong style="display:block;margin-bottom:4px;">${p.name}</strong>
+          <span style="display:block;font-size:0.8rem;color:#1a73e8;margin-bottom:4px;">${p.type}</span>
+          ${p.address ? `<span style="display:block;font-size:0.8rem;color:#666;">${p.address}</span>` : ''}
+        </div>
+      `)
+    poiMarkers.value.push(marker)
+  })
+}
 
 // --- Données démo (affichées si l'API n'est pas encore disponible) ---
 const demoCategories = [
@@ -796,11 +844,21 @@ const demoArtisans = [
 .section-header h2 { margin-bottom: 6px; }
 
 /* --- Carte OSM --- */
+.map-wrapper {
+  position: relative;
+}
 #osm-map {
   width: 100%;
   height: 400px;
   border-radius: var(--r-lg);
   margin-top: 16px;
+}
+.map-fullscreen-btn {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  z-index: 400;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 }
 .leaflet-container {
   background-color: var(--c-cream-2);

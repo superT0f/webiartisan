@@ -13,7 +13,10 @@ function user_get_session_token(): ?string
 function user_require_auth(PDO $pdo): array
 {
     $token = user_get_session_token();
+    $ip = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+
     if (!$token) {
+        error_log("[USER-AUTH] missing bearer token, ip={$ip}");
         http_response_code(401);
         echo json_encode(['success' => false, 'error' => 'Authentification requise']);
         exit;
@@ -31,6 +34,7 @@ function user_require_auth(PDO $pdo): array
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$user) {
+        error_log("[USER-AUTH] invalid or expired session, ip={$ip}");
         http_response_code(401);
         echo json_encode(['success' => false, 'error' => 'Session invalide']);
         exit;

@@ -85,7 +85,7 @@ function setCookie(name, value, days) {
   const date = new Date()
   date.setTime(date.getTime() + days * 24 * 60 * 60 * 1000)
   const secure = location.protocol === 'https:' ? '; Secure' : ''
-  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${date.toUTCString()}; path=/; SameSite=Strict${secure}`
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${date.toUTCString()}; path=/; SameSite=Lax${secure}`
 }
 
 function getCookie(name) {
@@ -94,7 +94,7 @@ function getCookie(name) {
 }
 
 function deleteCookie(name) {
-  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Strict`
+  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Lax`
 }
 
 export function getArtisanToken() {
@@ -417,6 +417,49 @@ export async function resetPassword(token, password) {
   return res.json()
 }
 
+export async function enableBiometric(token, deviceId, secret, deviceName = 'Mon appareil') {
+  return requestJson(`${API_BASE}/auth/biometric-enable`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ device_id: deviceId, secret, device_name: deviceName }),
+  }, 'Erreur lors de l\'activation biométrique.')
+}
+
+export async function disableBiometric(token, deviceId) {
+  return requestJson(`${API_BASE}/auth/biometric-disable`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ device_id: deviceId }),
+  }, 'Erreur lors de la désactivation biométrique.')
+}
+
+export async function biometricLogin(deviceId, secret) {
+  const res = await fetch(`${API_BASE}/auth/biometric-login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ device_id: deviceId, secret }),
+  })
+  return res.json()
+}
+
+export async function changeUserPassword(token, currentPassword, newPassword) {
+  const res = await fetch(`${API_BASE}/users/change-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword, confirm_password: newPassword }),
+  })
+  return res.json()
+}
+
 export function resolveAvatarUrl(avatarUrl) {
   if (!avatarUrl) return null
   try {
@@ -695,6 +738,98 @@ export async function setArtisanPlan(token, id, plan, options = {}) {
     body: JSON.stringify({ plan }),
     signal: options.signal,
   }, 'Erreur lors du changement de plan.')
+}
+
+export async function updateAdminArtisan(token, id, data, options = {}) {
+  return requestJson(`${API_BASE}/admin/artisans/${id}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Artisan-Token': token,
+    },
+    body: JSON.stringify(data),
+    signal: options.signal,
+  }, 'Erreur lors de la mise à jour de l\'artisan.')
+}
+
+// --- Administration POI ------------------------------------------------
+
+export async function fetchAdminPois(token, options = {}) {
+  return requestJson(`${API_BASE}/admin/pois`, {
+    headers: { 'X-Artisan-Token': token },
+    signal: options.signal,
+  }, 'Impossible de charger les POI.')
+}
+
+export async function fetchAdminPoi(token, id, options = {}) {
+  return requestJson(`${API_BASE}/admin/pois/${id}`, {
+    headers: { 'X-Artisan-Token': token },
+    signal: options.signal,
+  }, 'Impossible de charger le POI.')
+}
+
+export async function createAdminPoi(token, data, options = {}) {
+  return requestJson(`${API_BASE}/admin/pois`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Artisan-Token': token,
+    },
+    body: JSON.stringify(data),
+    signal: options.signal,
+  }, 'Erreur lors de la création du POI.')
+}
+
+export async function updateAdminPoi(token, id, data, options = {}) {
+  return requestJson(`${API_BASE}/admin/pois/${id}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Artisan-Token': token,
+    },
+    body: JSON.stringify(data),
+    signal: options.signal,
+  }, 'Erreur lors de la mise à jour du POI.')
+}
+
+export async function deleteAdminPoi(token, id, options = {}) {
+  return requestJson(`${API_BASE}/admin/pois/${id}`, {
+    method: 'DELETE',
+    headers: { 'X-Artisan-Token': token },
+    signal: options.signal,
+  }, 'Erreur lors de la suppression du POI.')
+}
+
+export async function createAdminSchedule(token, data, options = {}) {
+  return requestJson(`${API_BASE}/admin/schedules`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Artisan-Token': token,
+    },
+    body: JSON.stringify(data),
+    signal: options.signal,
+  }, 'Erreur lors de l\'ajout de l\'horaire.')
+}
+
+export async function updateAdminSchedule(token, id, data, options = {}) {
+  return requestJson(`${API_BASE}/admin/schedules/${id}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Artisan-Token': token,
+    },
+    body: JSON.stringify(data),
+    signal: options.signal,
+  }, 'Erreur lors de la mise à jour de l\'horaire.')
+}
+
+export async function deleteAdminSchedule(token, id, options = {}) {
+  return requestJson(`${API_BASE}/admin/schedules/${id}`, {
+    method: 'DELETE',
+    headers: { 'X-Artisan-Token': token },
+    signal: options.signal,
+  }, 'Erreur lors de la suppression de l\'horaire.')
 }
 
 // --- Témoignages ---------------------------------------------------

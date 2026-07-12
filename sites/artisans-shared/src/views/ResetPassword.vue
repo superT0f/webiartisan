@@ -32,7 +32,7 @@ async function submit() {
       success.value = true
       message.value = res.message
       messageType.value = 'success'
-      setTimeout(() => router.push('/roue'), 2000)
+      setTimeout(() => router.push('/profil'), 2000)
     } else {
       message.value = res.error || 'Erreur lors de la réinitialisation.'
       messageType.value = 'error'

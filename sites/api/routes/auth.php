@@ -5,6 +5,12 @@
  * Public routes (no JWT required except GET:me, POST:avatar, POST:logout).
  */
 
+// Rate-limit sensitive auth endpoints
+$sensitiveActions = ['lookup', 'request-code', 'verify-code', 'biometric-login', 'register'];
+if (in_array($action, $sensitiveActions, true)) {
+    applyRateLimit($pdo, 'login');
+}
+
 // Helper: format user response
 function formatUserResponse(array $user, Auth $auth): array {
     return [
@@ -30,8 +36,10 @@ switch ("$method:$action") {
     case 'POST:lookup':
         $input = json_decode(file_get_contents('php://input'), true);
         $identifier = trim($input['identifier'] ?? '');
+        $ip = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 
         if (!$identifier) {
+            $logger->warning('[AUTH-LOOKUP] missing identifier', ['ip' => $ip]);
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => 'Email ou identifiant requis']);
             break;
@@ -42,11 +50,13 @@ switch ("$method:$action") {
             $user = $auth->findUserByIdentifier($pdo, $identifier);
 
             if (!$user) {
+                $logger->info('[AUTH-LOOKUP] account not found', ['identifier' => $identifier, 'ip' => $ip]);
                 http_response_code(404);
                 echo json_encode(['success' => false, 'error' => 'Aucun compte trouvé']);
                 break;
             }
 
+            $logger->info('[AUTH-LOOKUP] account found', ['user_id' => (int)$user['id'], 'identifier' => $identifier, 'ip' => $ip]);
             echo json_encode([
                 'success'    => true,
                 'user_id'    => (int) $user['id'],
@@ -55,6 +65,7 @@ switch ("$method:$action") {
                 'avatar_url' => $auth->getAvatarUrl($user['avatar_path'] ?? null),
             ]);
         } catch (Exception $e) {
+            $logger->error('[AUTH-LOOKUP] server error', ['identifier' => $identifier, 'ip' => $ip, 'error' => $e->getMessage()]);
             http_response_code(500);
             echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
         }
@@ -66,8 +77,10 @@ switch ("$method:$action") {
     case 'POST:request-code':
         $input = json_decode(file_get_contents('php://input'), true);
         $identifier = trim($input['identifier'] ?? '');
+        $ip = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 
         if (!$identifier) {
+            $logger->warning('[AUTH-REQUEST-CODE] missing identifier', ['ip' => $ip]);
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => 'Email ou identifiant requis']);
             break;
@@ -79,13 +92,21 @@ switch ("$method:$action") {
 
             if (!$user) {
                 // Don't reveal if user exists or not
+                $logger->info('[AUTH-REQUEST-CODE] no active user', ['identifier' => $identifier, 'ip' => $ip]);
                 echo json_encode(['success' => true, 'message' => 'Si ce compte existe, un code a été envoyé']);
                 break;
             }
 
             $code = $auth->generateCode();
             $auth->storeCode($pdo, (int)$user['id'], $code);
-            $auth->sendCode($user['email'], $code, $user['name'] ?? '');
+            $sent = $auth->sendCode($user['email'], $code, $user['name'] ?? '');
+
+            $logger->info('[AUTH-REQUEST-CODE] code generated', [
+                'user_id' => (int)$user['id'],
+                'identifier' => $identifier,
+                'ip' => $ip,
+                'sent' => $sent ? 'yes' : 'no',
+            ]);
 
             echo json_encode([
                 'success' => true,
@@ -93,6 +114,7 @@ switch ("$method:$action") {
                 'email_hint' => preg_replace('/^(.).+(@.+)$/', '$1***$2', $user['email']),
             ]);
         } catch (Exception $e) {
+            $logger->error('[AUTH-REQUEST-CODE] server error', ['identifier' => $identifier, 'ip' => $ip, 'error' => $e->getMessage()]);
             http_response_code(500);
             echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
         }
@@ -106,14 +128,17 @@ switch ("$method:$action") {
         $identifier  = trim($input['identifier'] ?? '');
         $code        = trim($input['code'] ?? '');
         $rememberMe  = (bool)($input['remember_me'] ?? true);
+        $ip = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 
         if (!$identifier) {
+            $logger->warning('[AUTH-VERIFY-CODE] missing identifier', ['ip' => $ip]);
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => 'Identifiant requis']);
             break;
         }
 
         if (!$code) {
+            $logger->warning('[AUTH-VERIFY-CODE] missing code', ['identifier' => $identifier, 'ip' => $ip]);
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => 'Code requis']);
             break;
@@ -124,12 +149,18 @@ switch ("$method:$action") {
             $user = $auth->findUserByIdentifier($pdo, $identifier);
 
             if (!$user) {
+                $logger->warning('[AUTH-VERIFY-CODE] user not found', ['identifier' => $identifier, 'ip' => $ip]);
                 http_response_code(401);
                 echo json_encode(['success' => false, 'error' => 'Code invalide ou expiré']);
                 break;
             }
 
             if (!$auth->verifyCode($pdo, (int)$user['id'], $code)) {
+                $logger->warning('[AUTH-VERIFY-CODE] invalid or expired code', [
+                    'user_id' => (int)$user['id'],
+                    'identifier' => $identifier,
+                    'ip' => $ip,
+                ]);
                 http_response_code(401);
                 echo json_encode(['success' => false, 'error' => 'Code invalide ou expiré']);
                 break;
@@ -146,12 +177,24 @@ switch ("$method:$action") {
                 $auth->createRememberToken($pdo, $user);
             }
 
+            $logger->info('[AUTH-VERIFY-CODE] login success', [
+                'user_id' => (int)$user['id'],
+                'identifier' => $identifier,
+                'ip' => $ip,
+                'remember_me' => $rememberMe ? 'yes' : 'no',
+            ]);
+
             echo json_encode([
                 'success' => true,
                 'token'   => $token,
                 'user'    => formatUserResponse($user, $auth),
             ]);
         } catch (Exception $e) {
+            $logger->error('[AUTH-VERIFY-CODE] server error', [
+                'identifier' => $identifier,
+                'ip' => $ip,
+                'error' => $e->getMessage(),
+            ]);
             http_response_code(500);
             echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
         }
@@ -163,12 +206,14 @@ switch ("$method:$action") {
     case 'POST:biometric-enable':
         $authUser = $auth->requireAuth();
         $input = json_decode(file_get_contents('php://input'), true);
+        $ip = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 
         $deviceId = trim($input['device_id'] ?? '');
         $secret   = trim($input['secret'] ?? ''); // Unique secret generated by the app
         $deviceName = isset($input['device_name']) && $input['device_name'] !== null ? trim($input['device_name']) : null;
 
         if (!$deviceId || !$secret) {
+            $logger->warning('[AUTH-BIOMETRIC-ENABLE] missing fields', ['user_id' => (int)$authUser['sub'], 'ip' => $ip]);
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => 'device_id et secret requis']);
             break;
@@ -178,8 +223,18 @@ switch ("$method:$action") {
             $pdo = getDatabase();
             $auth->createBiometricKey($pdo, (int)$authUser['sub'], $deviceId, $secret, $deviceName);
 
+            $logger->info('[AUTH-BIOMETRIC-ENABLE] biometric key created', [
+                'user_id' => (int)$authUser['sub'],
+                'device_id' => substr(hash('sha256', $deviceId), 0, 16),
+                'ip' => $ip,
+            ]);
             echo json_encode(['success' => true, 'message' => 'Biométrie activée pour cet appareil']);
         } catch (Exception $e) {
+            $logger->error('[AUTH-BIOMETRIC-ENABLE] server error', [
+                'user_id' => (int)$authUser['sub'],
+                'ip' => $ip,
+                'error' => $e->getMessage(),
+            ]);
             http_response_code(500);
             echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
         }
@@ -192,8 +247,10 @@ switch ("$method:$action") {
         $input = json_decode(file_get_contents('php://input'), true);
         $deviceId = trim($input['device_id'] ?? '');
         $secret   = trim($input['secret'] ?? '');
+        $ip = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 
         if (!$deviceId || !$secret) {
+            $logger->warning('[AUTH-BIOMETRIC-LOGIN] missing fields', ['ip' => $ip]);
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => 'device_id et secret requis']);
             break;
@@ -204,6 +261,10 @@ switch ("$method:$action") {
             $user = $auth->verifyBiometric($pdo, $deviceId, $secret);
 
             if (!$user) {
+                $logger->warning('[AUTH-BIOMETRIC-LOGIN] invalid credentials', [
+                    'device_id' => substr(hash('sha256', $deviceId), 0, 16),
+                    'ip' => $ip,
+                ]);
                 http_response_code(401);
                 echo json_encode(['success' => false, 'error' => 'Authentification biométrique invalide ou expirée']);
                 break;
@@ -222,12 +283,23 @@ switch ("$method:$action") {
             // Update last_login_at
             $pdo->prepare("UPDATE users SET last_login_at = NOW() WHERE id = ?")->execute([$user['id']]);
 
+            $logger->info('[AUTH-BIOMETRIC-LOGIN] login success', [
+                'user_id' => (int)$user['id'],
+                'device_id' => substr(hash('sha256', $deviceId), 0, 16),
+                'ip' => $ip,
+            ]);
+
             echo json_encode([
                 'success' => true,
                 'token'   => $token,
                 'user'    => formatUserResponse($user, $auth),
             ]);
         } catch (Exception $e) {
+            $logger->error('[AUTH-BIOMETRIC-LOGIN] server error', [
+                'device_id' => substr(hash('sha256', $deviceId), 0, 16),
+                'ip' => $ip,
+                'error' => $e->getMessage(),
+            ]);
             http_response_code(500);
             echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
         }
@@ -240,8 +312,10 @@ switch ("$method:$action") {
         $authUser = $auth->requireAuth();
         $input = json_decode(file_get_contents('php://input'), true);
         $deviceId = trim($input['device_id'] ?? '');
+        $ip = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 
         if (!$deviceId) {
+            $logger->warning('[AUTH-BIOMETRIC-DISABLE] missing device_id', ['user_id' => (int)$authUser['sub'], 'ip' => $ip]);
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => 'device_id requis']);
             break;
@@ -250,8 +324,18 @@ switch ("$method:$action") {
         try {
             $pdo = getDatabase();
             $auth->clearBiometricKey($pdo, (int)$authUser['sub'], $deviceId);
+            $logger->info('[AUTH-BIOMETRIC-DISABLE] biometric key cleared', [
+                'user_id' => (int)$authUser['sub'],
+                'device_id' => substr(hash('sha256', $deviceId), 0, 16),
+                'ip' => $ip,
+            ]);
             echo json_encode(['success' => true, 'message' => 'Biométrie désactivée pour cet appareil']);
         } catch (Exception $e) {
+            $logger->error('[AUTH-BIOMETRIC-DISABLE] server error', [
+                'user_id' => (int)$authUser['sub'],
+                'ip' => $ip,
+                'error' => $e->getMessage(),
+            ]);
             http_response_code(500);
             echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
         }
@@ -266,8 +350,10 @@ switch ("$method:$action") {
         $companyName = trim($input['company_name'] ?? '');
         $slug        = trim($input['slug'] ?? '');
         $login       = trim($input['login'] ?? '');
+        $ip = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 
         if (!$email || !$companyName) {
+            $logger->warning('[AUTH-REGISTER] missing fields', ['ip' => $ip]);
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => 'Email et nom d\'entreprise requis']);
             break;
@@ -290,6 +376,7 @@ switch ("$method:$action") {
             $stmt->execute([$email]);
             if ($stmt->fetch()) {
                 $pdo->rollBack();
+                $logger->warning('[AUTH-REGISTER] email already used', ['email' => $email, 'ip' => $ip]);
                 http_response_code(409);
                 echo json_encode(['success' => false, 'error' => 'Email déjà utilisé']);
                 break;
@@ -300,6 +387,7 @@ switch ("$method:$action") {
                 $stmt->execute([$login]);
                 if ($stmt->fetch()) {
                     $pdo->rollBack();
+                    $logger->warning('[AUTH-REGISTER] login already taken', ['login' => $login, 'ip' => $ip]);
                     http_response_code(409);
                     echo json_encode(['success' => false, 'error' => 'Identifiant déjà pris']);
                     break;
@@ -310,6 +398,7 @@ switch ("$method:$action") {
             $stmt->execute([$slug]);
             if ($stmt->fetch()) {
                 $pdo->rollBack();
+                $logger->warning('[AUTH-REGISTER] slug already taken', ['slug' => $slug, 'ip' => $ip]);
                 http_response_code(409);
                 echo json_encode(['success' => false, 'error' => 'Slug entreprise déjà pris']);
                 break;
@@ -331,7 +420,15 @@ switch ("$method:$action") {
             // Send magic code to verify email
             $code = $auth->generateCode();
             $auth->storeCode($pdo, $userId, $code);
-            $auth->sendCode($email, $code);
+            $sent = $auth->sendCode($email, $code);
+
+            $logger->info('[AUTH-REGISTER] account created', [
+                'user_id' => $userId,
+                'tenant_id' => $tenantId,
+                'email' => $email,
+                'ip' => $ip,
+                'code_sent' => $sent ? 'yes' : 'no',
+            ]);
 
             echo json_encode([
                 'success'    => true,
@@ -341,6 +438,7 @@ switch ("$method:$action") {
             ]);
         } catch (Exception $e) {
             if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
+            $logger->error('[AUTH-REGISTER] server error', ['email' => $email, 'ip' => $ip, 'error' => $e->getMessage()]);
             http_response_code(500);
             echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
         }
@@ -351,6 +449,7 @@ switch ("$method:$action") {
     // ============================================
     case 'GET:me':
         $authUser = $auth->requireAuth();
+        $ip = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? 'unknown';
         try {
             $pdo = getDatabase();
             $stmt = $pdo->prepare(
@@ -365,6 +464,7 @@ switch ("$method:$action") {
             $user = $stmt->fetch();
 
             if (!$user) {
+                $logger->warning('[AUTH-ME] user not found', ['user_id' => (int)$authUser['sub'], 'ip' => $ip]);
                 http_response_code(404);
                 echo json_encode(['success' => false, 'error' => 'User not found']);
                 break;
@@ -372,6 +472,7 @@ switch ("$method:$action") {
 
             echo json_encode(['success' => true, 'user' => formatUserResponse($user, $auth)]);
         } catch (Exception $e) {
+            $logger->error('[AUTH-ME] server error', ['user_id' => (int)$authUser['sub'], 'ip' => $ip, 'error' => $e->getMessage()]);
             http_response_code(500);
             echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
         }
@@ -381,11 +482,13 @@ switch ("$method:$action") {
     // LOGOUT — clear remember cookie
     // ============================================
     case 'POST:logout':
+        $ip = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? 'unknown';
         try {
             $pdo = getDatabase();
             $auth->clearRememberToken($pdo);
+            $logger->info('[AUTH-LOGOUT] remember token cleared', ['ip' => $ip]);
         } catch (Exception $e) {
-            // ignore
+            $logger->warning('[AUTH-LOGOUT] failed to clear remember token', ['ip' => $ip, 'error' => $e->getMessage()]);
         }
         echo json_encode(['success' => true, 'message' => 'Déconnecté']);
         break;

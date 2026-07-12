@@ -71,6 +71,9 @@
                 <td>{{ a.subscription_status || '—' }}</td>
                 <td>
                   <div class="actions">
+                    <RouterLink :to="`/espace/admin/artisans/${a.id}`" class="btn btn-outline btn-sm">
+                      Modifier
+                    </RouterLink>
                     <button
                       v-if="a.status !== 'active'"
                       class="btn btn-outline btn-sm"

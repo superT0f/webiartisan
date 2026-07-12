@@ -45,7 +45,8 @@
 
       <img v-if="avatarPreviewUrl" :src="avatarPreviewUrl" alt="Aperçu de l'avatar" class="upload-preview" />
 
-      <button type="submit" :disabled="saving">{{ saving ? 'Enregistrement…' : 'Enregistrer' }}</button>
+      <button type="submit" class="btn-save" :disabled="saving">{{ saving ? 'Enregistrement…' : 'Enregistrer les modifications' }}</button>
+    <button type="button" class="btn-cancel" @click="router.push('/profil')">Annuler</button>
     </form>
   </div>
 </template>
@@ -78,7 +79,7 @@ onMounted(async () => {
   const token = getUserToken()
   if (!token) {
     loadingProfile.value = false
-    return router.push('/roue')
+    return router.push('/profil')
   }
   try {
     profileAbortController.value = new AbortController()
@@ -86,7 +87,7 @@ onMounted(async () => {
     if (!res.success) {
       if (res.error === 'AbortError') return
       if (res.status === 401) {
-        return router.push('/roue')
+        return router.push('/profil')
       }
       error.value = res.error || 'Impossible de charger le profil.'
       return
@@ -101,7 +102,7 @@ onMounted(async () => {
     await loadAvatars()
   } catch (e) {
     console.error('Failed to load character page', e)
-    router.push('/roue')
+    router.push('/profil')
   } finally {
     if (!profileAbortController.value?.signal.aborted) {
       loadingProfile.value = false
@@ -234,7 +235,7 @@ function onFileChange(e) {
 function handleAuthError() {
   error.value = 'Session expirée. Veuillez vous reconnecter.'
   removeUserToken()
-  router.push('/roue')
+  router.push('/profil')
 }
 
 function handleUpdateError(res, fallbackMessage) {
@@ -302,17 +303,25 @@ async function save() {
 
 <style scoped>
 .character-edit { max-width: 640px; margin: 0 auto; padding: 24px; }
-label, legend { display: block; margin-top: 16px; font-weight: 600; }
-input, select { width: 100%; padding: 8px; margin-top: 4px; }
+.character-edit h1 { margin-bottom: 24px; }
+label, legend { display: block; margin-top: 20px; margin-bottom: 6px; font-weight: 600; color: var(--c-text); }
+input, select { width: 100%; padding: 10px 12px; margin-top: 4px; border: 1px solid var(--c-border, #ddd); border-radius: 8px; font-size: 1rem; }
+input:focus, select:focus { outline: none; border-color: var(--c-green); box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.1); }
 .avatar-fieldset { border: none; padding: 0; margin: 0; }
-.avatar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 12px; margin-top: 8px; }
-.avatar-item { text-align: center; padding: 8px; border: 2px solid transparent; border-radius: 8px; cursor: pointer; background: transparent; font: inherit; color: inherit; }
+.avatar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 12px; margin-top: 12px; }
+.avatar-item { text-align: center; padding: 12px 8px; border: 2px solid transparent; border-radius: 12px; cursor: pointer; background: var(--c-cream, #f8fafc); font: inherit; color: inherit; transition: all 0.2s; }
+.avatar-item:hover:not(.locked) { border-color: var(--c-green-light, #95d5b2); }
 .avatar-item.selected { border-color: #10b981; background: #ecfdf5; }
 .avatar-item.locked { opacity: 0.4; cursor: not-allowed; }
-.avatar-item img { width: 64px; height: 64px; object-fit: cover; border-radius: 50%; }
-.upload-preview { display: block; width: 96px; height: 96px; object-fit: cover; border-radius: 50%; margin-top: 12px; }
-button { margin-top: 24px; padding: 12px 24px; background: #1a1a2e; color: #fff; border: none; border-radius: 8px; cursor: pointer; }
-button:disabled { opacity: 0.6; }
+.avatar-item img { width: 64px; height: 64px; object-fit: cover; border-radius: 50%; margin-bottom: 6px; }
+.avatar-item span { display: block; font-size: 0.85rem; font-weight: 500; }
+.avatar-item small { display: block; font-size: 0.75rem; color: #64748b; margin-top: 2px; }
+.upload-preview { display: block; width: 120px; height: 120px; object-fit: cover; border-radius: 50%; margin-top: 16px; border: 3px solid var(--c-green); }
+.btn-save { margin-top: 28px; margin-right: 12px; padding: 12px 24px; background: var(--c-green, #1a1a2e); color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+.btn-save:hover { background: var(--c-green-dark, #1a1a2e); }
+.btn-save:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-cancel { margin-top: 28px; padding: 12px 24px; background: transparent; color: var(--c-text-2); border: 1px solid var(--c-border); border-radius: 8px; cursor: pointer; }
+.btn-cancel:hover { background: var(--c-cream-2); }
 .error { margin-top: 16px; padding: 12px; background: #fee2e2; color: #991b1b; border-radius: 8px; }
 .loading-avatars { margin-top: 8px; color: #64748b; }
 .loading-profile { margin-top: 16px; color: #64748b; }

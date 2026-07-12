@@ -34,6 +34,8 @@ $subAction = $segments[3] ?? '';
 
 if ($method === 'GET' && $action === 'artisans' && $param === null) {
     admin_list_artisans($pdo);
+} elseif ($method === 'PUT' && $action === 'artisans' && is_numeric($param) && $subAction === '') {
+    admin_update_artisan($pdo, (int)$param);
 } elseif ($method === 'POST' && $action === 'artisans' && is_numeric($param) && $subAction === 'activate') {
     admin_activate_artisan($pdo, (int)$param);
 } elseif ($method === 'POST' && $action === 'artisans' && is_numeric($param) && $subAction === 'suspend') {
@@ -113,6 +115,38 @@ function admin_set_artisan_plan(PDO $pdo, int $id): void
     echo json_encode([
         'success' => true,
         'message' => "Plan mis à jour : $plan",
+        'affected' => $stmt->rowCount(),
+    ]);
+}
+
+function admin_update_artisan(PDO $pdo, int $id): void
+{
+    $body = json_decode(file_get_contents('php://input'), true) ?? [];
+
+    $allowed = ['company_name', 'description', 'phone', 'website', 'address', 'logo_url', 'cover_url'];
+    $updates = [];
+    $params  = [];
+
+    foreach ($allowed as $field) {
+        if (array_key_exists($field, $body)) {
+            $updates[] = "{$field} = ?";
+            $params[]  = trim($body[$field]);
+        }
+    }
+
+    if (empty($updates)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Aucun champ à mettre à jour']);
+        return;
+    }
+
+    $params[] = $id;
+    $stmt = $pdo->prepare("UPDATE local_artisans SET " . implode(', ', $updates) . " WHERE id = ?");
+    $stmt->execute($params);
+
+    echo json_encode([
+        'success' => true,
+        'message' => 'Artisan mis à jour',
         'affected' => $stmt->rowCount(),
     ]);
 }

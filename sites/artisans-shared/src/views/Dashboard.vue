@@ -103,7 +103,21 @@
           <RouterLink to="/espace/admin" class="prospect-mini">
             <div>
               <strong>Gérer les artisans</strong>
-              <span class="text-muted small">Activer, suspendre et modifier les plans</span>
+              <span class="text-muted small">Activer, suspendre et modifier les fiches</span>
+            </div>
+            <span class="badge badge-green">Ouvrir</span>
+          </RouterLink>
+          <RouterLink to="/espace/admin/pois" class="prospect-mini">
+            <div>
+              <strong>Gérer les POI</strong>
+              <span class="text-muted small">Services publics, horaires et points d'intérêt</span>
+            </div>
+            <span class="badge badge-green">Ouvrir</span>
+          </RouterLink>
+          <RouterLink to="/espace/admin-recettes" class="prospect-mini">
+            <div>
+              <strong>Modérer les recettes</strong>
+              <span class="text-muted small">Publier, archiver et modérer</span>
             </div>
             <span class="badge badge-green">Ouvrir</span>
           </RouterLink>

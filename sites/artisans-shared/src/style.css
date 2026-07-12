@@ -115,6 +115,15 @@ h3 { font-size: 1.25rem; }
   background: var(--c-green);
   color: var(--c-white);
 }
+.btn-danger {
+  border: 2px solid #B71C1C;
+  color: #B71C1C;
+  background: transparent;
+}
+.btn-danger:hover {
+  background: #B71C1C;
+  color: var(--c-white);
+}
 .btn-sm { padding: 8px 16px; font-size: 0.85rem; }
 .btn-lg { padding: 16px 36px; font-size: 1.1rem; }
 

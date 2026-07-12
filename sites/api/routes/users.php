@@ -9,6 +9,7 @@
  * POST /users/logout            — déconnexion
  * POST /users/forgot-password   — demande de réinitialisation
  * POST /users/reset-password    — réinitialise le mot de passe
+ * POST /users/change-password   — change le mot de passe (connecté)
  * GET  /users/me                — infos utilisateur connecté
  */
 
@@ -26,7 +27,7 @@ function pad_user_auth_response(float $startTime): void
     }
 }
 
-$authActions = ['magic-link', 'auth', 'register', 'login', 'forgot-password', 'reset-password'];
+$authActions = ['magic-link', 'auth', 'register', 'login', 'forgot-password', 'reset-password', 'change-password'];
 if (in_array($action, $authActions, true)) {
     applyRateLimit($pdo, 'login');
 } else {
@@ -50,6 +51,8 @@ switch ($method) {
             user_forgot_password($pdo, $body);
         } elseif ($action === 'reset-password') {
             user_reset_password($pdo, $body);
+        } elseif ($action === 'change-password') {
+            user_change_password($pdo, $body);
         } elseif ($action === 'me' && $param === 'avatar') {
             user_update_avatar($pdo, $body);
         } else {
@@ -843,6 +846,83 @@ function user_reset_password(PDO $pdo, array $body): void
             SET used_at = NOW()
             WHERE email = ? AND used_at IS NULL
         ")->execute([$reset['email']]);
+
+        $pdo->commit();
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        pad_user_auth_response($startTime);
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
+        return;
+    }
+
+    pad_user_auth_response($startTime);
+
+    echo json_encode([
+        'success' => true,
+        'message' => 'Votre mot de passe a été mis à jour.',
+    ]);
+}
+
+/**
+ * POST /users/change-password — Changement de mot de passe pour utilisateur connecté
+ */
+function user_change_password(PDO $pdo, array $body): void
+{
+    $user = user_require_auth($pdo);
+    $startTime = microtime(true);
+
+    $currentPassword = $body['current_password'] ?? '';
+    $newPassword     = $body['new_password'] ?? '';
+    $confirmPassword = $body['confirm_password'] ?? '';
+
+    if (!$currentPassword || strlen($newPassword) < 8) {
+        pad_user_auth_response($startTime);
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Mot de passe actuel ou nouveau mot de passe invalide']);
+        return;
+    }
+
+    if ($newPassword !== $confirmPassword) {
+        pad_user_auth_response($startTime);
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Les mots de passe ne correspondent pas']);
+        return;
+    }
+
+    $pdo->beginTransaction();
+    try {
+        $lock = $pdo->prepare("SELECT id, password_hash FROM local_users WHERE id = ? FOR UPDATE");
+        $lock->execute([(int)$user['id']]);
+        $row = $lock->fetch(PDO::FETCH_ASSOC);
+
+        if (!$row || empty($row['password_hash']) || !password_verify($currentPassword, $row['password_hash'])) {
+            $pdo->rollBack();
+            pad_user_auth_response($startTime);
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Mot de passe actuel incorrect']);
+            return;
+        }
+
+        $passwordHash = password_hash($newPassword, PASSWORD_BCRYPT);
+
+        // Mettre à jour le mot de passe
+        $pdo->prepare("UPDATE local_users SET password_hash = ? WHERE id = ?")
+            ->execute([$passwordHash, (int)$user['id']]);
+
+        // Invalider les sessions existantes (sauf la session actuelle)
+        $pdo->prepare("
+            UPDATE local_users
+            SET session_token = NULL, session_exp = NULL
+            WHERE id = ? AND session_token != ?
+        ")->execute([(int)$user['id'], hash('sha256', user_get_session_token() ?? '')]);
+
+        // Invalider les tokens magiques
+        $pdo->prepare("
+            UPDATE local_users
+            SET magic_token = NULL, magic_token_exp = NULL
+            WHERE id = ?
+        ")->execute([(int)$user['id']]);
 
         $pdo->commit();
     } catch (Throwable $e) {

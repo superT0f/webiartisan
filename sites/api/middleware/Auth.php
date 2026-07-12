@@ -321,6 +321,8 @@ class Auth {
 
     /**
      * Verify a biometric login request.
+     * A device_id should normally identify a single active key, but we iterate
+     * over all active keys for the device to avoid collisions.
      */
     public function verifyBiometric(PDO $pdo, string $deviceId, string $secret): ?array {
         $stmt = $pdo->prepare(
@@ -331,31 +333,35 @@ class Auth {
              JOIN users u ON u.id = bk.user_id
              JOIN tenants t ON t.id = u.tenant_id
              WHERE bk.device_id = ? AND (bk.expires_at IS NULL OR bk.expires_at > NOW())
-             LIMIT 1"
+             ORDER BY bk.created_at DESC"
         );
         $stmt->execute([$deviceId]);
-        $row = $stmt->fetch();
+        $rows = $stmt->fetchAll();
 
-        if (!$row || !$row['is_active']) return null;
+        foreach ($rows as $row) {
+            if (!$row['is_active']) continue;
+            if (!password_verify($secret, $row['key_hash'])) continue;
 
-        if (!password_verify($secret, $row['key_hash'])) return null;
+            // Update last_used_at
+            $pdo->prepare("UPDATE biometric_keys SET last_used_at = NOW() WHERE id = ?")
+                ->execute([$row['id']]);
 
-        // Update last_used_at
-        $pdo->prepare("UPDATE biometric_keys SET last_used_at = NOW() WHERE id = ?")->execute([$row['id']]);
+            return [
+                'id'          => (int)$row['user_id'],
+                'email'       => $row['email'],
+                'login'       => $row['login'],
+                'role'        => $row['role'],
+                'tenant_id'   => (int)$row['tenant_id'],
+                'name'        => $row['name'],
+                'fonction'    => $row['fonction'],
+                'phone'       => $row['phone'],
+                'tenant_slug' => $row['tenant_slug'],
+                'tenant_name' => $row['tenant_name'],
+                'avatar_path' => $row['avatar_path'],
+            ];
+        }
 
-        return [
-            'id'          => (int)$row['user_id'],
-            'email'       => $row['email'],
-            'login'       => $row['login'],
-            'role'        => $row['role'],
-            'tenant_id'   => (int)$row['tenant_id'],
-            'name'        => $row['name'],
-            'fonction'    => $row['fonction'],
-            'phone'       => $row['phone'],
-            'tenant_slug' => $row['tenant_slug'],
-            'tenant_name' => $row['tenant_name'],
-            'avatar_path' => $row['avatar_path'],
-        ];
+        return null;
     }
 
     /**
@@ -449,8 +455,12 @@ HTML;
 
     /**
      * Check if the user account is a demo account.
+     * Fast path: only the known demo email can trigger the check.
      */
     private function isDemoAccount(array $user): bool {
+        if (($user['email'] ?? '') !== 'demo@prigent.tech') {
+            return false;
+        }
         try {
             $pdo = getDatabase();
             $stmt = $pdo->prepare(

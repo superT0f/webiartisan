@@ -123,10 +123,26 @@ function renderMarkers() {
     const el = document.createElement('div')
     el.className = 'artisan-marker'
     el.innerHTML = `<span>${categoryIcon(a.category_slug)}</span>`
+
+    const popupHtml = `
+      <div class="map-popup artisan-popup">
+        <strong>${a.company_name}</strong>
+        <span class="popup-category">${a.category_name || 'Artisan'}</span>
+        ${a.address ? `<span class="popup-address">${a.address}</span>` : ''}
+        ${a.phone ? `<span class="popup-phone">📞 ${a.phone}</span>` : ''}
+        <div class="popup-actions">
+          <a href="#/artisan/${a.id}" class="popup-link">Voir la fiche</a>
+          <a href="https://www.google.com/maps/dir/?api=1&destination=${a.latitude},${a.longitude}" target="_blank" rel="noopener" class="popup-link">Itinéraire</a>
+        </div>
+      </div>
+    `
+    const popup = new Popup({ offset: 16 }).setHTML(popupHtml)
+
     el.addEventListener('click', () => emit('select', a))
 
     const marker = new Marker({ element: el, anchor: 'bottom' })
       .setLngLat([parseFloat(a.longitude), parseFloat(a.latitude)])
+      .setPopup(popup)
       .addTo(map.value)
     markers.push(marker)
   })
@@ -137,8 +153,18 @@ function renderMarkers() {
     el.className = 'poi-marker'
     el.innerHTML = `<span>${poiIcon(p.type)}</span>`
 
+    const scheduleInfo = p.schedules?.length
+      ? `<br><small>${formatSchedules(p.schedules)}</small>`
+      : ''
+
     const popup = new Popup({ offset: 16 }).setHTML(
-      `<strong>${p.name}</strong><br><span style="color:#666">${p.address || ''}</span>`
+      `<div class="map-popup poi-popup">
+        <strong>${p.name}</strong>
+        <span class="popup-type">${p.type}</span>
+        ${p.address ? `<span class="popup-address">${p.address}</span>` : ''}
+        ${p.phone ? `<span class="popup-phone">📞 ${p.phone}</span>` : ''}
+        ${scheduleInfo}
+      </div>`
     )
 
     const marker = new Marker({ element: el, anchor: 'bottom' })
@@ -147,6 +173,14 @@ function renderMarkers() {
       .addTo(map.value)
     markers.push(marker)
   })
+}
+
+function formatSchedules(schedules) {
+  const days = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
+  return schedules
+    .filter(s => !s.is_closed)
+    .map(s => `${days[s.day_of_week] || '?'} ${s.open_time?.slice(0, 5)}–${s.close_time?.slice(0, 5)}`)
+    .join(' · ')
 }
 
 function categoryIcon(slug) {
@@ -174,6 +208,12 @@ function poiIcon(type) {
 
 <template>
   <div ref="mapEl" class="immersive-map"></div>
+  <div class="map-legend">
+    <div class="legend-title">Légende</div>
+    <div class="legend-item"><span class="legend-dot artisan"></span> Artisans</div>
+    <div class="legend-item"><span class="legend-dot poi"></span> Services publics</div>
+    <div class="legend-item"><span class="legend-dot user"></span> Votre position</div>
+  </div>
 </template>
 
 <style scoped>
@@ -221,5 +261,84 @@ function poiIcon(type) {
   border: 3px solid #fff;
   border-radius: 50%;
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.map-legend {
+  position: absolute;
+  bottom: 24px;
+  left: 24px;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  font-size: 0.85rem;
+  min-width: 140px;
+}
+.legend-title {
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--c-text);
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  color: var(--c-text-2);
+}
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+.legend-dot.artisan { background: #16a34a; }
+.legend-dot.poi { background: #1a73e8; }
+.legend-dot.user { background: #3b82f6; }
+
+:deep(.map-popup) {
+  font-family: inherit;
+  min-width: 180px;
+}
+:deep(.map-popup strong) {
+  display: block;
+  font-size: 1rem;
+  margin-bottom: 4px;
+  color: var(--c-text);
+}
+:deep(.map-popup .popup-category),
+:deep(.map-popup .popup-type) {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--c-green);
+  margin-bottom: 6px;
+}
+:deep(.map-popup .popup-type) { color: #1a73e8; }
+:deep(.map-popup .popup-address),
+:deep(.map-popup .popup-phone) {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--c-text-2);
+  margin-bottom: 2px;
+}
+:deep(.map-popup .popup-actions) {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+:deep(.map-popup .popup-link) {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--c-green);
+  padding: 6px 10px;
+  border-radius: 6px;
+  text-decoration: none;
+}
+:deep(.map-popup .popup-link:last-child) {
+  background: #1a73e8;
 }
 </style>
