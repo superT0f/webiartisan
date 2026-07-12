@@ -51,6 +51,7 @@
                 <th>Ville</th>
                 <th>Statut</th>
                 <th>Plan</th>
+                <th>Admin</th>
                 <th>Abonnement</th>
                 <th>Actions</th>
               </tr>
@@ -69,6 +70,11 @@
                 <td>
                   <span class="badge" :class="planClass(a.plan)">
                     {{ a.plan === 'premium' ? 'Premium' : 'Gratuit' }}
+                  </span>
+                </td>
+                <td>
+                  <span class="badge" :class="a.is_admin ? 'badge-admin' : 'badge-grey'">
+                    {{ a.is_admin ? 'Admin' : 'Non' }}
                   </span>
                 </td>
                 <td>{{ subscriptionLabel(a.subscription_status) }}</td>
@@ -102,6 +108,14 @@
                       @click="openSubscription(a)"
                     >
                       Abonnement
+                    </button>
+                    <button
+                      class="btn btn-sm"
+                      :class="a.is_admin ? 'btn-danger' : 'btn-primary'"
+                      :disabled="acting === a.id"
+                      @click="toggleAdmin(a)"
+                    >
+                      {{ a.is_admin ? 'Retirer admin' : 'Promouvoir admin' }}
                     </button>
                   </div>
                 </td>
@@ -188,6 +202,7 @@ import {
   getArtisanToken,
   fetchAdminArtisans,
   setArtisanPlan,
+  setArtisanAdmin,
   resetArtisanPassword,
   forceArtisanPassword,
   setArtisanSubscriptionStatus,
@@ -348,6 +363,25 @@ async function togglePlan(a) {
   }
 }
 
+async function toggleAdmin(a) {
+  const newAdmin = !a.is_admin
+  const actionLabel = newAdmin ? 'promouvoir admin' : 'retirer les droits admin'
+  if (!confirm(`${actionLabel.charAt(0).toUpperCase() + actionLabel.slice(1)} « ${a.company_name || a.email} » ?`)) return
+  acting.value = a.id
+  try {
+    const res = await setArtisanAdmin(token.value, a.id, newAdmin)
+    if (res.success) {
+      a.is_admin = newAdmin
+    } else {
+      alert(res.error || 'Erreur')
+    }
+  } catch (e) {
+    alert('Erreur réseau')
+  } finally {
+    acting.value = null
+  }
+}
+
 function openSubscription(a) {
   selectedArtisan.value = a
   subscriptionStatus.value = a.subscription_status || ''
@@ -443,6 +477,9 @@ onMounted(() => {
 .empty-icon { font-size: 3rem; margin-bottom: 16px; }
 
 .badge-red { background: #FFEBEE; color: #B71C1C; }
+.badge-admin { background: #E3F2FD; color: #0D47A1; }
+.btn-danger { background: #b71c1c; color: #fff; border-color: #b71c1c; }
+.btn-danger:hover { background: #9b1515; }
 
 .modal-overlay {
   position: fixed;

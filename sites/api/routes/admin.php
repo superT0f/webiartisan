@@ -48,6 +48,8 @@ if ($method === 'GET' && $action === 'artisans' && $param === null) {
     admin_force_artisan_password($pdo, (int)$param);
 } elseif ($method === 'POST' && $action === 'artisans' && is_numeric($param) && $subAction === 'set-subscription-status') {
     admin_set_artisan_subscription_status($pdo, (int)$param);
+} elseif ($method === 'POST' && $action === 'artisans' && is_numeric($param) && $subAction === 'set-admin') {
+    admin_set_artisan_admin($pdo, (int)$param);
 } elseif ($action === 'pois') {
     admin_pois_router($pdo, $method, $param);
 } elseif ($action === 'schedules') {
@@ -67,6 +69,7 @@ function admin_list_artisans(PDO $pdo): void
             a.phone,
             a.status,
             a.plan,
+            a.is_admin,
             a.subscription_status,
             a.created_at,
             a.updated_at,
@@ -241,6 +244,40 @@ function admin_set_artisan_subscription_status(PDO $pdo, int $id): void
     echo json_encode([
         'success' => true,
         'message' => 'Statut d\'abonnement mis à jour',
+        'affected' => $stmt->rowCount(),
+    ]);
+}
+
+/**
+ * POST /admin/artisans/{id}/set-admin — Accorde ou révoque les droits admin
+ */
+function admin_set_artisan_admin(PDO $pdo, int $id): void
+{
+    $body = json_decode(file_get_contents('php://input'), true) ?? [];
+    if (!array_key_exists('is_admin', $body)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Paramètre is_admin requis']);
+        return;
+    }
+
+    $isAdmin = filter_var($body['is_admin'], FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
+
+    $stmt = $pdo->prepare("UPDATE local_artisans SET is_admin = ? WHERE id = ?");
+    $stmt->execute([$isAdmin, $id]);
+
+    if ($stmt->rowCount() === 0) {
+        $check = $pdo->prepare("SELECT id FROM local_artisans WHERE id = ? LIMIT 1");
+        $check->execute([$id]);
+        if (!$check->fetch()) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'Artisan non trouvé']);
+            return;
+        }
+    }
+
+    echo json_encode([
+        'success' => true,
+        'message' => $isAdmin ? 'Droits admin accordés' : 'Droits admin retirés',
         'affected' => $stmt->rowCount(),
     ]);
 }

@@ -783,6 +783,18 @@ export async function setArtisanSubscriptionStatus(token, id, status, options = 
   }, 'Erreur lors du changement de statut.')
 }
 
+export async function setArtisanAdmin(token, id, isAdmin, options = {}) {
+  return requestJson(`${API_BASE}/admin/artisans/${id}/set-admin`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Artisan-Token': token,
+    },
+    body: JSON.stringify({ is_admin: isAdmin }),
+    signal: options.signal,
+  }, 'Erreur lors du changement de droits admin.')
+}
+
 export async function updateAdminArtisan(token, id, data, options = {}) {
   return requestJson(`${API_BASE}/admin/artisans/${id}`, {
     method: 'PUT',
