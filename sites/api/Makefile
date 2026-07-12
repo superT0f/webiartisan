@@ -33,7 +33,7 @@ push:
 	@test -L $(PROD_LINK) || (echo "❌ Symlink $(PROD_LINK) missing. Create it:" && \
 		echo "   ln -s /mnt/gandi/vhosts/api.prigent.tech/htdocs $(PROD_LINK)" && exit 1)
 	@test -d $(PROD_LINK)/ || (echo "❌ Gandi not mounted at /mnt/gandi" && exit 1)
-	rsync -avz --no-owner --no-group \
+	rsync -avz --delete --no-owner --no-group \
 		--exclude='.env' \
 		--exclude='.env.*' \
 		--exclude='.git/' \
@@ -58,7 +58,7 @@ push:
 status:
 	@echo "📊 Checking API sync status..."
 	@test -L $(PROD_LINK) || (echo "❌ Symlink $(PROD_LINK) missing" && exit 1)
-	rsync -avn --no-owner --no-group \
+	rsync -avn --delete --no-owner --no-group \
 		--exclude='.env' \
 		--exclude='.env.*' \
 		--exclude='.git/' \
