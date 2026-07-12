@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { Map, NavigationControl, GeolocateControl, Marker, Popup } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useMapStyle } from '../composables/useMapStyle.js'
+import { getPosition } from '../utils/flutterBridge.js'
 
 const props = defineProps({
   center: { type: Array, default: () => [49.1081, -0.7658] },
@@ -32,8 +33,77 @@ onMounted(async () => {
     'bottom-right'
   )
 
-  map.value.on('load', renderMarkers)
+  map.value.on('load', () => {
+    renderMarkers()
+    centerOnUser()
+  })
 })
+
+async function centerOnUser() {
+  try {
+    const isFlutter = typeof FlutterBridge !== 'undefined' && FlutterBridge.postMessage
+    let position
+
+    if (isFlutter) {
+      position = await getPosition({ accuracy: 'best', timeout: 15000, maxAccuracy: 20 })
+    } else if (navigator.geolocation) {
+      position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          pos => resolve({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            accuracy: pos.coords.accuracy
+          }),
+          reject,
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+        )
+      })
+    } else {
+      return
+    }
+
+    const { latitude, longitude, accuracy } = position
+    if (!map.value || !latitude || !longitude) return
+
+    map.value.flyTo({ center: [longitude, latitude], zoom: 16 })
+
+    const el = document.createElement('div')
+    el.className = 'user-location-marker'
+
+    new Marker({ element: el, anchor: 'center' })
+      .setLngLat([longitude, latitude])
+      .addTo(map.value)
+
+    map.value.addSource('user-accuracy', {
+      type: 'geojson',
+      data: {
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [longitude, latitude]
+        }
+      }
+    })
+
+    map.value.addLayer({
+      id: 'user-accuracy-circle',
+      type: 'circle',
+      source: 'user-accuracy',
+      paint: {
+        'circle-radius': {
+          stops: [[10, accuracy / 30], [16, accuracy / 5], [20, accuracy / 2]],
+          base: 2
+        },
+        'circle-color': '#3b82f6',
+        'circle-opacity': 0.15,
+        'circle-stroke-width': 1,
+        'circle-stroke-color': '#3b82f6'
+      }
+    })
+  } catch (err) {
+    console.warn('[ImmersiveMap] Impossible d\'obtenir la position', err)
+  }
+}
 
 onUnmounted(() => {
   markers.forEach(m => m.remove())
@@ -143,5 +213,13 @@ function poiIcon(type) {
 }
 :deep(.poi-marker span) {
   font-size: 1rem;
+}
+:deep(.user-location-marker) {
+  width: 16px;
+  height: 16px;
+  background: #3b82f6;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 </style>
