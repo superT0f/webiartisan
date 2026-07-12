@@ -176,7 +176,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { getArtisanToken, fetchAdminPois, createAdminPoi, updateAdminPoi, deleteAdminPoi, createAdminSchedule, updateAdminSchedule, deleteAdminSchedule, DAYS } from '../api.js'
+import { getArtisanToken, fetchAdminPois, createAdminPoi, updateAdminPoi, deleteAdminPoi, createAdminSchedule, deleteAdminSchedule, DAYS } from '../api.js'
 
 const token = ref(getArtisanToken())
 const pois = ref([])

@@ -21,7 +21,7 @@ function getAppConfig(): array {
         'api_url'          => $env['API_URL']   ?? 'http://localhost:8080/api',
         'site_output_dir'  => $env['SITE_OUTPUT_DIR'] ?? '../htdocs',
         'site_base_url'    => $siteBaseUrl,
-        'jwt_secret'       => $env['JWT_SECRET'] ?? 'change_me_in_production',
+        'jwt_secret'       => $env['JWT_SECRET'] ?? 'dev_fallback_secret_must_be_at_least_32_bytes_long_ok',
         'mail_from'          => $env['MAIL_FROM'] ?? 'noreply@webiartisan.prigent.tech',
         'from_name'          => $env['FROM_NAME'] ?? 'WebIArtisan',
         'subscription_return_urls' => [

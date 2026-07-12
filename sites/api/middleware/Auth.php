@@ -4,6 +4,9 @@
  * Plus de mot de passe. Authentification style Supercell ID.
  */
 
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
+
 class Auth {
     private string $secret;
     private const CODE_LENGTH = 6;
@@ -24,45 +27,33 @@ class Auth {
      * Generate a JWT token for a user.
      */
     public function generateToken(array $user): string {
-        $header = $this->base64UrlEncode(json_encode([
-            'alg' => 'HS256',
-            'typ' => 'JWT'
-        ]));
-
-        $payload = $this->base64UrlEncode(json_encode([
-            'sub'       => $user['id'],
-            'tenant_id' => $user['tenant_id'],
+        $payload = [
+            'sub'       => (int) $user['id'],
+            'tenant_id' => (int) $user['tenant_id'],
             'email'     => $user['email'],
             'role'      => $user['role'],
             'iat'       => time(),
             'exp'       => time() + self::JWT_EXPIRY,
-        ]));
+        ];
 
-        $signature = $this->base64UrlEncode(
-            hash_hmac('sha256', "$header.$payload", $this->secret, true)
-        );
-
-        return "$header.$payload.$signature";
+        return JWT::encode($payload, $this->secret, 'HS256');
     }
 
     /**
      * Generate a short-lived SSO handoff token (60s, scope=sso).
      */
     public function generateSsoToken(array $user): string {
-        $header = $this->base64UrlEncode(json_encode(['alg' => 'HS256', 'typ' => 'JWT']));
-        $payload = $this->base64UrlEncode(json_encode([
-            'sub'       => $user['id'],
-            'tenant_id' => $user['tenant_id'],
+        $payload = [
+            'sub'       => (int) $user['id'],
+            'tenant_id' => (int) $user['tenant_id'],
             'email'     => $user['email'],
             'role'      => $user['role'],
             'scope'     => 'sso',
             'iat'       => time(),
             'exp'       => time() + self::SSO_EXPIRY,
-        ]));
-        $signature = $this->base64UrlEncode(
-            hash_hmac('sha256', "$header.$payload", $this->secret, true)
-        );
-        return "$header.$payload.$signature";
+        ];
+
+        return JWT::encode($payload, $this->secret, 'HS256');
     }
 
     /**
@@ -78,23 +69,12 @@ class Auth {
      * Verify and decode a JWT token.
      */
     public function verifyToken(string $token): ?array {
-        $parts = explode('.', $token);
-        if (count($parts) !== 3) return null;
-
-        [$header, $payload, $signature] = $parts;
-
-        $expectedSig = $this->base64UrlEncode(
-            hash_hmac('sha256', "$header.$payload", $this->secret, true)
-        );
-
-        if (!hash_equals($expectedSig, $signature)) return null;
-
-        $data = json_decode($this->base64UrlDecode($payload), true);
-        if (!$data) return null;
-
-        if (isset($data['exp']) && $data['exp'] < time()) return null;
-
-        return $data;
+        try {
+            $decoded = JWT::decode($token, new Key($this->secret, 'HS256'));
+            return (array) $decoded;
+        } catch (Exception $e) {
+            return null;
+        }
     }
 
     /**
@@ -440,15 +420,8 @@ HTML;
     public function getAvatarUrl(?string $avatarPath): ?string {
         if (!$avatarPath) return null;
         $config = getAppConfig();
-        return ($config['api_url'] ?? '') . '/auth/avatar/' . basename($avatarPath);
-    }
-
-    private function base64UrlEncode(string $data): string {
-        return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
-    }
-
-    private function base64UrlDecode(string $data): string {
-        return base64_decode(strtr($data, '-_', '+/'));
+        $baseUrl = rtrim($config['url'] ?? '', '/');
+        return $baseUrl . '/uploads/avatars/' . basename($avatarPath);
     }
 
     // ── Demo Account Security ───────────────────────

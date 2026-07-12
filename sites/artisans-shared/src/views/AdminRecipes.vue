@@ -75,10 +75,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import { getAdminRecipes, archiveRecipe } from '../api.js'
-
-const router = useRouter()
 const STORAGE_KEY = 'artisan_token'
 const token = ref(localStorage.getItem(STORAGE_KEY) || '')
 const recipes = ref([])

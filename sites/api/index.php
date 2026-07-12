@@ -39,6 +39,9 @@ if (file_exists($adminLoggerPath)) {
 
 header('Content-Type: application/json; charset=UTF-8');
 
+// Load Composer autoloader
+require_once __DIR__ . '/vendor/autoload.php';
+
 // Load core
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/config/app.php';
@@ -65,6 +68,19 @@ foreach ($env as $key => $value) {
 
 // Database connection used by rate limiting and route files
 $pdo = getDatabase();
+
+// Global exception handler — return JSON for API requests
+set_exception_handler(function (Throwable $e) use ($logger): void {
+    $logger->error('Unhandled exception', ['error' => $e->getMessage(), 'file' => $e->getFile(), 'line' => $e->getLine()]);
+    if (!headers_sent()) {
+        header('Content-Type: application/json; charset=UTF-8');
+        http_response_code(500);
+    }
+    echo json_encode([
+        'success' => false,
+        'error'   => 'Erreur serveur',
+    ]);
+});
 
 // Handle CORS
 handleCors();
@@ -189,6 +205,12 @@ if ($module === 'avatars') {
     exit;
 }
 
+// Backward compatibility: old /auth/avatar/:file URLs redirect to static uploads
+if ($module === 'auth' && $action === 'avatar' && $method === 'GET' && $param !== null) {
+    header('Location: /uploads/avatars/' . basename($param), true, 301);
+    exit;
+}
+
 if ($module === 'spin') {
     applyRateLimit($pdo, 'public');
     require_once __DIR__ . '/routes/spin.php';
@@ -254,11 +276,22 @@ if ($module && file_exists($routeFile)) {
     ]);
     require_once $routeFile;
 } elseif ($module === '' || $module === 'health') {
-    $logger->debug('Health check');
+    $dbHealthy = false;
+    try {
+        $pdo->query('SELECT 1');
+        $dbHealthy = true;
+    } catch (Exception $e) {
+        $logger->error('Health check: database unreachable', ['error' => $e->getMessage()]);
+    }
+
+    $statusCode = $dbHealthy ? 200 : 503;
+    http_response_code($statusCode);
+    $logger->debug('Health check', ['healthy' => $dbHealthy]);
     echo json_encode([
-        'success' => true,
+        'success' => $dbHealthy,
         'service' => 'WebIArtisan API',
         'version' => '1.1.0',
+        'database'=> $dbHealthy,
         'time'    => date('c'),
     ]);
 } else {

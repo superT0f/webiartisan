@@ -7,7 +7,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, '../artisans-shared/src'),
-      '@shared': resolve(__dirname, '../artisans-shared/src')
+      '@shared': resolve(__dirname, '../artisans-shared/src'),
+      pinia: resolve(__dirname, 'node_modules/pinia'),
     }
   },
   server: {

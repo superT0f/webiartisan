@@ -80,11 +80,10 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { getProspect, getMyProspects, followProspect, unfollowProspect } from '../api.js'
 
 const route = useRoute()
-const router = useRouter()
 
 const prospect = ref(null)
 const loading = ref(true)

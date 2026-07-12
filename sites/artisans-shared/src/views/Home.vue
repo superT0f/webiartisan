@@ -325,8 +325,8 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { fetchArtisans, fetchCategories, fetchCityPois, fetchWeather,
-  weatherInfo, DAYS, formatTime, todayIndex,
-  CITY_NAME, CITY_CP, CITY_SLUG, CITY_LAT, CITY_LNG
+  weatherInfo, formatTime, todayIndex,
+  CITY_NAME, CITY_CP, CITY_LAT, CITY_LNG
 } from '../api.js'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
