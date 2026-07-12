@@ -1011,7 +1011,7 @@ function artisan_me(PDO $pdo): void
             a.latitude, a.longitude,
             a.logo_url, a.cover_url,
             a.is_verified, a.is_featured, a.status,
-            a.auth_token, a.auth_token_hash,
+            a.auth_token_hash,
             c.slug AS city_slug, c.name AS city_name, c.postal_code,
             cat.slug AS category_slug, cat.name AS category_name,
             cat.icon AS category_icon, cat.color AS category_color,
@@ -1021,7 +1021,7 @@ function artisan_me(PDO $pdo): void
         JOIN local_cities c            ON a.city_id = c.id
         LEFT JOIN local_categories cat ON a.category_id = cat.id
         LEFT JOIN local_reviews r      ON r.artisan_id = a.id AND r.is_approved = 1
-        WHERE (a.auth_token_hash IS NOT NULL OR a.auth_token IS NOT NULL)
+        WHERE a.auth_token_hash IS NOT NULL
           AND a.auth_token_exp > NOW()
         GROUP BY a.id
     ");
@@ -1030,11 +1030,7 @@ function artisan_me(PDO $pdo): void
 
     $artisan = null;
     foreach ($rows as $row) {
-        if (!empty($row['auth_token_hash']) && password_verify($token, $row['auth_token_hash'])) {
-            $artisan = $row;
-            break;
-        }
-        if (empty($row['auth_token_hash']) && !empty($row['auth_token']) && hash_equals($row['auth_token'], $token)) {
+        if (password_verify($token, $row['auth_token_hash'])) {
             $artisan = $row;
             break;
         }
@@ -1077,8 +1073,8 @@ function artisan_update_me(PDO $pdo, array $body): void
     }
 
     $stmt = $pdo->prepare("
-        SELECT id, auth_token, auth_token_hash FROM local_artisans
-        WHERE (auth_token_hash IS NOT NULL OR auth_token IS NOT NULL)
+        SELECT id, auth_token_hash FROM local_artisans
+        WHERE auth_token_hash IS NOT NULL
           AND auth_token_exp > NOW() AND status = 'active'
     ");
     $stmt->execute();
@@ -1086,11 +1082,7 @@ function artisan_update_me(PDO $pdo, array $body): void
 
     $artisan = null;
     foreach ($rows as $row) {
-        if (!empty($row['auth_token_hash']) && password_verify($token, $row['auth_token_hash'])) {
-            $artisan = $row;
-            break;
-        }
-        if (empty($row['auth_token_hash']) && !empty($row['auth_token']) && hash_equals($row['auth_token'], $token)) {
+        if (password_verify($token, $row['auth_token_hash'])) {
             $artisan = $row;
             break;
         }
@@ -1141,8 +1133,8 @@ function artisan_update(PDO $pdo, int $id, array $body): void
     }
 
     $stmt = $pdo->prepare("
-        SELECT id, auth_token, auth_token_hash FROM local_artisans
-        WHERE id = ? AND (auth_token_hash IS NOT NULL OR auth_token IS NOT NULL)
+        SELECT id, auth_token_hash FROM local_artisans
+        WHERE id = ? AND auth_token_hash IS NOT NULL
           AND auth_token_exp > NOW() AND status = 'active'
     ");
     $stmt->execute([$id]);
@@ -1150,11 +1142,7 @@ function artisan_update(PDO $pdo, int $id, array $body): void
 
     $artisan = null;
     foreach ($rows as $row) {
-        if (!empty($row['auth_token_hash']) && password_verify($token, $row['auth_token_hash'])) {
-            $artisan = $row;
-            break;
-        }
-        if (empty($row['auth_token_hash']) && !empty($row['auth_token']) && hash_equals($row['auth_token'], $token)) {
+        if (password_verify($token, $row['auth_token_hash'])) {
             $artisan = $row;
             break;
         }

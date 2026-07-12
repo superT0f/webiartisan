@@ -28,6 +28,7 @@ archives/
 
 # Superpowers docs (specs/plans are local working files)
 docs/superpowers/
+.superpowers/
 sites/api/.env.production
 .nodes.md
 

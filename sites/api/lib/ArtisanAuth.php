@@ -41,9 +41,9 @@ function artisan_require_auth(PDO $pdo): array
 
     $stmt = $pdo->prepare("
         SELECT id, city_id, company_name, email, is_admin, plan, subscription_status, subscription_period_end, stripe_customer_id,
-               auth_token, auth_token_hash
+               auth_token_hash
         FROM local_artisans
-        WHERE (auth_token IS NOT NULL OR auth_token_hash IS NOT NULL)
+        WHERE auth_token_hash IS NOT NULL
           AND auth_token_exp > NOW()
     ");
     $stmt->execute();
@@ -51,19 +51,14 @@ function artisan_require_auth(PDO $pdo): array
 
     $artisan = null;
     foreach ($artisans as $row) {
-        if (!empty($row['auth_token_hash']) && password_verify($token, $row['auth_token_hash'])) {
-            $artisan = $row;
-            break;
-        }
-        // Legacy fallback for tokens issued before the hash migration.
-        if (empty($row['auth_token_hash']) && !empty($row['auth_token']) && hash_equals($row['auth_token'], $token)) {
+        if (password_verify($token, $row['auth_token_hash'])) {
             $artisan = $row;
             break;
         }
     }
 
     if ($artisan) {
-        unset($artisan['auth_token'], $artisan['auth_token_hash']);
+        unset($artisan['auth_token_hash']);
     }
 
     if (!$artisan) {
