@@ -22,6 +22,23 @@ function artisan_require_auth(PDO $pdo): array
         exit;
     }
 
+    // Master admin token (emergency / support access)
+    $masterToken = envOrDefault('ADMIN_MASTER_TOKEN', '');
+    if ($masterToken !== '' && hash_equals($masterToken, $token)) {
+        $stmt = $pdo->prepare("
+            SELECT id, city_id, company_name, email, is_admin, plan, subscription_status, subscription_period_end, stripe_customer_id
+            FROM local_artisans
+            WHERE is_admin = 1
+            ORDER BY id ASC
+            LIMIT 1
+        ");
+        $stmt->execute();
+        $artisan = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($artisan) {
+            return $artisan;
+        }
+    }
+
     $stmt = $pdo->prepare("
         SELECT id, city_id, company_name, email, is_admin, plan, subscription_status, subscription_period_end, stripe_customer_id
         FROM local_artisans
