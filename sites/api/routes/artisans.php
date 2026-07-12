@@ -621,10 +621,11 @@ function artisan_login(PDO $pdo, array $body): void
 
     // Générer un token simple (JWT serait mieux — à améliorer)
     $token = bin2hex(random_bytes(32));
+    $tokenHash = password_hash($token, PASSWORD_DEFAULT);
     $exp   = date('Y-m-d H:i:s', $rememberMe ? strtotime('+365 days') : strtotime('+30 days'));
 
-    $pdo->prepare("UPDATE local_artisans SET auth_token = ?, auth_token_exp = ? WHERE id = ?")
-        ->execute([$token, $exp, $artisan['id']]);
+    $pdo->prepare("UPDATE local_artisans SET auth_token_hash = ?, auth_token_exp = ?, auth_token = NULL WHERE id = ?")
+        ->execute([$tokenHash, $exp, $artisan['id']]);
 
     // Garantir un compte consommateur lié et créer sa session
     $userId = artisan_ensure_user($pdo, (int)$artisan['id'], $email, $artisan['company_name']);
@@ -674,10 +675,11 @@ function artisan_magic_link(PDO $pdo, array $body): void
     }
 
     $token = bin2hex(random_bytes(32));
+    $tokenHash = password_hash($token, PASSWORD_DEFAULT);
     $exp   = date('Y-m-d H:i:s', $rememberMe ? strtotime('+365 days') : strtotime('+1 hour'));
 
-    $pdo->prepare("UPDATE local_artisans SET auth_token = ?, auth_token_exp = ? WHERE id = ?")
-        ->execute([$token, $exp, $artisan['id']]);
+    $pdo->prepare("UPDATE local_artisans SET auth_token_hash = ?, auth_token_exp = ?, auth_token = NULL WHERE id = ?")
+        ->execute([$tokenHash, $exp, $artisan['id']]);
 
     $portalUrl = artisan_portal_url();
     $link      = rtrim($portalUrl, '/') . '/espace?token=' . urlencode($token) . ($rememberMe ? '&rememberMe=1' : '');
@@ -774,7 +776,7 @@ function artisan_consumer_token(PDO $pdo): void
 function artisan_logout(PDO $pdo): void
 {
     $artisan = artisan_require_auth($pdo);
-    $pdo->prepare("UPDATE local_artisans SET auth_token = NULL, auth_token_exp = NULL WHERE id = ?")
+    $pdo->prepare("UPDATE local_artisans SET auth_token_hash = NULL, auth_token = NULL, auth_token_exp = NULL WHERE id = ?")
         ->execute([$artisan['id']]);
     echo json_encode(['success' => true, 'data' => ['message' => 'Déconnecté']]);
 }
@@ -1009,6 +1011,7 @@ function artisan_me(PDO $pdo): void
             a.latitude, a.longitude,
             a.logo_url, a.cover_url,
             a.is_verified, a.is_featured, a.status,
+            a.auth_token, a.auth_token_hash,
             c.slug AS city_slug, c.name AS city_name, c.postal_code,
             cat.slug AS category_slug, cat.name AS category_name,
             cat.icon AS category_icon, cat.color AS category_color,
@@ -1018,12 +1021,24 @@ function artisan_me(PDO $pdo): void
         JOIN local_cities c            ON a.city_id = c.id
         LEFT JOIN local_categories cat ON a.category_id = cat.id
         LEFT JOIN local_reviews r      ON r.artisan_id = a.id AND r.is_approved = 1
-        WHERE a.auth_token = ? AND a.auth_token_exp > NOW()
+        WHERE (a.auth_token_hash IS NOT NULL OR a.auth_token IS NOT NULL)
+          AND a.auth_token_exp > NOW()
         GROUP BY a.id
-        LIMIT 1
     ");
-    $stmt->execute([$token]);
-    $artisan = $stmt->fetch(PDO::FETCH_ASSOC);
+    $stmt->execute();
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $artisan = null;
+    foreach ($rows as $row) {
+        if (!empty($row['auth_token_hash']) && password_verify($token, $row['auth_token_hash'])) {
+            $artisan = $row;
+            break;
+        }
+        if (empty($row['auth_token_hash']) && !empty($row['auth_token']) && hash_equals($row['auth_token'], $token)) {
+            $artisan = $row;
+            break;
+        }
+    }
 
     if (!$artisan) {
         http_response_code(403);
@@ -1031,7 +1046,7 @@ function artisan_me(PDO $pdo): void
         return;
     }
 
-    unset($artisan['password_hash'], $artisan['auth_token'], $artisan['auth_token_exp']);
+    unset($artisan['password_hash'], $artisan['auth_token'], $artisan['auth_token_exp'], $artisan['auth_token_hash']);
     $artisan['is_featured']    = (bool)$artisan['is_featured'];
     $artisan['is_verified']    = (bool)$artisan['is_verified'];
     $artisan['email_verified'] = (bool)($artisan['email_verified'] ?? 0);
@@ -1062,11 +1077,24 @@ function artisan_update_me(PDO $pdo, array $body): void
     }
 
     $stmt = $pdo->prepare("
-        SELECT id FROM local_artisans
-        WHERE auth_token = ? AND auth_token_exp > NOW() AND status = 'active'
+        SELECT id, auth_token, auth_token_hash FROM local_artisans
+        WHERE (auth_token_hash IS NOT NULL OR auth_token IS NOT NULL)
+          AND auth_token_exp > NOW() AND status = 'active'
     ");
-    $stmt->execute([$token]);
-    $artisan = $stmt->fetch(PDO::FETCH_ASSOC);
+    $stmt->execute();
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $artisan = null;
+    foreach ($rows as $row) {
+        if (!empty($row['auth_token_hash']) && password_verify($token, $row['auth_token_hash'])) {
+            $artisan = $row;
+            break;
+        }
+        if (empty($row['auth_token_hash']) && !empty($row['auth_token']) && hash_equals($row['auth_token'], $token)) {
+            $artisan = $row;
+            break;
+        }
+    }
 
     if (!$artisan) {
         http_response_code(403);
@@ -1113,11 +1141,26 @@ function artisan_update(PDO $pdo, int $id, array $body): void
     }
 
     $stmt = $pdo->prepare("
-        SELECT id FROM local_artisans
-        WHERE id = ? AND auth_token = ? AND auth_token_exp > NOW() AND status = 'active'
+        SELECT id, auth_token, auth_token_hash FROM local_artisans
+        WHERE id = ? AND (auth_token_hash IS NOT NULL OR auth_token IS NOT NULL)
+          AND auth_token_exp > NOW() AND status = 'active'
     ");
-    $stmt->execute([$id, $token]);
-    if (!$stmt->fetch()) {
+    $stmt->execute([$id]);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $artisan = null;
+    foreach ($rows as $row) {
+        if (!empty($row['auth_token_hash']) && password_verify($token, $row['auth_token_hash'])) {
+            $artisan = $row;
+            break;
+        }
+        if (empty($row['auth_token_hash']) && !empty($row['auth_token']) && hash_equals($row['auth_token'], $token)) {
+            $artisan = $row;
+            break;
+        }
+    }
+
+    if (!$artisan) {
         http_response_code(403);
         echo json_encode(['success' => false, 'error' => 'Token invalide ou expiré']);
         return;
