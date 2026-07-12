@@ -79,6 +79,8 @@ switch ($method) {
             artisan_validate_spin_win($pdo, $segments[3]);
         } elseif ($action === 'me' && $param === 'consumer-token') {
             artisan_consumer_token($pdo);
+        } elseif ($action === 'me' && $param === 'change-password') {
+            artisan_change_password($pdo, $body);
         } else {
             http_response_code(404);
             echo json_encode(['success' => false, 'error' => 'Endpoint inconnu']);
@@ -775,6 +777,58 @@ function artisan_logout(PDO $pdo): void
     $pdo->prepare("UPDATE local_artisans SET auth_token = NULL, auth_token_exp = NULL WHERE id = ?")
         ->execute([$artisan['id']]);
     echo json_encode(['success' => true, 'data' => ['message' => 'Déconnecté']]);
+}
+
+/**
+ * POST /artisans/me/change-password — Change le mot de passe artisan
+ */
+function artisan_change_password(PDO $pdo, array $body): void
+{
+    $artisan = artisan_require_auth($pdo);
+
+    $current = $body['current_password'] ?? '';
+    $new     = $body['new_password'] ?? '';
+    $confirm = $body['confirm_password'] ?? '';
+
+    if (!$current || !$new || !$confirm) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Tous les champs sont requis']);
+        return;
+    }
+
+    if ($new !== $confirm) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Les nouveaux mots de passe ne correspondent pas']);
+        return;
+    }
+
+    if (strlen($new) < 8) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Le nouveau mot de passe doit faire au moins 8 caractères']);
+        return;
+    }
+
+    $stmt = $pdo->prepare("SELECT password_hash FROM local_artisans WHERE id = ?");
+    $stmt->execute([$artisan['id']]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$row || empty($row['password_hash'])) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Aucun mot de passe défini. Utilisez la connexion par lien magique.']);
+        return;
+    }
+
+    if (!password_verify($current, $row['password_hash'])) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'error' => 'Mot de passe actuel incorrect']);
+        return;
+    }
+
+    $hash = password_hash($new, PASSWORD_BCRYPT);
+    $pdo->prepare("UPDATE local_artisans SET password_hash = ? WHERE id = ?")
+        ->execute([$hash, $artisan['id']]);
+
+    echo json_encode(['success' => true, 'message' => 'Mot de passe mis à jour']);
 }
 
 /**

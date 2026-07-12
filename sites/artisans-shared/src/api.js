@@ -183,6 +183,17 @@ export async function fetchMe(token, options = {}) {
   }, 'Impossible de charger votre profil.')
 }
 
+export async function changeArtisanPassword(token, currentPassword, newPassword, confirmPassword) {
+  return requestJson(`${API_BASE}/artisans/me/change-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Artisan-Token': token,
+    },
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword, confirm_password: confirmPassword }),
+  }, 'Erreur lors du changement de mot de passe.')
+}
+
 export async function updateMe(token, data, options = {}) {
   return requestJson(`${API_BASE}/artisans/me`, {
     method: 'PUT',

@@ -124,6 +124,36 @@
         </div>
       </section>
 
+      <section class="dashboard-section card">
+        <div class="section-title">
+          <h2>🔐 Sécurité</h2>
+        </div>
+        <div class="security-block">
+          <div>
+            <strong>Changer mon mot de passe</strong>
+            <p class="text-muted small">Modifiez le mot de passe de votre espace artisan.</p>
+          </div>
+          <button type="button" class="btn btn-outline" @click="showPasswordForm = !showPasswordForm">
+            {{ showPasswordForm ? 'Annuler' : 'Modifier' }}
+          </button>
+        </div>
+        <form v-if="showPasswordForm" class="password-form" @submit.prevent="submitPasswordChange">
+          <label for="artisan-current-password">Mot de passe actuel</label>
+          <input id="artisan-current-password" v-model="passwordForm.current" type="password" required />
+
+          <label for="artisan-new-password">Nouveau mot de passe</label>
+          <input id="artisan-new-password" v-model="passwordForm.new" type="password" minlength="8" required />
+
+          <label for="artisan-confirm-password">Confirmer le mot de passe</label>
+          <input id="artisan-confirm-password" v-model="passwordForm.confirm" type="password" minlength="8" required />
+
+          <button type="submit" class="btn btn-primary" :disabled="passwordLoading">
+            {{ passwordLoading ? 'Enregistrement…' : 'Enregistrer' }}
+          </button>
+          <p v-if="passwordMessage" class="form-message" :class="passwordMessageType">{{ passwordMessage }}</p>
+        </form>
+      </section>
+
       <section class="dashboard-section card premium-card" :class="{ 'premium-active': isPremium }">
         <div class="section-title">
           <h2>Abonnement</h2>
@@ -283,7 +313,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { requestMagicLink, loginArtisan, fetchMe, updateMe, getMyProspects, getArtisanToken, setArtisanToken, removeArtisanToken, fetchArtisanConsumerToken, setUserToken, logoutArtisan, getSubscriptionStatus, createSubscriptionCheckout, createSubscriptionPortal } from '../api.js'
+import { requestMagicLink, loginArtisan, fetchMe, updateMe, getMyProspects, getArtisanToken, setArtisanToken, removeArtisanToken, fetchArtisanConsumerToken, setUserToken, logoutArtisan, getSubscriptionStatus, createSubscriptionCheckout, createSubscriptionPortal, changeArtisanPassword } from '../api.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -315,6 +345,12 @@ const loadingSubscription = ref(false)
 const subscribing = ref(false)
 let isMounted = false
 const activeControllers = new Set()
+
+const showPasswordForm = ref(false)
+const passwordForm = ref({ current: '', new: '', confirm: '' })
+const passwordLoading = ref(false)
+const passwordMessage = ref('')
+const passwordMessageType = ref('info')
 
 const isPremium = computed(() =>
   subscriptionStatus.value?.plan === 'premium' || artisan.value?.plan === 'premium'
@@ -557,6 +593,39 @@ async function saveProfile() {
   }
 }
 
+async function submitPasswordChange() {
+  passwordMessage.value = ''
+  if (passwordForm.value.new.length < 8) {
+    passwordMessage.value = 'Le nouveau mot de passe doit faire au moins 8 caractères.'
+    passwordMessageType.value = 'error'
+    return
+  }
+  if (passwordForm.value.new !== passwordForm.value.confirm) {
+    passwordMessage.value = 'Les mots de passe ne correspondent pas.'
+    passwordMessageType.value = 'error'
+    return
+  }
+
+  passwordLoading.value = true
+  try {
+    const res = await changeArtisanPassword(token.value, passwordForm.value.current, passwordForm.value.new, passwordForm.value.confirm)
+    if (res.success) {
+      passwordMessage.value = res.message || 'Mot de passe mis à jour.'
+      passwordMessageType.value = 'success'
+      passwordForm.value = { current: '', new: '', confirm: '' }
+      setTimeout(() => { showPasswordForm.value = false }, 1500)
+    } else {
+      passwordMessage.value = res.error || 'Erreur lors de la mise à jour.'
+      passwordMessageType.value = 'error'
+    }
+  } catch (e) {
+    passwordMessage.value = 'Erreur réseau.'
+    passwordMessageType.value = 'error'
+  } finally {
+    passwordLoading.value = false
+  }
+}
+
 async function logout() {
   const currentToken = token.value
   const signal = newAbortSignal()
@@ -763,6 +832,51 @@ watch(() => route.query.token, () => {
   gap: 12px;
 }
 .premium-content p { margin: 0; }
+
+.security-block {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--c-border, #e8e8e8);
+}
+.security-block:last-of-type { border-bottom: none; }
+.security-block strong { display: block; margin-bottom: 4px; }
+
+.password-form {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--c-border, #e8e8e8);
+}
+.password-form label {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.password-form input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+}
+
+.form-message {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+.form-message.success {
+  background: rgba(45, 106, 79, 0.1);
+  color: var(--c-green-dark);
+}
+.form-message.error {
+  background: rgba(183, 28, 28, 0.08);
+  color: #b71c1c;
+}
 
 @media (max-width: 600px) {
   .form-row { grid-template-columns: 1fr; }
