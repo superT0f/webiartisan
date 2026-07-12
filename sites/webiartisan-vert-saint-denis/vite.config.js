@@ -23,6 +23,7 @@ export default defineConfig({
       }
     }
   },
+  publicDir: resolve(__dirname, '../artisans-shared/public'),
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
