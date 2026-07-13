@@ -94,15 +94,37 @@ class RateLimit
 }
 
 /**
+ * Résout l'IP client réelle.
+ * X-Forwarded-For n'est fiable que si le pair direct est un proxy de confiance
+ * (IP privée/réservée = Varnish sur l'infra gPaas). Dans ce cas, la dernière
+ * entrée du XFF est celle ajoutée par Varnish ; les précédentes peuvent être
+ * forgées par le client.
+ */
+function clientIp(): string
+{
+    $remote = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    $isTrustedProxy = filter_var(
+        $remote,
+        FILTER_VALIDATE_IP,
+        FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+    ) === false;
+
+    if ($isTrustedProxy && !empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+        $parts = array_map('trim', explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']));
+        $last = end($parts);
+        if ($last && filter_var($last, FILTER_VALIDATE_IP)) {
+            return $last;
+        }
+    }
+    return $remote;
+}
+
+/**
  * Helper — applique le rate limit et stoppe si dépassé.
  */
 function applyRateLimit(PDO $pdo, string $endpoint): void
 {
-    $ip = $_SERVER['HTTP_X_FORWARDED_FOR']
-        ?? $_SERVER['REMOTE_ADDR']
-        ?? '0.0.0.0';
-    // Prendre uniquement la première IP si liste (proxy)
-    $ip = trim(explode(',', $ip)[0]);
+    $ip = clientIp();
 
     $rl = new RateLimit($pdo);
     if (!$rl->check($endpoint, $ip)) {

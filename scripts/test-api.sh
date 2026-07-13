@@ -44,15 +44,15 @@ curl_json_status() {
 reset_rate_limit() {
   local endpoint="$1"
   if [[ "$MYSQL_AVAILABLE" -eq 1 ]]; then
-    (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
+    (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -h 127.0.0.1 -u webiartisan -pwebiartisan_dev webiartisan \
       -e "DELETE FROM api_rate_limits WHERE endpoint = '$endpoint';" >/dev/null 2>&1 || true)
   fi
 }
 
 # Ensure the demo recipe used below is published (previous runs may have archived it)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if command -v docker >/dev/null 2>&1 && docker compose ps | grep -q mysql; then
-  (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
+if command -v docker >/dev/null 2>&1 && docker compose ps 2>/dev/null | grep -q mysql; then
+  (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -h 127.0.0.1 -u webiartisan -pwebiartisan_dev webiartisan \
     -e "UPDATE local_recipes SET status='published' WHERE slug='tarte-aux-pommes-normandes';" >/dev/null 2>&1 || true)
 fi
 
@@ -82,8 +82,8 @@ curl -s "${BASE_URL}/artisans/register" -X POST -H 'Content-Type: application/js
 
 # Activate and set admin flag
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if command -v docker >/dev/null 2>&1 && docker compose ps | grep -q mysql; then
-  (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
+if command -v docker >/dev/null 2>&1 && docker compose ps 2>/dev/null | grep -q mysql; then
+  (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -h 127.0.0.1 -u webiartisan -pwebiartisan_dev webiartisan \
     -e "UPDATE local_artisans SET status='active', is_admin=1 WHERE email='admin-bot@example.com'; UPDATE local_artisans SET status='active', is_admin=0 WHERE email='user-bot@example.com';" >/dev/null 2>&1 || true)
 fi
 
@@ -111,8 +111,8 @@ if [[ -n "$ADMIN_TOKEN" && -n "$USER_TOKEN" ]]; then
     check "$code" "Archive recipe with admin" "200"
 
     # Restore recipe so public endpoint tests remain idempotent across runs
-    if command -v docker >/dev/null 2>&1 && docker compose ps | grep -q mysql; then
-      (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
+    if command -v docker >/dev/null 2>&1 && docker compose ps 2>/dev/null | grep -q mysql; then
+      (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -h 127.0.0.1 -u webiartisan -pwebiartisan_dev webiartisan \
         -e "UPDATE local_recipes SET status='published' WHERE id=${FIRST_ID};" >/dev/null 2>&1 || true)
     fi
   fi
@@ -125,9 +125,9 @@ echo "== Spin wheel =="
 curl -s "${BASE_URL}/artisans/register" -X POST -H 'Content-Type: application/json' \
   -d '{"company_name":"Spin Artisan","city_slug":"livry","category_slug":"boulangerie","email":"spin-artisan@example.com","phone":"02 00 00 00 20","password":"spinpass123"}' >/dev/null || true
 
-if command -v docker >/dev/null 2>&1 && docker compose ps | grep -q mysql; then
+if command -v docker >/dev/null 2>&1 && docker compose ps 2>/dev/null | grep -q mysql; then
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
+  (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -h 127.0.0.1 -u webiartisan -pwebiartisan_dev webiartisan \
     -e "UPDATE local_artisans SET status='active', plan='premium' WHERE email='spin-artisan@example.com';" >/dev/null 2>&1 || true)
 fi
 
@@ -147,10 +147,10 @@ if [[ -n "$SPIN_ARTISAN_TOKEN" ]]; then
   # Create user and session directly in DB. Use REPLACE so re-runs reset
   # the user row; also explicitly clear spin limits/wins in case the FK
   # does not cascade (defensive against repeated runs the same day).
-  if command -v docker >/dev/null 2>&1 && docker compose ps | grep -q mysql; then
+  if command -v docker >/dev/null 2>&1 && docker compose ps 2>/dev/null | grep -q mysql; then
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     SPIN_SESSION_HASH=$(printf '%s' 'test-session-token-12345' | sha256sum | cut -d' ' -f1)
-    (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
+    (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -h 127.0.0.1 -u webiartisan -pwebiartisan_dev webiartisan \
       -e "DELETE FROM local_spin_daily_limits WHERE user_id = 99999; DELETE FROM local_spin_wins WHERE user_id = 99999; REPLACE INTO local_users (id, email, session_token, session_exp) VALUES (99999, 'spin-user@example.com', '$SPIN_SESSION_HASH', DATE_ADD(NOW(), INTERVAL 1 DAY));" >/dev/null 2>&1 || true)
   fi
 
@@ -195,8 +195,8 @@ MYSQL_AVAILABLE=0
 
 cleanup_profile_tests() {
   if [[ "$MYSQL_AVAILABLE" -eq 1 ]]; then
-    (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
-      -e "DELETE FROM local_user_actions WHERE user_id = $TEST_USER_ID; DELETE FROM local_user_cooldowns WHERE user_id = $TEST_USER_ID; DELETE FROM local_user_badges WHERE user_id = $TEST_USER_ID; DELETE FROM local_user_streaks WHERE user_id = $TEST_USER_ID; DELETE FROM local_users WHERE id = $TEST_USER_ID;") >/dev/null
+    (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -h 127.0.0.1 -u webiartisan -pwebiartisan_dev webiartisan \
+      -e "DELETE FROM local_user_actions WHERE user_id = $TEST_USER_ID; DELETE FROM local_user_cooldowns WHERE user_id = $TEST_USER_ID; DELETE FROM local_user_badges WHERE user_id = $TEST_USER_ID; DELETE FROM local_user_streaks WHERE user_id = $TEST_USER_ID; DELETE FROM local_users WHERE id = $TEST_USER_ID;") >/dev/null 2>&1
   fi
 
   rm -f "$AVATAR_DIR/locked-test.png" "$AVATAR_DIR/locked-test.png.json"
@@ -208,25 +208,37 @@ cleanup_profile_tests() {
 
 trap cleanup_profile_tests EXIT INT TERM
 
-if command -v docker >/dev/null 2>&1 && docker compose ps | grep -q mysql; then
-  if (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
+if command -v docker >/dev/null 2>&1 && docker compose ps 2>/dev/null | grep -q mysql; then
+  if (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -h 127.0.0.1 -u webiartisan -pwebiartisan_dev webiartisan \
     -e "SELECT 1;" >/dev/null 2>&1); then
     MYSQL_AVAILABLE=1
   fi
 fi
 
 if [[ "$MYSQL_AVAILABLE" -eq 1 ]]; then
-  (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
-    -e "REPLACE INTO local_users (id, email, session_token, session_exp) VALUES ($TEST_USER_ID, 'profile-user@example.com', '$PROFILE_USER_HASH', DATE_ADD(NOW(), INTERVAL 1 DAY));" >/dev/null)
+  (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -h 127.0.0.1 -u webiartisan -pwebiartisan_dev webiartisan \
+    -e "REPLACE INTO local_users (id, email, session_token, session_exp) VALUES ($TEST_USER_ID, 'profile-user@example.com', '$PROFILE_USER_HASH', DATE_ADD(NOW(), INTERVAL 1 DAY));" >/dev/null 2>&1)
 fi
 
-echo "--- Test /avatars static files ---"
-# Static avatars are served by nginx at the host root (location /avatars/);
-# the JSON listing under /api/avatars never existed (404).
-AVATARS_BASE_URL="${BASE_URL%/api}"
-curl_json_status "${AVATARS_BASE_URL}/avatars/neutral/default.png" 2>/dev/null
-check "$LAST_HTTP_CODE" "GET /avatars/neutral/default.png" "200"
-echo "✅ /avatars static files served"
+echo "--- Test /avatars ---"
+curl_json_status "${BASE_URL}/avatars?gender=male"
+check "$LAST_HTTP_CODE" "GET /avatars male" "200"
+if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+  assert_json "$JSON_BODY" "d.get('success')" "avatars endpoint should succeed"
+  assert_json "$JSON_BODY" "isinstance(d.get('data'), list)" "avatars data should be a list"
+  assert_json "$JSON_BODY" "len(d.get('data',[])) > 0" "avatars list should not be empty"
+fi
+echo "✅ /avatars returns avatars"
+
+echo "--- Test /avatars neutral and invalid gender ---"
+curl_json_status "${BASE_URL}/avatars?gender=neutral"
+check "$LAST_HTTP_CODE" "GET /avatars neutral gender" "200"
+if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+  assert_json "$JSON_BODY" "d.get('success')" "neutral avatars endpoint should succeed"
+fi
+curl_json_status "${BASE_URL}/avatars?gender=invalid"
+check "$LAST_HTTP_CODE" "GET /avatars invalid gender" "200"
+echo "✅ /avatars handles neutral and invalid gender"
 
 if [[ "$MYSQL_AVAILABLE" -eq 0 ]]; then
   echo "⚠️  Skipping user profile/avatar tests (Docker/MySQL unavailable)"
@@ -370,8 +382,8 @@ fi
 GAMIFICATION_HASH=$(printf '%s' "$GAMIFICATION_TOKEN" | sha256sum | cut -d' ' -f1)
 
 if [[ "$MYSQL_AVAILABLE" -eq 1 ]]; then
-  (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
-    -e "REPLACE INTO local_users (id, email, session_token, session_exp) VALUES ($GAMIFICATION_USER_ID, 'gamification-user@example.com', '$GAMIFICATION_HASH', DATE_ADD(NOW(), INTERVAL 1 DAY));" >/dev/null)
+  (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -h 127.0.0.1 -u webiartisan -pwebiartisan_dev webiartisan \
+    -e "REPLACE INTO local_users (id, email, session_token, session_exp) VALUES ($GAMIFICATION_USER_ID, 'gamification-user@example.com', '$GAMIFICATION_HASH', DATE_ADD(NOW(), INTERVAL 1 DAY));" >/dev/null 2>&1)
 fi
 
 # Public events list
@@ -439,7 +451,7 @@ TESTIMONIALS_MYSQL_AVAILABLE=0
 if command -v docker >/dev/null 2>&1 && docker compose ps 2>/dev/null | grep -q mysql; then
   TESTIMONIALS_MYSQL_AVAILABLE=1
   testimonials_mysql() {
-    (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
+    (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -h 127.0.0.1 -u webiartisan -pwebiartisan_dev webiartisan \
       --init-command="SET time_zone = '+02:00';" -e "$1")
   }
 elif command -v mysql >/dev/null 2>&1 && \
@@ -497,6 +509,12 @@ if [[ -n "$TESTIMONIALS_SESSION_TOKEN" ]]; then
 
   TESTIMONIAL_ID=$(echo "$JSON_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin).get('data',{}).get('id',''))" || true)
   if [[ -n "$TESTIMONIAL_ID" ]]; then
+    # Phase 3 : un nouveau témoignage est 'pending' — l'approuver (comme le
+    # ferait un admin) avant de tester le marquage utile, réservé aux
+    # témoignages visibles publiquement.
+    if [[ "$TESTIMONIALS_MYSQL_AVAILABLE" -eq 1 ]]; then
+      testimonials_mysql "UPDATE local_testimonials SET status = 'approved' WHERE id = $TESTIMONIAL_ID;" >/dev/null 2>&1 || true
+    fi
     curl_json_status -X POST -H "Authorization: Bearer $TESTIMONIALS_SESSION_TOKEN" -H "Content-Type: application/json" \
       "${BASE_URL}/testimonials/${TESTIMONIAL_ID}/helpful"
     check "$LAST_HTTP_CODE" "POST /testimonials/:id/helpful" "200"
@@ -515,9 +533,9 @@ echo "== Mini-games =="
 curl -s "${BASE_URL}/artisans/register" -X POST -H 'Content-Type: application/json' \
   -d '{"company_name":"Games Artisan","city_slug":"livry","category_slug":"boulangerie","email":"games-artisan@example.com","phone":"02 00 00 00 30","password":"gamespass123"}' >/dev/null || true
 
-if command -v docker >/dev/null 2>&1 && docker compose ps | grep -q mysql; then
+if command -v docker >/dev/null 2>&1 && docker compose ps 2>/dev/null | grep -q mysql; then
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
+  (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -h 127.0.0.1 -u webiartisan -pwebiartisan_dev webiartisan \
     -e "UPDATE local_artisans SET status='active' WHERE email='games-artisan@example.com';" >/dev/null 2>&1 || true)
 fi
 
@@ -686,8 +704,8 @@ CONSUMER_EMAIL="consumer-test@example.com"
 CONSUMER_MAGIC_TOKEN="consumer-magic-token-$CONSUMER_USER_ID"
 CONSUMER_MAGIC_HASH=$(printf '%s' "$CONSUMER_MAGIC_TOKEN" | sha256sum | cut -d' ' -f1)
 
-if command -v docker >/dev/null 2>&1 && docker compose ps | grep -q mysql; then
-  (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
+if command -v docker >/dev/null 2>&1 && docker compose ps 2>/dev/null | grep -q mysql; then
+  (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -h 127.0.0.1 -u webiartisan -pwebiartisan_dev webiartisan \
     -e "DELETE FROM local_users WHERE email = '$CONSUMER_EMAIL'; DELETE FROM local_user_actions WHERE user_id = $CONSUMER_USER_ID; DELETE FROM local_user_badges WHERE user_id = $CONSUMER_USER_ID; DELETE FROM local_user_streaks WHERE user_id = $CONSUMER_USER_ID;") >/dev/null 2>&1 || true
 fi
 
@@ -700,7 +718,7 @@ curl_json_status -X POST "${BASE_URL}/users/magic-link" \
 check "$LAST_HTTP_CODE" "POST /users/magic-link" "200"
 
 if [[ "$MYSQL_AVAILABLE" -eq 1 ]]; then
-  (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
+  (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -h 127.0.0.1 -u webiartisan -pwebiartisan_dev webiartisan \
     -e "UPDATE local_users SET magic_token = '$CONSUMER_MAGIC_HASH', magic_token_exp = '2030-01-01 00:00:00' WHERE email = '$CONSUMER_EMAIL';") >/dev/null 2>&1 || true
 fi
 
@@ -719,6 +737,137 @@ if [[ -n "$CONSUMER_MAGIC_TOKEN" ]]; then
     check "$LAST_HTTP_CODE" "GET /users/me consumer" "200"
   fi
 fi
+
+echo ""
+echo "== Phase 3 — authz & modération =="
+
+# === Phase 3 — authz & modération ===
+
+PHASE3_RECIPE_TITLE="TEST PHASE3 MODERATION $(date +%s)"
+
+# Nettoyage des recettes de test Phase 3 (ingrédients/étapes supprimés en cascade)
+cleanup_phase3() {
+  if [[ "${MYSQL_AVAILABLE:-0}" -eq 1 ]]; then
+    (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -h 127.0.0.1 -u webiartisan -pwebiartisan_dev webiartisan \
+      -e "DELETE FROM local_recipes WHERE title LIKE 'TEST PHASE3 MODERATION%';" >/dev/null 2>&1 || true)
+  fi
+}
+
+# Combine with the existing cleanup traps
+combined_cleanup() {
+  cleanup_profile_tests
+  cleanup_testimonials
+  cleanup_phase3
+}
+trap combined_cleanup EXIT INT TERM
+
+# Supprimer les restes d'exécutions interrompues pour garantir l'idempotence
+cleanup_phase3
+
+# Le bucket 'login' (10 req/60s) est partagé par register, gamification et
+# /admin/* : repartir d'un compteur propre avant les tests de modération.
+reset_rate_limit 'login'
+
+# 1. Profil public artisan : pas de colonnes sensibles
+curl_json_status "${BASE_URL}/artisans/1"
+check "$LAST_HTTP_CODE" "GET /artisans/1 (phase 3)" "200"
+if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+  assert_json "$JSON_BODY" "'auth_token_hash' not in json.dumps(d)" "public artisan profile must not expose auth_token_hash"
+  assert_json "$JSON_BODY" "'stripe_customer_id' not in json.dumps(d)" "public artisan profile must not expose stripe_customer_id"
+fi
+
+# 2. Profil gamification public sans email
+#    L'utilisateur 999999 est créé par la section Gamification ci-dessus
+curl_json_status "${BASE_URL}/gamification/999999/xp"
+if [[ "$MYSQL_AVAILABLE" -eq 1 ]]; then
+  check "$LAST_HTTP_CODE" "GET /gamification/999999/xp" "200"
+fi
+if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+  assert_json "$JSON_BODY" "'email' not in d.get('data', {})" "public gamification profile must not expose email"
+else
+  assert_json "$JSON_BODY" "'email' not in json.dumps(d)" "gamification profile error must not leak email"
+fi
+
+# 3. Recette créée en pending et invisible publiquement
+curl_json_status -X POST "${BASE_URL}/recipes" -H 'Content-Type: application/json' \
+  -d "{\"city_slug\":\"livry\",\"title\":\"$PHASE3_RECIPE_TITLE\",\"description\":\"Recette de test Phase 3\",\"ingredients\":[{\"name\":\"Farine\",\"quantity\":100,\"unit\":\"g\"}],\"steps\":[{\"instruction\":\"Melanger tous les ingredients\"}]}"
+check "$LAST_HTTP_CODE" "POST /recipes (soumission communautaire)" "200"
+if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+  assert_json "$JSON_BODY" "d.get('success')" "recipe submission should succeed"
+fi
+
+curl_json_status "${BASE_URL}/recipes?city=livry"
+check "$LAST_HTTP_CODE" "GET /recipes?city=livry après soumission" "200"
+if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+  assert_json "$JSON_BODY" "all(r.get('title') != '$PHASE3_RECIPE_TITLE' for r in d.get('data', []))" "pending recipe must not appear in public list"
+fi
+
+# 4. Modération des recettes : authz (401/403) puis approbation
+if [[ -n "${ADMIN_TOKEN:-}" && -n "${USER_TOKEN:-}" && "$MYSQL_AVAILABLE" -eq 1 ]]; then
+  curl_json_status "${BASE_URL}/admin/moderation/recipes"
+  check "$LAST_HTTP_CODE" "GET /admin/moderation/recipes sans token" "401"
+
+  curl_json_status "${BASE_URL}/admin/moderation/recipes" -H "X-Artisan-Token: $USER_TOKEN"
+  check "$LAST_HTTP_CODE" "GET /admin/moderation/recipes non-admin" "403"
+
+  curl_json_status "${BASE_URL}/admin/moderation/recipes" -H "X-Artisan-Token: $ADMIN_TOKEN"
+  check "$LAST_HTTP_CODE" "GET /admin/moderation/recipes admin" "200"
+  if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+    assert_json "$JSON_BODY" "any(r.get('title') == '$PHASE3_RECIPE_TITLE' for r in d.get('data', []))" "pending recipe should appear in moderation queue"
+    PHASE3_RECIPE_ID=$(echo "$JSON_BODY" | python3 -c "import sys,json; rows=json.load(sys.stdin).get('data',[]); m=[r['id'] for r in rows if r.get('title')==sys.argv[1]]; print(m[0] if m else '')" "$PHASE3_RECIPE_TITLE" 2>/dev/null || true)
+  fi
+
+  if [[ -n "${PHASE3_RECIPE_ID:-}" ]]; then
+    curl_json_status -X POST "${BASE_URL}/admin/moderation/recipes/${PHASE3_RECIPE_ID}/approve" -H "X-Artisan-Token: $ADMIN_TOKEN"
+    check "$LAST_HTTP_CODE" "POST /admin/moderation/recipes/:id/approve" "200"
+
+    curl_json_status "${BASE_URL}/recipes?city=livry"
+    check "$LAST_HTTP_CODE" "GET /recipes?city=livry après approbation" "200"
+    if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+      assert_json "$JSON_BODY" "any(r.get('title') == '$PHASE3_RECIPE_TITLE' for r in d.get('data', []))" "approved recipe should appear in public list"
+    fi
+  fi
+else
+  echo "⚠️  Skipping recipe moderation tests (admin fixture or MySQL unavailable)"
+fi
+
+# 5. Témoignage créé en pending : invisible publiquement, réponse explicite
+if [[ -n "${TESTIMONIALS_SESSION_TOKEN:-}" ]]; then
+  PHASE3_TESTIMONIAL_CONTENT="TEST PHASE3 temoignage en attente de moderation"
+  curl_json_status -X POST -H "Authorization: Bearer $TESTIMONIALS_SESSION_TOKEN" -H "Content-Type: application/json" \
+    -d "{\"artisan_id\":1,\"content\":\"$PHASE3_TESTIMONIAL_CONTENT\"}" "${BASE_URL}/testimonials"
+  check "$LAST_HTTP_CODE" "POST /testimonials (phase 3)" "200"
+  if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+    assert_json "$JSON_BODY" "d.get('success')" "testimonial submission should succeed"
+    assert_json "$JSON_BODY" "'après validation' in d.get('data', {}).get('message', '')" "testimonial response should mention moderation"
+  fi
+
+  curl_json_status "${BASE_URL}/testimonials?city=livry"
+  check "$LAST_HTTP_CODE" "GET /testimonials?city=livry (phase 3)" "200"
+  if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+    assert_json "$JSON_BODY" "all(t.get('content') != '$PHASE3_TESTIMONIAL_CONTENT' for t in d.get('data', []))" "pending testimonial must not appear in public list"
+  fi
+else
+  echo "⚠️  Skipping pending testimonial test (no consumer session)"
+fi
+
+# 6. Rate limit non contournable par XFF forgé — vérification statique
+#    (la stack docker de dev n'a pas de reverse proxy de confiance en amont,
+#    le comportement XFF ne peut pas y être reproduit par un test HTTP)
+RATE_LIMIT_FILE="$SCRIPT_DIR/../sites/api/middleware/RateLimit.php"
+if [[ -f "$RATE_LIMIT_FILE" ]] && grep -q 'function clientIp' "$RATE_LIMIT_FILE"; then
+  echo "✅ clientIp() est défini dans middleware/RateLimit.php"
+else
+  fail "clientIp() introuvable dans middleware/RateLimit.php"
+fi
+if [[ -f "$RATE_LIMIT_FILE" ]] && grep -A10 'function applyRateLimit' "$RATE_LIMIT_FILE" | grep -q 'clientIp()'; then
+  echo "✅ applyRateLimit() utilise clientIp()"
+else
+  fail "applyRateLimit() n'utilise pas clientIp()"
+fi
+
+# Nettoyage immédiat de la recette approuvée (le trap couvre les interruptions)
+cleanup_phase3
 
 if [[ "$FAILED" -ne 0 ]]; then
   echo "❌ Some API tests failed."
