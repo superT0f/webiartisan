@@ -98,15 +98,15 @@ function user_magic_link(PDO $pdo, array $body): void
 
     $rememberMe = !empty($body['rememberMe']);
 
-    $rawRedirect = $body['redirect'] ?? '/roue';
+    $rawRedirect = $body['redirect'] ?? '/carte';
     if (!is_string($rawRedirect)) {
-        $rawRedirect = '/roue';
+        $rawRedirect = '/carte';
     }
     $rawRedirect = trim($rawRedirect);
     $redirect = trim(urldecode($rawRedirect));
     if ($redirect === '' || $redirect[0] !== '/' || preg_match('#^//#', $redirect) || strpbrk($redirect, "\r\n#") !== false || strpos($redirect, '..') !== false) {
-        $redirect = '/roue';
-        $rawRedirect = '/roue';
+        $redirect = '/carte';
+        $rawRedirect = '/carte';
     }
 
     $startTime = microtime(true);
@@ -169,14 +169,14 @@ function user_magic_link(PDO $pdo, array $body): void
 
     $safeLink = htmlspecialchars($link, ENT_QUOTES, 'UTF-8');
 
-    $subject = 'Votre lien pour tourner la roue des artisans';
+    $subject = 'Votre lien pour jouer sur la carte des artisans';
     $html = <<<HTML
 <!DOCTYPE html>
 <html><body style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 20px;">
   <h2 style="color: #1a1a2e;">Bonjour,</h2>
-  <p>Voici votre lien sécurisé pour tourner la roue des artisans de Livry :</p>
+  <p>Voici votre lien sécurisé pour jouer sur la carte des artisans :</p>
   <div style="text-align: center; margin: 24px 0;">
-    <a href="{$safeLink}" style="display: inline-block; background: #1a1a2e; color: #fff; padding: 14px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">Tourner la roue</a>
+    <a href="{$safeLink}" style="display: inline-block; background: #1a1a2e; color: #fff; padding: 14px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">Jouer sur la carte</a>
   </div>
   <p style="color: #888; font-size: 13px;">Ce lien est valable 1 heure. Si vous ne l'avez pas demandé, ignorez cet email.</p>
 </body></html>
