@@ -288,7 +288,16 @@ function artisan_get(PDO $pdo, int $id): void
     }
 
     // Retirer les champs sensibles
-    unset($artisan['password_hash'], $artisan['auth_token'], $artisan['auth_token_exp']);
+    unset(
+        $artisan['password_hash'],
+        $artisan['auth_token'],
+        $artisan['auth_token_exp'],
+        $artisan['auth_token_hash'],
+        $artisan['auth_token_lookup'],
+        $artisan['stripe_customer_id'],
+        $artisan['stripe_subscription_id'],
+        $artisan['user_id']
+    );
 
     $artisan['is_featured']  = (bool)$artisan['is_featured'];
     $artisan['is_verified']  = (bool)$artisan['is_verified'];
