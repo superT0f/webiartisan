@@ -24,6 +24,10 @@ function artisan_require_auth(PDO $pdo): array
 
     // Master admin token (emergency / support access)
     $masterToken = envOrDefault('ADMIN_MASTER_TOKEN', '');
+    if ($masterToken !== '' && (strlen($masterToken) !== 300 || !ctype_xdigit($masterToken))) {
+        error_log('[ARTISAN-AUTH] ADMIN_MASTER_TOKEN set but invalid (must be 300 hex chars) — ignoring');
+        $masterToken = '';
+    }
     if ($masterToken !== '' && hash_equals($masterToken, $token)) {
         $stmt = $pdo->prepare("
             SELECT id, city_id, company_name, email, is_admin, plan, subscription_status, subscription_period_end, stripe_customer_id
