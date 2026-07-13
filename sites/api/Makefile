@@ -45,6 +45,7 @@ push:
 		--exclude='Makefile' \
 		--exclude='production' \
 		--exclude='tests/' \
+		--exclude='migrations/' \
 		--exclude='*.md' \
 		--exclude='composer.lock' \
 		--exclude='*.backup.*' \
@@ -69,6 +70,7 @@ status:
 		--exclude='Makefile' \
 		--exclude='production' \
 		--exclude='tests/' \
+		--exclude='migrations/' \
 		--exclude='*.md' \
 		--exclude='composer.lock' \
 		--exclude='*.backup.*' \
