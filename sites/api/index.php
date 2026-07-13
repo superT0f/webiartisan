@@ -38,6 +38,12 @@ if (file_exists($adminLoggerPath)) {
 }
 
 header('Content-Type: application/json; charset=UTF-8');
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: DENY');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+    header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+}
 
 // Load Composer autoloader
 require_once __DIR__ . '/vendor/autoload.php';
@@ -64,6 +70,15 @@ foreach ($env as $key => $value) {
         continue;
     }
     $_ENV[$key] = $value;
+}
+
+$appEnv = $_ENV['APP_ENV'] ?? 'production';
+$jwtSecret = $_ENV['JWT_SECRET'] ?? '';
+if ($appEnv === 'production' && (strlen($jwtSecret) < 32)) {
+    http_response_code(500);
+    header('Content-Type: application/json; charset=UTF-8');
+    echo json_encode(['success' => false, 'error' => 'Configuration error: JWT_SECRET too weak']);
+    exit;
 }
 
 // Database connection used by rate limiting and route files

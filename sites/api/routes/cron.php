@@ -18,7 +18,7 @@ if ($cronAction !== 'process-email-queue') {
 $secret   = $_ENV['CRON_SECRET'] ?? '';
 $provided = $_GET['token'] ?? '';
 
-if (!$secret || $provided !== $secret) {
+if (!$secret || !hash_equals($secret, $provided)) {
     http_response_code(403);
     echo json_encode(['success' => false, 'error' => 'Forbidden']);
     exit;
