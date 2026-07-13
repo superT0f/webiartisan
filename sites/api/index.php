@@ -79,6 +79,15 @@ foreach ($env as $key => $value) {
     $_ENV[$key] = $value;
 }
 
+// The shared admin Logger (loaded above) populates $_ENV from its own vhost's
+// .env, which can diverge from this app's. Re-assert this app's DB credentials
+// from its own .env unless real environment variables are set (docker-compose).
+foreach (['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASS'] as $dbKey) {
+    if (isset($env[$dbKey]) && getenv($dbKey) === false) {
+        $_ENV[$dbKey] = $env[$dbKey];
+    }
+}
+
 $appEnv = $_ENV['APP_ENV'] ?? 'production';
 $jwtSecret = $_ENV['JWT_SECRET'] ?? '';
 if ($appEnv === 'production' && (strlen($jwtSecret) < 64)) {
