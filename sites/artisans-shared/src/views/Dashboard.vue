@@ -174,7 +174,7 @@
         </div>
         <div v-else class="premium-content">
           <p class="text-muted">
-            Passez Premium pour débloquer les mini-jeux avancés, la roue des artisans et plus de services.
+            Passez Premium pour débloquer « Tournez l'avatar » en boutique et plus de services.
           </p>
           <button type="button" class="btn btn-gold" @click="startCheckout" :disabled="subscribing">
             {{ subscribing ? 'Redirection…' : 'Passer Premium — 2,99 €/mois' }}
@@ -228,7 +228,7 @@
         </div>
         <div class="prospect-list">
           <button type="button" class="prospect-mini" @click="playAsConsumer" :disabled="linkingConsumer">
-            <div><strong>Jouer aux mini-jeux</strong><span class="text-muted small">Participer comme un habitant</span></div>
+            <div><strong>Jouer sur la carte</strong><span class="text-muted small">Participer comme un habitant</span></div>
             <span class="badge badge-green">{{ linkingConsumer ? 'Lien…' : 'Jouer' }}</span>
           </button>
         </div>
@@ -659,7 +659,7 @@ async function playAsConsumer() {
     if (!isMounted || !token.value) return
     if (res.success && res.data?.token) {
       setUserToken(res.data.token, true)
-      router.push('/jeux')
+      router.push('/carte')
     } else {
       setMessage(res.error || 'Impossible de créer le compte joueur.', 'error')
     }

@@ -14,7 +14,6 @@
         <RouterLink to="/carte" class="nav-link nav-link-featured">🗺️ Carte des artisans</RouterLink>
         <RouterLink to="/temoignages" class="nav-link">Avis</RouterLink>
         <RouterLink to="/prospection" class="nav-link">Prospection</RouterLink>
-        <RouterLink to="/jeux" class="nav-link">🎮 Jeux</RouterLink>
         <RouterLink to="/#services-locaux" class="nav-link" @click.prevent="scrollTo('services-locaux')">Services locaux</RouterLink>
         <RouterLink v-if="!user" to="/profil" class="nav-link">Se connecter / Mon compte</RouterLink>
         <RouterLink to="/espace" class="nav-link">Mon espace</RouterLink>
@@ -47,7 +46,6 @@
         <RouterLink to="/carte" class="nav-mobile-link nav-link-featured">🗺️ Carte des artisans</RouterLink>
         <RouterLink to="/temoignages" class="nav-mobile-link">💬 Avis locaux</RouterLink>
         <RouterLink to="/prospection" class="nav-mobile-link">🎯 Prospection</RouterLink>
-        <RouterLink to="/jeux" class="nav-mobile-link">🎮 Jeux</RouterLink>
         <a href="/#meteo" class="nav-mobile-link">🌤️ Météo locale</a>
         <a href="/#services-locaux" class="nav-mobile-link">🏙️ Services locaux</a>
         <RouterLink v-if="!user" to="/profil" class="nav-mobile-link">👤 Se connecter / Mon compte</RouterLink>

@@ -1042,14 +1042,6 @@ export async function fetchGames(filters = {}) {
   return res.json()
 }
 
-export async function fetchGame(id) {
-  const res = await fetch(`${API_BASE}/games/${id}`, {
-    headers: { ...userHeaders() },
-  })
-  if (!res.ok) throw new Error('Jeu non trouvé')
-  return res.json()
-}
-
 export async function playGame(id, data = {}) {
   const res = await fetch(`${API_BASE}/games/${id}/play`, {
     method: 'POST',

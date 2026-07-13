@@ -6,7 +6,6 @@
  * GET  /games?city=livry&artisan_id=...
  * GET  /games/:id
  * POST /games/:id/play
- * POST /games/:id/claim
  */
 
 require_once __DIR__ . '/../lib/Games.php';
@@ -30,8 +29,6 @@ switch ($method) {
         $body = json_decode(file_get_contents('php://input'), true) ?? [];
         if (filter_var($action, FILTER_VALIDATE_INT) && $param === 'play') {
             games_play($pdo, (int)$action, $body);
-        } elseif (filter_var($action, FILTER_VALIDATE_INT) && $param === 'claim') {
-            games_claim($pdo, (int)$action, $body);
         } else {
             http_response_code(404);
             echo json_encode(['success' => false, 'error' => 'Endpoint inconnu']);
@@ -208,13 +205,4 @@ function games_play(PDO $pdo, int $id, array $body): void
     }
 
     echo json_encode(['success' => true, 'data' => $result]);
-}
-
-function games_claim(PDO $pdo, int $id, array $body): void
-{
-    user_require_auth($pdo);
-    // Claim logic: update reward stock and return coupon code.
-    // Minimal implementation: return the reward label from the last play.
-    http_response_code(501);
-    echo json_encode(['success' => false, 'error' => 'Non implémenté']);
 }

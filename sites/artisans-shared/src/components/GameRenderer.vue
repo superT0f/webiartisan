@@ -12,8 +12,6 @@
 <script setup>
 import { computed } from 'vue'
 import CouponGame from './games/CouponGame.vue'
-import PollGame from './games/PollGame.vue'
-import VoteBattleGame from './games/VoteBattleGame.vue'
 
 const props = defineProps({
   instanceId: { type: [String, Number], required: true },
@@ -22,17 +20,5 @@ const props = defineProps({
 })
 defineEmits(['played'])
 
-const engines = {
-  CouponGame,
-  PollGame,
-  VoteBattleGame,
-}
-
-const engineComponent = computed(() => {
-  const key = props.gameType === 'coupon' ? 'CouponGame'
-    : props.gameType === 'poll' ? 'PollGame'
-    : props.gameType === 'vote' ? 'VoteBattleGame'
-    : null
-  return engines[key]
-})
+const engineComponent = computed(() => props.gameType === 'coupon' ? CouponGame : null)
 </script>
