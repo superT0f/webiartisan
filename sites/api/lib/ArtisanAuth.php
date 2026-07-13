@@ -46,7 +46,7 @@ function artisan_require_auth(PDO $pdo): array
     $tokenLookup = hash('sha256', $token);
     $stmt = $pdo->prepare("
         SELECT id, city_id, company_name, email, is_admin, plan, subscription_status, subscription_period_end, stripe_customer_id,
-               auth_token_hash
+               auth_token_hash, status
         FROM local_artisans
         WHERE auth_token_lookup = ?
           AND auth_token_hash IS NOT NULL
@@ -58,6 +58,13 @@ function artisan_require_auth(PDO $pdo): array
 
     if ($artisan && !password_verify($token, $artisan['auth_token_hash'])) {
         $artisan = null;
+    }
+
+    if ($artisan && $artisan['status'] !== 'active') {
+        error_log("[ARTISAN-AUTH] suspended account access attempt, id={$artisan['id']}, ip={$ip}");
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Compte suspendu']);
+        exit;
     }
 
     if ($artisan) {
