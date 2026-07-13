@@ -4,10 +4,10 @@
 
     <AuthForm v-if="!token" />
 
-    <div v-else-if="loading" class="spin-loading">Chargement…</div>
+    <div v-else-if="loading && !result" class="spin-loading">Chargement…</div>
 
     <template v-else>
-      <div v-if="alreadySpun" class="spin-message">
+      <div v-if="alreadySpun && !showResult" class="spin-message">
         <h3>Vous avez déjà tourné aujourd'hui 🎉</h3>
         <p>Revenez demain pour une nouvelle chance.</p>
       </div>
@@ -82,7 +82,7 @@ function parisTodayIso() {
 }
 
 function toParisIso(iso) {
-  const [datePart] = String(iso).split('T')
+  const [datePart] = String(iso).split(/[T ]/)
   const [y, m, d] = datePart.split('-').map(Number)
   if (!y || !m || !d) return null
   const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0))
