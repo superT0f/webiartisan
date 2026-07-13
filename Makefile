@@ -75,4 +75,4 @@ console:
 	@python3 scripts/gpaas-console.py
 
 console-exec:
-	@python3 scripts/gpaas-console.py exec "$(CMD)"
+	@python3 scripts/gpaas-console.py exec '$(CMD)'
