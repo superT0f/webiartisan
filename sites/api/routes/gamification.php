@@ -56,6 +56,8 @@ function gamification_user_profile_endpoint(PDO $pdo, int $userId): void
         echo json_encode(['success' => false, 'error' => 'Utilisateur non trouvé']);
         return;
     }
+    // Endpoint public : ne pas exposer l'email (énumération possible par id)
+    unset($profile['email']);
     echo json_encode(['success' => true, 'data' => $profile]);
 }
 
