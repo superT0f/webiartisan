@@ -1,4 +1,4 @@
-.PHONY: help up down migrate seed build dev test-api push-api push-app push-livry build-combs push-combs build-vsd push-vsd deploy-all
+.PHONY: help up down migrate seed build dev test-api push-api push-app push-livry build-combs push-combs build-vsd push-vsd deploy-all console console-exec
 
 APP_VERSION := $(shell cat .version 2>/dev/null || echo 2.0.1)
 
@@ -19,6 +19,8 @@ help:
 	@echo "  make build-vsd       Build Vert-Saint-Denis frontend"
 	@echo "  make push-vsd        Deploy Vert-Saint-Denis to Gandi"
 	@echo "  make deploy-all      Build & push Livry, Combs and VSD"
+	@echo "  make console         Open Gandi gPaas emergency console (SSH)"
+	@echo "  make console-exec CMD='...'  Run one command on the emergency console"
 
 up:
 	@docker compose up -d --build
@@ -66,3 +68,11 @@ push-vsd:
 	@VITE_APP_VERSION=$(APP_VERSION) $(MAKE) -C sites/webiartisan-vert-saint-denis push
 
 deploy-all: build push-livry build-combs push-combs build-vsd push-vsd
+
+console:
+	@echo "Admin web (Gandi Simple Hosting):"
+	@echo "  https://admin.gandi.net/simplehosting/94bfdc39-ba8a-46ad-aff8-633112a25dfc/instances/c82ad26c-00cd-11ea-81f0-00163e108e85/administration"
+	@python3 scripts/gpaas-console.py
+
+console-exec:
+	@python3 scripts/gpaas-console.py exec "$(CMD)"
