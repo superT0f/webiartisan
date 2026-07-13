@@ -285,7 +285,7 @@ onUnmounted(() => {
     <SpinOverlay v-if="overlay === 'spin'" :artisan="selected" @close="overlay = null" />
 
     <GameOverlay v-if="overlay === 'auth'" title="Connexion" @close="overlay = null">
-      <AuthForm />
+      <AuthForm @authenticated="overlay = null" />
     </GameOverlay>
   </div>
 </template>

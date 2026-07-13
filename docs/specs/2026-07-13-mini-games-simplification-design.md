@@ -122,7 +122,7 @@ CREATE TABLE local_checkins (
 
 **Migration**:
 
-- SQL `037`: create `local_checkins`, reseed `local_game_types` (keep `coupon`, add `wheel` mapped to the legacy system), idempotent (`CREATE TABLE IF NOT EXISTS`, `INSERT ... ON DUPLICATE KEY`).
+- SQL `039`: create `local_checkins`, reseed `local_game_types` (keep `coupon`, add `wheel` mapped to the legacy system), idempotent (`CREATE TABLE IF NOT EXISTS`, `INSERT ... ON DUPLICATE KEY`).
 - Free-tier active-game limit 2 → 1: no artisan has configured any game, zero impact.
 - Deploy order (existing Makefile flow): SQL migration → API → city frontends.
 

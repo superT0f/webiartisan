@@ -1810,6 +1810,14 @@ function artisan_create_game(PDO $pdo, array $body): void
         return;
     }
 
+    // Only the coupon is instantiated as a game instance; the wheel (premium)
+    // is managed via the legacy spin system (/artisans/me/spin-offers).
+    if ($gameTypeKey !== 'coupon') {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Type de jeu non disponible']);
+        return;
+    }
+
     if ((bool)$type['is_premium'] && !artisanIsPremium($pdo, $artisanId)) {
         http_response_code(403);
         echo json_encode(['success' => false, 'error' => 'Type de jeu premium']);
