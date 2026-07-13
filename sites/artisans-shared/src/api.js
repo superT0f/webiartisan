@@ -358,7 +358,7 @@ function userHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
-export async function requestUserMagicLink(email, rememberMe = true, redirect = '/roue') {
+export async function requestUserMagicLink(email, rememberMe = true, redirect = '/carte') {
   const res = await fetch(`${API_BASE}/users/magic-link`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1097,4 +1097,22 @@ export async function deleteArtisanGame(token, gameId) {
     headers: { 'X-Artisan-Token': token },
   })
   return res.json()
+}
+
+// --- Check-ins -----------------------------------------------------
+
+export async function postCheckin({ target_type, target_id, lat, lng }, options = {}) {
+  return requestJson(`${API_BASE}/checkin`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...userHeaders() },
+    body: JSON.stringify({ target_type, target_id, lat, lng }),
+    signal: options.signal,
+  }, 'Erreur lors du check-in.')
+}
+
+export async function getCheckinStatus(lat, lng, options = {}) {
+  return requestJson(`${API_BASE}/checkin/status?lat=${lat}&lng=${lng}`, {
+    headers: { ...userHeaders() },
+    signal: options.signal,
+  }, 'Impossible de charger les points à proximité.')
 }
