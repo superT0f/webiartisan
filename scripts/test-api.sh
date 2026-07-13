@@ -220,25 +220,13 @@ if [[ "$MYSQL_AVAILABLE" -eq 1 ]]; then
     -e "REPLACE INTO local_users (id, email, session_token, session_exp) VALUES ($TEST_USER_ID, 'profile-user@example.com', '$PROFILE_USER_HASH', DATE_ADD(NOW(), INTERVAL 1 DAY));" >/dev/null)
 fi
 
-echo "--- Test /avatars ---"
-curl_json_status "${BASE_URL}/avatars?gender=male"
-check "$LAST_HTTP_CODE" "GET /avatars male" "200"
-if [[ "$LAST_HTTP_CODE" == "200" ]]; then
-  assert_json "$JSON_BODY" "d.get('success')" "avatars endpoint should succeed"
-  assert_json "$JSON_BODY" "isinstance(d.get('data'), list)" "avatars data should be a list"
-  assert_json "$JSON_BODY" "len(d.get('data',[])) > 0" "avatars list should not be empty"
-fi
-echo "✅ /avatars returns avatars"
-
-echo "--- Test /avatars neutral and invalid gender ---"
-curl_json_status "${BASE_URL}/avatars?gender=neutral"
-check "$LAST_HTTP_CODE" "GET /avatars neutral gender" "200"
-if [[ "$LAST_HTTP_CODE" == "200" ]]; then
-  assert_json "$JSON_BODY" "d.get('success')" "neutral avatars endpoint should succeed"
-fi
-curl_json_status "${BASE_URL}/avatars?gender=invalid"
-check "$LAST_HTTP_CODE" "GET /avatars invalid gender" "200"
-echo "✅ /avatars handles neutral and invalid gender"
+echo "--- Test /avatars static files ---"
+# Static avatars are served by nginx at the host root (location /avatars/);
+# the JSON listing under /api/avatars never existed (404).
+AVATARS_BASE_URL="${BASE_URL%/api}"
+curl_json_status "${AVATARS_BASE_URL}/avatars/neutral/default.png" 2>/dev/null
+check "$LAST_HTTP_CODE" "GET /avatars/neutral/default.png" "200"
+echo "✅ /avatars static files served"
 
 if [[ "$MYSQL_AVAILABLE" -eq 0 ]]; then
   echo "⚠️  Skipping user profile/avatar tests (Docker/MySQL unavailable)"
@@ -541,6 +529,7 @@ curl_json_status "${BASE_URL}/games/types"
 check "$LAST_HTTP_CODE" "GET /games/types" "200"
 if [[ "$LAST_HTTP_CODE" == "200" ]]; then
   assert_json "$JSON_BODY" "d.get('success')" "game types should succeed"
+  assert_json "$JSON_BODY" "all(e.get('key') in ('coupon','wheel') for e in d.get('data',[]))" "game types should only contain coupon and wheel"
 fi
 
 curl_json_status "${BASE_URL}/games?city=livry"
@@ -581,6 +570,115 @@ if [[ -n "$GAMES_ARTISAN_TOKEN" ]]; then
 fi
 
 echo ""
+echo "== Check-ins =="
+
+CHECKIN_USER_ID=999990
+if command -v openssl >/dev/null 2>&1; then
+  CHECKIN_TOKEN="checkin-$(openssl rand -hex 16)"
+else
+  CHECKIN_TOKEN="checkin-$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
+fi
+CHECKIN_HASH=$(printf '%s' "$CHECKIN_TOKEN" | sha256sum | cut -d' ' -f1)
+
+# POST /checkin requires auth
+curl_json_status -X POST "${BASE_URL}/checkin" -H 'Content-Type: application/json' \
+  -d '{"target_type":"artisan","target_id":1,"lat":49.1081,"lng":-0.7658}'
+check "$LAST_HTTP_CODE" "POST /checkin without token" "401"
+
+if [[ "$MYSQL_AVAILABLE" -eq 1 ]]; then
+  (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
+    -e "DELETE FROM local_user_cooldowns WHERE user_id = $CHECKIN_USER_ID;
+        DELETE FROM local_user_actions WHERE user_id = $CHECKIN_USER_ID;
+        DELETE FROM local_checkins WHERE user_id = $CHECKIN_USER_ID;
+        REPLACE INTO local_users (id, email, session_token, session_exp)
+        VALUES ($CHECKIN_USER_ID, 'checkin-user@example.com', '$CHECKIN_HASH', DATE_ADD(NOW(), INTERVAL 1 DAY));" >/dev/null 2>&1 || true)
+
+  CHECKIN_ARTISAN=$(cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan -sN \
+    -e "SELECT id, latitude, longitude FROM local_artisans WHERE status='active' AND latitude IS NOT NULL LIMIT 1;")
+  CHECKIN_ARTISAN_ID=$(echo "$CHECKIN_ARTISAN" | cut -f1)
+  CHECKIN_LAT=$(echo "$CHECKIN_ARTISAN" | cut -f2)
+  CHECKIN_LNG=$(echo "$CHECKIN_ARTISAN" | cut -f3)
+
+  CHECKIN_POI=$(cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan -sN \
+    -e "SELECT id, latitude, longitude FROM local_pois WHERE is_active=1 AND latitude IS NOT NULL LIMIT 1;")
+  CHECKIN_POI_ID=$(echo "$CHECKIN_POI" | cut -f1)
+  CHECKIN_POI_LAT=$(echo "$CHECKIN_POI" | cut -f2)
+  CHECKIN_POI_LNG=$(echo "$CHECKIN_POI" | cut -f3)
+
+  if [[ -n "$CHECKIN_ARTISAN_ID" && -n "$CHECKIN_LAT" ]]; then
+    # Unknown target -> 404
+    curl_json_status -X POST "${BASE_URL}/checkin" -H "Authorization: Bearer $CHECKIN_TOKEN" -H 'Content-Type: application/json' \
+      -d '{"target_type":"artisan","target_id":999999999,"lat":49.1081,"lng":-0.7658}'
+    check "$LAST_HTTP_CODE" "POST /checkin unknown target" "404"
+
+    # Too far (~1.1 km north) -> 422
+    FAR_LAT=$(python3 -c "print(float('$CHECKIN_LAT') + 0.01)")
+    curl_json_status -X POST "${BASE_URL}/checkin" -H "Authorization: Bearer $CHECKIN_TOKEN" -H 'Content-Type: application/json' \
+      -d "{\"target_type\":\"artisan\",\"target_id\":$CHECKIN_ARTISAN_ID,\"lat\":$FAR_LAT,\"lng\":$CHECKIN_LNG}"
+    check "$LAST_HTTP_CODE" "POST /checkin too far" "422"
+    if [[ "$LAST_HTTP_CODE" == "422" ]]; then
+      assert_json "$JSON_BODY" "d.get('data',{}).get('distance_m',0) > 200" "distance_m should exceed 200"
+    fi
+
+    # First check-in of the day -> 100 XP
+    curl_json_status -X POST "${BASE_URL}/checkin" -H "Authorization: Bearer $CHECKIN_TOKEN" -H 'Content-Type: application/json' \
+      -d "{\"target_type\":\"artisan\",\"target_id\":$CHECKIN_ARTISAN_ID,\"lat\":$CHECKIN_LAT,\"lng\":$CHECKIN_LNG}"
+    check "$LAST_HTTP_CODE" "POST /checkin first of day" "200"
+    if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+      assert_json "$JSON_BODY" "d.get('data',{}).get('xp_awarded') == 100" "first check-in should award 100 XP"
+      assert_json "$JSON_BODY" "bool(d.get('data',{}).get('next_spin_at'))" "response should include next_spin_at"
+    fi
+
+    # Immediate second check-in -> 429 cooldown
+    curl_json_status -X POST "${BASE_URL}/checkin" -H "Authorization: Bearer $CHECKIN_TOKEN" -H 'Content-Type: application/json' \
+      -d "{\"target_type\":\"artisan\",\"target_id\":$CHECKIN_ARTISAN_ID,\"lat\":$CHECKIN_LAT,\"lng\":$CHECKIN_LNG}"
+    check "$LAST_HTTP_CODE" "POST /checkin cooldown" "429"
+
+    # Backdate the recharge cooldown by 11 minutes -> 10 XP (daily still consumed)
+    (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
+      -e "UPDATE local_user_cooldowns SET last_at = DATE_SUB(NOW(), INTERVAL 11 MINUTE)
+          WHERE user_id = $CHECKIN_USER_ID AND action_key = 'poi_spin';" >/dev/null 2>&1 || true)
+    curl_json_status -X POST "${BASE_URL}/checkin" -H "Authorization: Bearer $CHECKIN_TOKEN" -H 'Content-Type: application/json' \
+      -d "{\"target_type\":\"artisan\",\"target_id\":$CHECKIN_ARTISAN_ID,\"lat\":$CHECKIN_LAT,\"lng\":$CHECKIN_LNG}"
+    check "$LAST_HTTP_CODE" "POST /checkin recharge" "200"
+    if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+      assert_json "$JSON_BODY" "d.get('data',{}).get('xp_awarded') == 10" "recharge check-in should award 10 XP"
+    fi
+
+    # Status endpoint lists the artisan with daily_available false
+    curl_json_status "${BASE_URL}/checkin/status?lat=$CHECKIN_LAT&lng=$CHECKIN_LNG" \
+      -H "Authorization: Bearer $CHECKIN_TOKEN"
+    check "$LAST_HTTP_CODE" "GET /checkin/status" "200"
+    if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+      assert_json "$JSON_BODY" "any(t.get('target_type') == 'artisan' and t.get('target_id') == $CHECKIN_ARTISAN_ID and t.get('daily_available') is False for t in d.get('data',[]))" "status should list the artisan on daily cooldown"
+    fi
+  else
+    echo "⚠️  Skipping artisan check-in tests: no geocoded artisan"
+  fi
+
+  if [[ -n "$CHECKIN_POI_ID" && -n "$CHECKIN_POI_LAT" ]]; then
+    # POI check-in -> 100 XP
+    curl_json_status -X POST "${BASE_URL}/checkin" -H "Authorization: Bearer $CHECKIN_TOKEN" -H 'Content-Type: application/json' \
+      -d "{\"target_type\":\"poi\",\"target_id\":$CHECKIN_POI_ID,\"lat\":$CHECKIN_POI_LAT,\"lng\":$CHECKIN_POI_LNG}"
+    check "$LAST_HTTP_CODE" "POST /checkin POI" "200"
+    if [[ "$LAST_HTTP_CODE" == "200" ]]; then
+      assert_json "$JSON_BODY" "d.get('data',{}).get('xp_awarded') == 100" "POI check-in should award 100 XP"
+    fi
+  else
+    echo "⚠️  Skipping POI check-in test: no geocoded POI"
+  fi
+
+  # Cleanup check-in fixtures
+  (cd "$SCRIPT_DIR/.." && docker compose exec -T mysql mysql -u webiartisan -pwebiartisan_dev webiartisan \
+    -e "DELETE FROM local_user_cooldowns WHERE user_id = $CHECKIN_USER_ID;
+        DELETE FROM local_user_actions WHERE user_id = $CHECKIN_USER_ID;
+        DELETE FROM local_checkins WHERE user_id = $CHECKIN_USER_ID;
+        DELETE FROM local_users WHERE id = $CHECKIN_USER_ID;" >/dev/null 2>&1 || true)
+else
+  echo "⚠️  Skipping check-in tests (Docker/MySQL unavailable)"
+fi
+
+echo ""
 echo "== Consumer auth =="
 
 CONSUMER_USER_ID=999997
@@ -598,7 +696,7 @@ reset_rate_limit 'login'
 curl_json_status -X POST "${BASE_URL}/users/magic-link" \
   -H 'Content-Type: application/json' \
   -H 'Origin: http://localhost:8080' \
-  -d "{\"email\":\"$CONSUMER_EMAIL\",\"rememberMe\":true,\"redirect\":\"/jeu/1\"}"
+  -d "{\"email\":\"$CONSUMER_EMAIL\",\"rememberMe\":true,\"redirect\":\"/carte\"}"
 check "$LAST_HTTP_CODE" "POST /users/magic-link" "200"
 
 if [[ "$MYSQL_AVAILABLE" -eq 1 ]]; then
