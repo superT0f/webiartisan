@@ -1,7 +1,24 @@
 RewriteEngine On
 RewriteBase /
+
+# Pass Authorization header through to PHP
 RewriteCond %{HTTP:Authorization} ^(.*)
 RewriteRule .* - [e=HTTP_AUTHORIZATION:%1]
+
+# Block dotfiles (.env, .gitignore, ...) and sensitive file types
+<FilesMatch "(^\.|\.(sql|bak|backup|log|sh|md|lock)$)">
+    Require all denied
+</FilesMatch>
+
+# Block dev/test entry points even if they reappear on the server
+<FilesMatch "^test[-_]">
+    Require all denied
+</FilesMatch>
+
+# Block direct access to non-public directories (PHP includes still work)
+RewriteRule ^(config|lib|middleware|models|routes|migrations|cron|tests|vendor)/ - [R=404,L]
+
+# Front controller
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^(.*)$ index.php?r=$1 [QSA,L]
