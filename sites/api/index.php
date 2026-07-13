@@ -44,6 +44,13 @@ header('Referrer-Policy: strict-origin-when-cross-origin');
 if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
     header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
 }
+// Never let the shared Varnish cache store personalized responses: it caches
+// by URL only, so a cached /artisans/me would be served to any other artisan
+// (and keep sessions alive after logout). Requests bearing a session token
+// get non-cacheable responses.
+if (!empty($_SERVER['HTTP_X_ARTISAN_TOKEN']) || !empty($_SERVER['HTTP_AUTHORIZATION'])) {
+    header('Cache-Control: no-store, private');
+}
 
 // Load Composer autoloader
 require_once __DIR__ . '/vendor/autoload.php';
