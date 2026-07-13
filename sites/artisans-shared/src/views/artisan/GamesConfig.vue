@@ -23,7 +23,7 @@
 
       <section class="dashboard-section card">
         <FreemiumLimitBanner
-          v-if="activeCount >= 1"
+          v-if="!isPremium && activeCount >= 1"
           message="Limite de 1 jeu actif atteinte en version gratuite."
           @upgrade="startCheckout"
         />
@@ -63,7 +63,7 @@
             <input id="reveal_text" v-model="newGame.config.reveal_text" type="text" class="form-input" />
           </div>
 
-          <button type="submit" class="btn btn-primary" :disabled="activeCount >= 1 || saving">
+          <button type="submit" class="btn btn-primary" :disabled="(!isPremium && activeCount >= 1) || saving">
             {{ saving ? 'Création…' : 'Créer le jeu' }}
           </button>
         </form>
@@ -72,7 +72,7 @@
       <section class="dashboard-section card">
         <div class="section-title">
           <h2>Jeux créés</h2>
-          <span class="badge badge-grey">{{ activeCount }} actif / 1</span>
+          <span class="badge badge-grey">{{ activeCount }} actif{{ isPremium ? '' : ' / 1' }}</span>
         </div>
 
         <ul v-if="games.length" class="game-list">
@@ -174,7 +174,10 @@ async function startCheckout() {
 }
 
 async function createGame() {
-  if (activeCount.value >= 1) return
+  if (!isPremium.value && activeCount.value >= 1) {
+    error.value = 'Limite de 1 jeu actif atteinte.'
+    return
+  }
   error.value = ''
   success.value = ''
   saving.value = true
@@ -202,7 +205,7 @@ async function createGame() {
 }
 
 async function toggleActive(g) {
-  if (!g.is_active && activeCount.value >= 1) {
+  if (!g.is_active && !isPremium.value && activeCount.value >= 1) {
     error.value = 'Limite de 1 jeu actif atteinte.'
     return
   }
