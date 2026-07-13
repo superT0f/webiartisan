@@ -7,7 +7,7 @@
     <p class="game-card__type">{{ game.game_type_label }}</p>
     <p v-if="game.description" class="game-card__desc">{{ game.description }}</p>
     <p class="game-card__artisan">par {{ game.artisan_name }}</p>
-    <RouterLink :to="`/jeu/${game.id}`" class="game-card__cta">
+    <RouterLink to="/carte" class="game-card__cta">
       {{ game.is_premium ? 'Voir' : 'Jouer' }}
     </RouterLink>
   </article>
