@@ -54,12 +54,12 @@ try {
         echo "Successfully migrated {$migrated} artisan token(s).\n";
     }
 
-    // Clear any expired plaintext tokens that were not migrated.
+    // Clear any expired or undated plaintext tokens that were not migrated.
     $clear = $pdo->prepare("
         UPDATE local_artisans
         SET auth_token = NULL
-        WHERE auth_token_exp <= NOW()
-          AND auth_token IS NOT NULL
+        WHERE auth_token IS NOT NULL
+          AND (auth_token_exp <= NOW() OR auth_token_exp IS NULL)
     ");
     $clear->execute();
     $cleared = $clear->rowCount();
