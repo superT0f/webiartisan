@@ -1,7 +1,7 @@
 # WebiArtisan Mini-Games Simplification — Design Spec
 
 > Date: 2026-07-13
-> Scope: replace the 7-type games hub and the hidden legacy spin wheel with **3 games integrated directly into the map** (web + Flutter WebView): free GPS check-in, merchant-activated coupon, premium wheel (€2.99/month artisan subscription). Brand identity is a separate spec (`2026-07-13-brand-identity-design.md`).
+> Scope: replace the 7-type games hub and the hidden legacy spin wheel with **3 games integrated directly into the map** (web + Flutter WebView): free GPS check-in, merchant-activated coupon, premium avatar spin (PokéStop-style, €2.99/month artisan subscription). Brand identity is a separate spec (`2026-07-13-brand-identity-design.md`).
 
 ---
 
@@ -11,7 +11,7 @@ Make games **instantly playable from the map** with a model a user understands i
 
 1. **Check-in POI** — free for everyone, rewards real visits with XP (Pokéstop loop).
 2. **Coupon** — free, activated and configured by the merchant.
-3. **Wheel of fortune** — premium, unlocked by the existing €2.99/month artisan subscription.
+3. **Avatar spin (« Tournez l'avatar »)** — premium, unlocked by the existing €2.99/month artisan subscription.
 
 Entry requires only a simplified account (email + magic link, single step).
 
@@ -50,11 +50,13 @@ Reusable as-is: XP/levels/badges/streaks engine (`sites/api/lib/Gamification.php
 - **Free-tier limit: 1 active game** per artisan (down from `FREE_TIER_MAX_ACTIVE_GAMES = 2`).
 - Marker gets a 🎁 badge; "Jouer" button in the artisan bottom sheet.
 
-### 3.3 Wheel of fortune (premium, €2.99/month)
+### 3.3 Avatar spin — PokéStop-style (premium, €2.99/month)
+
+> Amended 2026-07-13 (user decision): the fortune-wheel canvas UI is replaced by a PokéStop-style mechanic — the artisan's avatar spins to reveal the reward. Draw backend unchanged.
 
 - Legacy backend **reused as-is**: stock-managed offers (`local_spin_offers`), unique win codes (`LIV-XXXXXXXX`), in-shop validation (`/espace/spin-wins`), atomic 1 spin/day/city limit.
 - Gating already implemented (`artisanIsPremium()` + Stripe subscription at exactly €2.99/month — the brief's price).
-- Playable from the artisan's bottom sheet as an overlay; the hidden `/roue` page is removed.
+- Playable from the artisan's bottom sheet as a PokéStop-style overlay: the artisan's avatar (`logo_url`, 🛍️ fallback) spins to reveal the reward; the hidden `/roue` page is removed.
 
 ### 3.4 Identification
 
@@ -65,10 +67,10 @@ Reusable as-is: XP/levels/badges/streaks engine (`sites/api/lib/Gamification.php
 
 ## 4. Map UX ("Playable Map")
 
-- **Markers**: 🎁 badge when the artisan has an active game (coupon configured, or wheel if premium); data via `GET /games?city=` extended with a `has_active_game` flag.
+- **Markers**: 🎁 badge when the artisan has an active game (coupon configured, or avatar spin if premium); data via `GET /games?city=` extended with a `has_active_game` flag.
 - **Floating "Check-in" button**: appears when any point enters the 200 m radius; GPS from `flutterBridge` (app) or `navigator.geolocation` (web).
-- **`ArtisanSheet.vue`**: new "Jouer" section — Check-in button (enabled/greyed by distance + cooldown, shows remaining time), Coupon card if configured, Wheel button if the artisan is premium.
-- **Game overlays**: coupon and wheel open as full-screen mobile panels over the map. Routes `/jeux`, `/jeu/:id`, `/roue` leave the nav; `/roue` redirects to `/carte`.
+- **`ArtisanSheet.vue`**: new "Jouer" section — Check-in button (enabled/greyed by distance + cooldown, shows remaining time), Coupon card if configured, « 🌀 Tourner l'avatar » button if the artisan is premium.
+- **Game overlays**: coupon and avatar spin open as full-screen mobile panels over the map. Routes `/jeux`, `/jeu/:id`, `/roue` leave the nav; `/roue` redirects to `/carte`.
 - **Feedback**: "+100 XP" / "+10 XP" toasts via the existing `useGamification` composable; confetti kept.
 
 ---
@@ -113,10 +115,10 @@ CREATE TABLE local_checkins (
 
 - Phantom game types quiz, bingo, rebus, vote, poll: removed from the `local_game_types` seed and the `GameRenderer.vue` dispatch (coupon remains).
 - `GamesHub.vue`, `GamePlay.vue`, routes `/jeux` and `/jeu/:id`, "beta" banners.
-- `SpinWheel.vue` (739 lines) rewritten as a map overlay; the draw backend is kept.
+- `SpinWheel.vue` (739 lines) rewritten as a PokéStop-style map overlay (artisan avatar spin); the draw backend is kept.
 - `routes/actions.php` (duplicate of `gamification/xp`) removed.
 - `routes/avatars.php` (writes to the wrong `users` table) removed.
-- `POST /games/:id/claim` (501) replaced: all real-world rewards use the wheel's win-code system.
+- `POST /games/:id/claim` (501) replaced: all real-world rewards use the legacy spin win-code system.
 
 **Migration**:
 
@@ -138,7 +140,7 @@ Per the brand spec (§7), marketing copy replaces "coupon, quiz, tirage, vote, b
 
 - « Faites un check-in chez vos artisans et gagnez de l'XP »
 - « Des coupons offerts par vos commerçants »
-- « La roue de la fortune en boutique »
+- « Tournez l'avatar en boutique »
 
 Touches: `sites/app-landing/index.php`, README, city sites home copy.
 
