@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1140" height="512" viewBox="0 0 1140 512">
+  <defs>
+    <linearGradient id="gradIcon" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2E6BFF"/>
+      <stop offset="1" stop-color="#1438B0"/>
+    </linearGradient>
+  </defs>
+  <rect width="1140" height="512" fill="#FFFFFF"/>
+
+  <!-- Icône app : carré arrondi + W + baguette -->
+  <g transform="translate(26,26)">
+    <rect x="0" y="0" width="460" height="460" rx="104" fill="url(#gradIcon)"/>
+    <text x="230" y="305" font-family="Inter" font-weight="900" font-size="300" fill="#FFFFFF" text-anchor="middle">W</text>
+    <!-- Baguette-soulignement -->
+    <g transform="translate(230,392)">
+      <rect x="-72" y="-12" width="144" height="24" rx="12" fill="#FEF8EC"/>
+      <rect x="-38" y="-8" width="5" height="16" rx="2.5" fill="#1438B0" transform="rotate(18 -35.5 0)"/>
+      <rect x="-2.5" y="-8" width="5" height="16" rx="2.5" fill="#EF4135" transform="rotate(18 0 0)"/>
+      <rect x="33" y="-8" width="5" height="16" rx="2.5" fill="#1438B0" transform="rotate(18 35.5 0)"/>
+    </g>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="540" y="262" font-family="Inter" font-weight="800" font-size="64" letter-spacing="-2">
+    <tspan fill="#1B4FDB">Webi</tspan><tspan fill="#141B34">Artisan</tspan>
+  </text>
+  <text x="542" y="302" font-family="Inter" font-weight="500" font-size="21" fill="#6B7280">L&#8217;artisanat local, propulsé par le web</text>
+</svg>
