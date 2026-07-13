@@ -18,6 +18,13 @@
  * POST   /admin/pois/{id}/schedules — Ajouter un horaire à un POI
  * PUT    /admin/schedules/{id}      — Modifier un horaire
  * DELETE /admin/schedules/{id}      — Supprimer un horaire
+ *
+ * GET  /admin/moderation/recipes                 — Recettes en attente
+ * POST /admin/moderation/recipes/{id}/approve    — Publier une recette
+ * POST /admin/moderation/recipes/{id}/archive    — Archiver une recette
+ * GET  /admin/moderation/testimonials            — Témoignages en attente
+ * POST /admin/moderation/testimonials/{id}/approve — Approuver un témoignage
+ * POST /admin/moderation/testimonials/{id}/reject  — Rejeter un témoignage
  */
 
 require_once __DIR__ . '/../lib/ArtisanAuth.php';
@@ -54,6 +61,18 @@ if ($method === 'GET' && $action === 'artisans' && $param === null) {
     admin_pois_router($pdo, $method, $param);
 } elseif ($action === 'schedules') {
     admin_schedules_router($pdo, $method, $param);
+} elseif ($action === 'moderation' && $param === 'recipes' && $method === 'GET' && $subAction === '') {
+    admin_moderation_recipes($pdo);
+} elseif ($action === 'moderation' && $param === 'recipes' && $method === 'POST' && is_numeric($subAction) && ($segments[4] ?? '') === 'approve') {
+    admin_moderation_recipe_approve($pdo, (int)$subAction);
+} elseif ($action === 'moderation' && $param === 'recipes' && $method === 'POST' && is_numeric($subAction) && ($segments[4] ?? '') === 'archive') {
+    admin_moderation_recipe_archive($pdo, (int)$subAction);
+} elseif ($action === 'moderation' && $param === 'testimonials' && $method === 'GET' && $subAction === '') {
+    admin_moderation_testimonials($pdo);
+} elseif ($action === 'moderation' && $param === 'testimonials' && $method === 'POST' && is_numeric($subAction) && ($segments[4] ?? '') === 'approve') {
+    admin_moderation_testimonial_approve($pdo, (int)$subAction);
+} elseif ($action === 'moderation' && $param === 'testimonials' && $method === 'POST' && is_numeric($subAction) && ($segments[4] ?? '') === 'reject') {
+    admin_moderation_testimonial_reject($pdo, (int)$subAction);
 } else {
     http_response_code(404);
     echo json_encode(['success' => false, 'error' => 'Endpoint inconnu']);
@@ -619,4 +638,102 @@ function admin_delete_schedule(PDO $pdo, int $cityId, int $id): void
     $stmt->execute([$id]);
 
     echo json_encode(['success' => true, 'affected' => $stmt->rowCount()]);
+}
+
+/* =============================================================
+ * Modération Admin (recettes + témoignages)
+ * ============================================================= */
+
+/**
+ * GET /admin/moderation/recipes — Recettes en attente de modération
+ */
+function admin_moderation_recipes(PDO $pdo): void
+{
+    $stmt = $pdo->query("
+        SELECT r.id, r.title, r.slug, r.submitted_by, r.submitter_email, r.created_at,
+               c.slug AS city_slug
+        FROM local_recipes r
+        JOIN local_cities c ON r.city_id = c.id
+        WHERE r.status = 'pending'
+        ORDER BY r.created_at ASC
+        LIMIT 100
+    ");
+    echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+}
+
+/**
+ * POST /admin/moderation/recipes/{id}/approve — Publier une recette
+ */
+function admin_moderation_recipe_approve(PDO $pdo, int $id): void
+{
+    $stmt = $pdo->prepare("UPDATE local_recipes SET status = 'published' WHERE id = ? AND status = 'pending'");
+    $stmt->execute([$id]);
+    if ($stmt->rowCount() === 0) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Recette en attente introuvable']);
+        return;
+    }
+    echo json_encode(['success' => true, 'data' => ['message' => 'Recette publiée']]);
+}
+
+/**
+ * POST /admin/moderation/recipes/{id}/archive — Archiver (rejeter) une recette
+ */
+function admin_moderation_recipe_archive(PDO $pdo, int $id): void
+{
+    $stmt = $pdo->prepare("UPDATE local_recipes SET status = 'archived' WHERE id = ? AND status = 'pending'");
+    $stmt->execute([$id]);
+    if ($stmt->rowCount() === 0) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Recette en attente introuvable']);
+        return;
+    }
+    echo json_encode(['success' => true, 'data' => ['message' => 'Recette archivée']]);
+}
+
+/**
+ * GET /admin/moderation/testimonials — Témoignages en attente
+ */
+function admin_moderation_testimonials(PDO $pdo): void
+{
+    $stmt = $pdo->query("
+        SELECT t.id, t.artisan_id, t.rating, t.title, t.content, t.created_at,
+               a.company_name
+        FROM local_testimonials t
+        JOIN local_artisans a ON t.artisan_id = a.id
+        WHERE t.status = 'pending'
+        ORDER BY t.created_at ASC
+        LIMIT 100
+    ");
+    echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+}
+
+/**
+ * POST /admin/moderation/testimonials/{id}/approve — Approuver un témoignage
+ */
+function admin_moderation_testimonial_approve(PDO $pdo, int $id): void
+{
+    $stmt = $pdo->prepare("UPDATE local_testimonials SET status = 'approved' WHERE id = ? AND status = 'pending'");
+    $stmt->execute([$id]);
+    if ($stmt->rowCount() === 0) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Témoignage en attente introuvable']);
+        return;
+    }
+    echo json_encode(['success' => true, 'data' => ['message' => 'Témoignage approuvé']]);
+}
+
+/**
+ * POST /admin/moderation/testimonials/{id}/reject — Rejeter un témoignage
+ */
+function admin_moderation_testimonial_reject(PDO $pdo, int $id): void
+{
+    $stmt = $pdo->prepare("UPDATE local_testimonials SET status = 'rejected' WHERE id = ? AND status = 'pending'");
+    $stmt->execute([$id]);
+    if ($stmt->rowCount() === 0) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Témoignage en attente introuvable']);
+        return;
+    }
+    echo json_encode(['success' => true, 'data' => ['message' => 'Témoignage rejeté']]);
 }
