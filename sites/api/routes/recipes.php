@@ -281,7 +281,7 @@ function recipes_create(PDO $pdo, array $body): void
 function recipes_report(PDO $pdo, int $id, array $body): void
 {
     $reason = trim($body['reason'] ?? '');
-    $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    $ip = clientIp();
 
     // Vérifier que la recette existe
     $check = $pdo->prepare("SELECT id FROM local_recipes WHERE id = ? LIMIT 1");
