@@ -237,12 +237,45 @@ function artisan_list(PDO $pdo): void
     $stmt->execute($params);
     $artisans = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    $artisanIds = array_map(fn($a) => (int)$a['id'], $artisans);
+    $couponArtisans = [];
+    $wheelArtisans = [];
+    if ($artisanIds) {
+        $in = implode(',', array_fill(0, count($artisanIds), '?'));
+
+        $couponStmt = $pdo->prepare("
+            SELECT DISTINCT i.artisan_id
+            FROM local_game_instances i
+            JOIN local_game_types gt ON gt.id = i.game_type_id
+            WHERE i.artisan_id IN ($in)
+              AND i.is_active = 1 AND gt.is_active = 1
+              AND (i.starts_at IS NULL OR i.starts_at <= NOW())
+              AND (i.ends_at IS NULL OR i.ends_at >= NOW())
+        ");
+        $couponStmt->execute($artisanIds);
+        $couponArtisans = array_map('intval', $couponStmt->fetchAll(PDO::FETCH_COLUMN));
+
+        $wheelStmt = $pdo->prepare("
+            SELECT DISTINCT so.artisan_id
+            FROM local_spin_offers so
+            JOIN local_artisans a2 ON a2.id = so.artisan_id
+            WHERE so.artisan_id IN ($in)
+              AND a2.plan = 'premium'
+              AND so.is_active = 1 AND so.stock_remaining > 0
+        ");
+        $wheelStmt->execute($artisanIds);
+        $wheelArtisans = array_map('intval', $wheelStmt->fetchAll(PDO::FETCH_COLUMN));
+    }
+
     foreach ($artisans as &$a) {
         $a['is_featured']  = (bool)$a['is_featured'];
         $a['is_verified']  = (bool)$a['is_verified'];
         $a['rating_avg']   = (float)$a['rating_avg'];
         $a['rating_count'] = (int)$a['rating_count'];
         $a['view_count']   = (int)$a['view_count'];
+        $a['has_coupon']   = in_array((int)$a['id'], $couponArtisans, true);
+        $a['has_wheel']    = in_array((int)$a['id'], $wheelArtisans, true);
+        $a['has_active_game'] = $a['has_coupon'] || $a['has_wheel'];
     }
 
     echo json_encode([
@@ -1785,7 +1818,7 @@ function artisan_create_game(PDO $pdo, array $body): void
 
     if (!games_can_artisan_create($pdo, $artisanId)) {
         http_response_code(403);
-        echo json_encode(['success' => false, 'error' => 'Limite de 2 jeux actifs atteinte']);
+        echo json_encode(['success' => false, 'error' => 'Limite de 1 jeu actif atteinte']);
         return;
     }
 
@@ -1825,7 +1858,7 @@ function artisan_update_game(PDO $pdo, int $gameId, array $body): void
     if (array_key_exists('is_active', $body) && (int)$body['is_active'] === 1 && !(bool)$game['is_active']) {
         if (!games_can_artisan_create($pdo, (int)$artisan['id'])) {
             http_response_code(403);
-            echo json_encode(['success' => false, 'error' => 'Limite de 2 jeux actifs atteinte']);
+            echo json_encode(['success' => false, 'error' => 'Limite de 1 jeu actif atteinte']);
             return;
         }
     }
