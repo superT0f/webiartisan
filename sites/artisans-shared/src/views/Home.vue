@@ -328,6 +328,7 @@ import { fetchArtisans, fetchCategories, fetchCityPois, fetchWeather,
   weatherInfo, formatTime, todayIndex,
   CITY_NAME, CITY_CP, CITY_LAT, CITY_LNG
 } from '../api.js'
+import { escapeHtml } from '@/utils/escapeHtml.js'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -483,8 +484,8 @@ function renderHomeMapMarkers() {
       .addTo(map.value)
       .bindPopup(`
         <div style="font-family:inherit;min-width:160px;">
-          <strong style="display:block;margin-bottom:4px;">${a.company_name}</strong>
-          <span style="display:block;font-size:0.8rem;color:#666;margin-bottom:6px;">${a.category_name || 'Artisan'}</span>
+          <strong style="display:block;margin-bottom:4px;">${escapeHtml(a.company_name)}</strong>
+          <span style="display:block;font-size:0.8rem;color:#666;margin-bottom:6px;">${escapeHtml(a.category_name || 'Artisan')}</span>
           <a href="#/artisan/${a.id}" style="display:inline-block;background:${color};color:#fff;padding:5px 10px;border-radius:6px;text-decoration:none;font-size:0.8rem;font-weight:600;">Voir la fiche</a>
         </div>
       `)
@@ -498,9 +499,9 @@ function renderHomeMapMarkers() {
       .addTo(map.value)
       .bindPopup(`
         <div style="font-family:inherit;min-width:160px;">
-          <strong style="display:block;margin-bottom:4px;">${p.name}</strong>
-          <span style="display:block;font-size:0.8rem;color:#1a73e8;margin-bottom:4px;">${p.type}</span>
-          ${p.address ? `<span style="display:block;font-size:0.8rem;color:#666;">${p.address}</span>` : ''}
+          <strong style="display:block;margin-bottom:4px;">${escapeHtml(p.name)}</strong>
+          <span style="display:block;font-size:0.8rem;color:#1a73e8;margin-bottom:4px;">${escapeHtml(p.type)}</span>
+          ${p.address ? `<span style="display:block;font-size:0.8rem;color:#666;">${escapeHtml(p.address)}</span>` : ''}
         </div>
       `)
     poiMarkers.value.push(marker)

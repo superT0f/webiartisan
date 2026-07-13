@@ -4,6 +4,7 @@ import { Map, NavigationControl, GeolocateControl, Marker, Popup } from 'maplibr
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useMapStyle } from '../composables/useMapStyle.js'
 import { getPosition } from '../utils/flutterBridge.js'
+import { escapeHtml } from '@/utils/escapeHtml.js'
 
 const props = defineProps({
   center: { type: Array, default: () => [49.1081, -0.7658] },
@@ -126,10 +127,10 @@ function renderMarkers() {
 
     const popupHtml = `
       <div class="map-popup artisan-popup">
-        <strong>${a.company_name}</strong>
-        <span class="popup-category">${a.category_name || 'Artisan'}</span>
-        ${a.address ? `<span class="popup-address">${a.address}</span>` : ''}
-        ${a.phone ? `<span class="popup-phone">📞 ${a.phone}</span>` : ''}
+        <strong>${escapeHtml(a.company_name)}</strong>
+        <span class="popup-category">${escapeHtml(a.category_name || 'Artisan')}</span>
+        ${a.address ? `<span class="popup-address">${escapeHtml(a.address)}</span>` : ''}
+        ${a.phone ? `<span class="popup-phone">📞 ${escapeHtml(a.phone)}</span>` : ''}
         <div class="popup-actions">
           <a href="#/artisan/${a.id}" class="popup-link">Voir la fiche</a>
           <a href="https://www.google.com/maps/dir/?api=1&destination=${a.latitude},${a.longitude}" target="_blank" rel="noopener" class="popup-link">Itinéraire</a>
@@ -154,15 +155,15 @@ function renderMarkers() {
     el.innerHTML = `<span>${poiIcon(p.type)}</span>`
 
     const scheduleInfo = p.schedules?.length
-      ? `<br><small>${formatSchedules(p.schedules)}</small>`
+      ? `<br><small>${escapeHtml(formatSchedules(p.schedules))}</small>`
       : ''
 
     const popup = new Popup({ offset: 16 }).setHTML(
       `<div class="map-popup poi-popup">
-        <strong>${p.name}</strong>
-        <span class="popup-type">${p.type}</span>
-        ${p.address ? `<span class="popup-address">${p.address}</span>` : ''}
-        ${p.phone ? `<span class="popup-phone">📞 ${p.phone}</span>` : ''}
+        <strong>${escapeHtml(p.name)}</strong>
+        <span class="popup-type">${escapeHtml(p.type)}</span>
+        ${p.address ? `<span class="popup-address">${escapeHtml(p.address)}</span>` : ''}
+        ${p.phone ? `<span class="popup-phone">📞 ${escapeHtml(p.phone)}</span>` : ''}
         ${scheduleInfo}
       </div>`
     )

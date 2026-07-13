@@ -2,6 +2,7 @@
 import { ref, onMounted, watch } from 'vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { escapeHtml } from '@/utils/escapeHtml.js';
 
 const props = defineProps({
   artisan: { type: Object, required: true },
@@ -26,7 +27,7 @@ onMounted(() => {
     radius: 9, color: '#16a34a', fillColor: '#16a34a', fillOpacity: 0.9
   })
     .addTo(map.value)
-    .bindPopup(`<b>${props.artisan.company_name}</b>`);
+    .bindPopup(`<b>${escapeHtml(props.artisan.company_name)}</b>`);
 
   renderNearby();
 });
@@ -42,7 +43,7 @@ function renderNearby() {
       [parseFloat(place.latitude), parseFloat(place.longitude)],
       { radius: 7, color, fillColor: color, fillOpacity: 0.7 }
     );
-    marker.bindPopup(`<b>${place.name}</b><br>${place.type}`);
+    marker.bindPopup(`<b>${escapeHtml(place.name)}</b><br>${escapeHtml(place.type)}`);
     nearbyLayer.value.addLayer(marker);
   });
 }

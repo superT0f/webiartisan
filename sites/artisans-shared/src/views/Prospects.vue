@@ -85,6 +85,7 @@ import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { escapeHtml } from '@/utils/escapeHtml.js'
 import { getProspects, CITY_NAME, CITY_LAT, CITY_LNG } from '../api.js'
 
 const prospects = ref([])
@@ -139,7 +140,7 @@ function updateMarkers() {
     const lng = parseFloat(p.longitude)
     if (isNaN(lat) || isNaN(lng)) return
     const marker = L.marker([lat, lng]).addTo(map.value)
-    marker.bindPopup(`<b>${p.name}</b><br>${p.type}`)
+    marker.bindPopup(`<b>${escapeHtml(p.name)}</b><br>${escapeHtml(p.type)}`)
     marker.on('click', () => router.push(`/prospect/${p.id}`))
     markers.value.push(marker)
   })
