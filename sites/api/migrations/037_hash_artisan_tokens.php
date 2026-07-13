@@ -84,6 +84,6 @@ try {
 
     exit(0);
 } catch (Throwable $e) {
-    fwrite(STDERR, "Migration failed: " . $e->getMessage() . "\n");
+    error_log("Migration failed: " . $e->getMessage());
     exit(1);
 }
