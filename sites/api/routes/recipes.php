@@ -275,7 +275,7 @@ function recipes_create(PDO $pdo, array $body): void
         }
     }
 
-    echo json_encode(['success' => true, 'slug' => $slug, 'message' => 'Recette publiée']);
+    echo json_encode(['success' => true, 'slug' => $slug, 'message' => 'Recette envoyée, elle sera visible après validation.']);
 }
 
 function recipes_report(PDO $pdo, int $id, array $body): void
