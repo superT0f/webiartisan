@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Run all SQL migrations in sites/api/migrations/ in numeric order.
+# Run all SQL and PHP migrations in sites/api/migrations/ in numeric order.
 # Usage:
 #   scripts/migrate.sh              # uses docker compose mysql service
 #   DB_HOST=localhost DB_USER=... DB_PASS=... DB_NAME=... scripts/migrate.sh
@@ -16,7 +16,7 @@ DB_USER="${DB_USER:-webiartisan}"
 DB_PASS="${DB_PASS:-webiartisan_dev}"
 
 if ! ls "${MIGRATIONS_DIR}"/*.sql >/dev/null 2>&1; then
-  echo "❌ No migration files found in ${MIGRATIONS_DIR}"
+  echo "❌ No SQL migration files found in ${MIGRATIONS_DIR}"
   exit 1
 fi
 
@@ -36,10 +36,18 @@ wait_for_mysql() {
 
 wait_for_mysql
 
-# Run migrations in numeric order
+# Run SQL migrations in numeric order
 for migration in $(ls -1 "${MIGRATIONS_DIR}"/*.sql | sort); do
   echo "▶ Applying $(basename "${migration}")"
   mysql -h "${DB_HOST}" -P "${DB_PORT}" -u "${DB_USER}" -p"${DB_PASS}" "${DB_NAME}" < "${migration}"
 done
+
+# Run PHP migrations in numeric order (data migrations / one-shot fixes)
+if ls "${MIGRATIONS_DIR}"/*.php >/dev/null 2>&1; then
+  for migration in $(ls -1 "${MIGRATIONS_DIR}"/*.php | sort); do
+    echo "▶ Applying $(basename "${migration}")"
+    php "${migration}"
+  done
+fi
 
 echo "✅ All migrations applied"

@@ -8,6 +8,14 @@
 
 require_once __DIR__ . '/../config/database.php';
 
+// Make sure .env credentials are available when running outside the FPM request.
+$env = loadEnv(__DIR__ . '/../.env');
+foreach ($env as $key => $value) {
+    if (!isset($_ENV[$key])) {
+        $_ENV[$key] = $value;
+    }
+}
+
 try {
     $pdo = getDatabase();
 
