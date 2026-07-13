@@ -151,10 +151,11 @@ function admin_reset_artisan_password(PDO $pdo, int $id): void
 
     $token = bin2hex(random_bytes(32));
     $tokenHash = password_hash($token, PASSWORD_DEFAULT);
+    $tokenLookup = hash('sha256', $token);
     $exp = date('Y-m-d H:i:s', strtotime('+1 hour'));
 
-    $pdo->prepare("UPDATE local_artisans SET auth_token_hash = ?, auth_token_exp = ?, auth_token = NULL WHERE id = ?")
-        ->execute([$tokenHash, $exp, $id]);
+    $pdo->prepare("UPDATE local_artisans SET auth_token_hash = ?, auth_token_lookup = ?, auth_token_exp = ?, auth_token = NULL WHERE id = ?")
+        ->execute([$tokenHash, $tokenLookup, $exp, $id]);
 
     $config = getAppConfig();
     $fromEmail = $config['mail_from'] ?? 'noreply@webiartisan.prigent.tech';

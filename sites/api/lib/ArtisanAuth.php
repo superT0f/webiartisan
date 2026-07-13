@@ -39,22 +39,21 @@ function artisan_require_auth(PDO $pdo): array
         }
     }
 
+    $tokenLookup = hash('sha256', $token);
     $stmt = $pdo->prepare("
         SELECT id, city_id, company_name, email, is_admin, plan, subscription_status, subscription_period_end, stripe_customer_id,
                auth_token_hash
         FROM local_artisans
-        WHERE auth_token_hash IS NOT NULL
+        WHERE auth_token_lookup = ?
+          AND auth_token_hash IS NOT NULL
           AND auth_token_exp > NOW()
+        LIMIT 1
     ");
-    $stmt->execute();
-    $artisans = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $stmt->execute([$tokenLookup]);
+    $artisan = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    $artisan = null;
-    foreach ($artisans as $row) {
-        if (password_verify($token, $row['auth_token_hash'])) {
-            $artisan = $row;
-            break;
-        }
+    if ($artisan && !password_verify($token, $artisan['auth_token_hash'])) {
+        $artisan = null;
     }
 
     if ($artisan) {

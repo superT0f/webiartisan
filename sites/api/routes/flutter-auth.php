@@ -156,9 +156,10 @@ function flutter_login(PDO $pdo, array $body): void
                 // Générer un token artisan longue durée pour le bridge vers l'espace web
                 $artisanToken = bin2hex(random_bytes(32));
                 $artisanTokenHash = password_hash($artisanToken, PASSWORD_DEFAULT);
+                $artisanTokenLookup = hash('sha256', $artisanToken);
                 $artisanTokenExp = date('Y-m-d H:i:s', $rememberMe ? strtotime('+365 days') : strtotime('+30 days'));
-                $pdo->prepare("UPDATE local_artisans SET auth_token_hash = ?, auth_token_exp = ?, auth_token = NULL WHERE id = ?")
-                    ->execute([$artisanTokenHash, $artisanTokenExp, $artisan['id']]);
+                $pdo->prepare("UPDATE local_artisans SET auth_token_hash = ?, auth_token_lookup = ?, auth_token_exp = ?, auth_token = NULL WHERE id = ?")
+                    ->execute([$artisanTokenHash, $artisanTokenLookup, $artisanTokenExp, $artisan['id']]);
 
                 $userStmt = $pdo->prepare("SELECT id, email, display_name FROM local_users WHERE email = ?");
                 $userStmt->execute([$email]);

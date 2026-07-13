@@ -82,16 +82,18 @@ echo "Test /subscription/status with auth...\n";
 
 $token = bin2hex(random_bytes(32));
 $tokenHash = password_hash($token, PASSWORD_DEFAULT);
+$tokenLookup = hash('sha256', $token);
 $tokenExp = date('Y-m-d H:i:s', strtotime('+1 hour'));
 $pdo->prepare("
     UPDATE local_artisans
     SET plan = 'premium',
         subscription_status = 'active',
         auth_token_hash = ?,
+        auth_token_lookup = ?,
         auth_token_exp = ?,
         auth_token = NULL
     WHERE id = ?
-")->execute([$tokenHash, $tokenExp, $artisanId]);
+")->execute([$tokenHash, $tokenLookup, $tokenExp, $artisanId]);
 
 $ch = curl_init($statusUrl);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);

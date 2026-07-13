@@ -74,7 +74,7 @@ foreach ($env as $key => $value) {
 
 $appEnv = $_ENV['APP_ENV'] ?? 'production';
 $jwtSecret = $_ENV['JWT_SECRET'] ?? '';
-if ($appEnv === 'production' && (strlen($jwtSecret) < 32)) {
+if ($appEnv === 'production' && (strlen($jwtSecret) < 64)) {
     http_response_code(500);
     header('Content-Type: application/json; charset=UTF-8');
     echo json_encode(['success' => false, 'error' => 'Configuration error: JWT_SECRET too weak']);

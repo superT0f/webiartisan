@@ -3,7 +3,11 @@
  * WebIArtisan API — Migration 037 : one-shot hash of legacy plaintext artisan tokens.
  *
  * Hashes any remaining plaintext auth_token values into auth_token_hash,
+ * stores a SHA-256 auth_token_lookup for O(1) indexed verification,
  * then clears the plaintext auth_token column.
+ *
+ * Tokens that were already stored as a bcrypt hash without a lookup value
+ * cannot be recovered, so they are invalidated to force re-login.
  */
 
 require_once __DIR__ . '/../config/database.php';
@@ -40,13 +44,14 @@ try {
     if ($total > 0) {
         $update = $pdo->prepare("
             UPDATE local_artisans
-            SET auth_token_hash = ?, auth_token = NULL
+            SET auth_token_hash = ?, auth_token_lookup = ?, auth_token = NULL
             WHERE id = ?
         ");
 
         foreach ($rows as $row) {
             $hash = password_hash($row['auth_token'], PASSWORD_DEFAULT);
-            $update->execute([$hash, $row['id']]);
+            $lookup = hash('sha256', $row['auth_token']);
+            $update->execute([$hash, $lookup, $row['id']]);
             $migrated++;
             echo "Migrated {$migrated}/{$total} (id={$row['id']})\n";
         }
@@ -64,6 +69,18 @@ try {
     $clear->execute();
     $cleared = $clear->rowCount();
     echo "Cleared {$cleared} expired plaintext token(s).\n";
+
+    // Tokens hashed with an earlier one-shot migration but lacking the lookup
+    // column cannot be verified efficiently; force re-login by clearing them.
+    $invalidate = $pdo->prepare("
+        UPDATE local_artisans
+        SET auth_token_hash = NULL, auth_token_exp = NULL
+        WHERE auth_token_hash IS NOT NULL
+          AND auth_token_lookup IS NULL
+    ");
+    $invalidate->execute();
+    $invalidated = $invalidate->rowCount();
+    echo "Invalidated {$invalidated} hash-only token(s) (force re-login).\n";
 
     exit(0);
 } catch (Throwable $e) {

@@ -1,7 +1,7 @@
 -- ============================================================
 -- WebiArtisan — Migration 037 : Hash artisan auth tokens
 -- ============================================================
--- Adds the auth_token_hash column and its index idempotently.
+-- Adds the auth_token_hash and auth_token_lookup columns and their indexes idempotently.
 -- Data migration (one-shot hashing of legacy plaintext tokens)
 -- is performed by the companion 037_hash_artisan_tokens.php CLI script.
 -- ============================================================
@@ -55,7 +55,9 @@ END //
 DELIMITER ;
 
 CALL webiartisan_add_column_if_not_exists('local_artisans', 'auth_token_hash', 'VARCHAR(255) NULL AFTER auth_token_exp');
+CALL webiartisan_add_column_if_not_exists('local_artisans', 'auth_token_lookup', 'CHAR(64) NULL AFTER auth_token_hash');
 CALL webiartisan_add_index_if_not_exists('local_artisans', 'idx_local_artisans_auth_token_hash', 'INDEX `idx_local_artisans_auth_token_hash` (`auth_token_hash`)');
+CALL webiartisan_add_index_if_not_exists('local_artisans', 'idx_local_artisans_auth_token_lookup', 'INDEX `idx_local_artisans_auth_token_lookup` (`auth_token_lookup`)');
 
 DROP PROCEDURE IF EXISTS webiartisan_add_column_if_not_exists;
 DROP PROCEDURE IF EXISTS webiartisan_add_index_if_not_exists;
