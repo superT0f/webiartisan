@@ -7,7 +7,7 @@ const props = defineProps({
   checkinState: { type: Object, default: null },
   authenticated: { type: Boolean, default: false },
 })
-defineEmits(['close', 'navigate', 'checkin', 'play-coupon'])
+defineEmits(['close', 'navigate', 'checkin', 'play-coupon', 'play-spin'])
 
 const checkinLabel = computed(() => {
   const s = props.checkinState
@@ -46,6 +46,9 @@ const checkinDisabled = computed(() => {
           </button>
           <button v-if="game" class="btn btn-secondary play-btn" @click="$emit('play-coupon')">
             🎁 {{ game.title }}
+          </button>
+          <button v-if="artisan.has_wheel" class="btn btn-secondary play-btn" @click="$emit('play-spin')">
+            🌀 Tourner l'avatar
           </button>
           <p v-if="!authenticated" class="play-hint">Connexion par email requise pour jouer.</p>
         </div>

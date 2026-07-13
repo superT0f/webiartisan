@@ -8,6 +8,7 @@ import CheckinButton from '../components/CheckinButton.vue'
 import GameOverlay from '../components/GameOverlay.vue'
 import AuthForm from '../components/AuthForm.vue'
 import GameRenderer from '../components/GameRenderer.vue'
+import SpinOverlay from '../components/games/SpinOverlay.vue'
 import {
   fetchArtisans, fetchCityPois, fetchGames,
   getUserToken, setUserToken, authUser, authEvents,
@@ -33,7 +34,7 @@ const { showToast } = useGamification()
 const userToken = ref(getUserToken())
 const statusTargets = ref([])
 const checkinLoading = ref(false)
-const overlay = ref(null) // null | 'coupon' | 'auth'
+const overlay = ref(null) // null | 'coupon' | 'spin' | 'auth'
 
 const categoryFilter = ref('')
 const poiTypeFilter = ref('')
@@ -76,7 +77,10 @@ const filteredPois = computed(() => {
 
 const gameByArtisan = computed(() => {
   const map = {}
-  for (const g of games.value) map[Number(g.artisan_id)] = g
+  for (const g of games.value) {
+    if (g.game_type_key !== 'coupon') continue
+    map[Number(g.artisan_id)] = g
+  }
   return map
 })
 
@@ -264,6 +268,7 @@ onUnmounted(() => {
       @navigate="navigate"
       @checkin="onSheetCheckin"
       @play-coupon="overlay = 'coupon'"
+      @play-spin="overlay = 'spin'"
     />
 
     <GameOverlay v-if="overlay === 'coupon'" :title="selectedGame?.title || 'Coupon'" @close="overlay = null">
@@ -276,6 +281,8 @@ onUnmounted(() => {
         @played="showToast('🎁 Coupon débloqué !')"
       />
     </GameOverlay>
+
+    <SpinOverlay v-if="overlay === 'spin'" :artisan="selected" @close="overlay = null" />
 
     <GameOverlay v-if="overlay === 'auth'" title="Connexion" @close="overlay = null">
       <AuthForm />
