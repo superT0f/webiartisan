@@ -101,7 +101,7 @@ const validMedia = computed(() => (props.testimonial.media || []).filter(m => is
 .testimonial-card__avatar--placeholder {
   display: grid;
   place-items: center;
-  background: #2d6a4f;
+  background: var(--c-green);
   color: #fff;
   font-size: 0.75rem;
   font-weight: bold;
@@ -116,7 +116,7 @@ const validMedia = computed(() => (props.testimonial.media || []).filter(m => is
   color: #666;
 }
 .testimonial-card__rating {
-  color: #f5a623;
+  color: var(--c-gold);
 }
 .testimonial-card__title {
   font-size: 1rem;
@@ -144,7 +144,7 @@ const validMedia = computed(() => (props.testimonial.media || []).filter(m => is
 .testimonial-card__actions button {
   background: none;
   border: none;
-  color: #2d6a4f;
+  color: var(--c-green);
   cursor: pointer;
   font-size: 0.85rem;
 }

@@ -55,7 +55,7 @@ async function play() {
 }
 .coupon-game__btn {
   padding: 0.75rem 1.5rem;
-  background: #2d6a4f;
+  background: var(--c-green);
   color: #fff;
   border: none;
   border-radius: 0.5rem;
@@ -67,7 +67,7 @@ async function play() {
   cursor: not-allowed;
 }
 .coupon-game__result {
-  border: 2px dashed #2d6a4f;
+  border: 2px dashed var(--c-green);
   padding: 1rem;
   border-radius: 0.5rem;
 }

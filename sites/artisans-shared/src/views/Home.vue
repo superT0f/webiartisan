@@ -146,7 +146,7 @@
             class="card artisan-card"
           >
             <!-- Cover / Logo -->
-            <div class="artisan-cover" :style="{ background: artisan.category_color || '#2D6A4F' }">
+            <div class="artisan-cover" :style="{ background: artisan.category_color || '#C07A2E' }">
               <span class="artisan-cover-icon">{{ artisan.category_icon || '🔧' }}</span>
               <div class="artisan-badges-top">
                 <span v-if="artisan.is_featured" class="badge badge-gold">⭐ En vedette</span>
@@ -472,7 +472,7 @@ function renderHomeMapMarkers() {
     if (a.latitude == null || a.longitude == null) return
     if (selectedCategory.value && a.category_slug !== selectedCategory.value) return
 
-    const color = a.category_color || '#2D6A4F'
+    const color = a.category_color || '#C07A2E'
     const marker = L.circleMarker([parseFloat(a.latitude), parseFloat(a.longitude)], {
       radius: 9,
       fillColor: color,

@@ -36,5 +36,5 @@ function icon(code) {
   font-weight: 700;
 }
 .icon { font-size: 1.2rem; }
-.temp { color: #1a1a2e; }
+.temp { color: var(--c-text); }
 </style>

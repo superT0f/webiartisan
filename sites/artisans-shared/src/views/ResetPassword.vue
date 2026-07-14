@@ -74,7 +74,7 @@ async function submit() {
 h1 { font-size: 1.4rem; margin-bottom: 16px; }
 label { display: block; margin-bottom: 12px; font-weight: 500; }
 input { width: 100%; padding: 10px; margin-top: 4px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
-button { width: 100%; padding: 12px; background: #1a1a2e; color: #fff; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+button { width: 100%; padding: 12px; background: var(--c-green); color: #fff; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
 button:disabled { opacity: 0.7; }
 .message { margin-top: 16px; padding: 10px; border-radius: 8px; }
 .message.success { background: #e6f4ea; color: #1e7e34; }

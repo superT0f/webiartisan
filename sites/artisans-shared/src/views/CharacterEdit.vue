@@ -317,8 +317,8 @@ input:focus, select:focus { outline: none; border-color: var(--c-green); box-sha
 .avatar-item span { display: block; font-size: 0.85rem; font-weight: 500; }
 .avatar-item small { display: block; font-size: 0.75rem; color: #64748b; margin-top: 2px; }
 .upload-preview { display: block; width: 120px; height: 120px; object-fit: cover; border-radius: 50%; margin-top: 16px; border: 3px solid var(--c-green); }
-.btn-save { margin-top: 28px; margin-right: 12px; padding: 12px 24px; background: var(--c-green, #1a1a2e); color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
-.btn-save:hover { background: var(--c-green-dark, #1a1a2e); }
+.btn-save { margin-top: 28px; margin-right: 12px; padding: 12px 24px; background: var(--c-green, #C07A2E); color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+.btn-save:hover { background: var(--c-green-dark, #B5712B); }
 .btn-save:disabled { opacity: 0.6; cursor: not-allowed; }
 .btn-cancel { margin-top: 28px; padding: 12px 24px; background: transparent; color: var(--c-text-2); border: 1px solid var(--c-border); border-radius: 8px; cursor: pointer; }
 .btn-cancel:hover { background: var(--c-cream-2); }

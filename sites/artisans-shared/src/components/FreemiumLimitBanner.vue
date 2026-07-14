@@ -28,7 +28,7 @@ defineEmits(['upgrade'])
   font-size: 0.9rem;
 }
 .freemium-banner__badge {
-  background: #2d6a4f;
+  background: var(--c-green);
   color: #fff;
   padding: 0.2rem 0.5rem;
   border-radius: 0.25rem;
@@ -37,7 +37,7 @@ defineEmits(['upgrade'])
 }
 .freemium-banner__cta {
   margin-left: auto;
-  background: #f5a623;
+  background: var(--c-gold);
   color: #fff;
   border: none;
   padding: 0.4rem 0.75rem;

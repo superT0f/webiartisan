@@ -101,7 +101,7 @@
 
           <div class="a4-footer">
             <p>Soutenez l'économie de proximité • Une initiative collaborative et citoyenne</p>
-            <span class="footer-platform">Développé avec ❤️ par WebIArtisan</span>
+            <span class="footer-platform">Développé avec ❤️ par WebiArtisan</span>
           </div>
         </div>
       </div>
@@ -169,7 +169,7 @@
         <div class="cards-grid">
           <div class="mini-card" v-for="n in 8" :key="n">
             <div class="card-top">
-              <div class="card-logo">🏠 WebIArtisan</div>
+              <div class="card-logo">🥖 WebiArtisan</div>
               <div class="card-title">Trouvez un artisan à<br><strong>{{ cityName }}</strong></div>
             </div>
             <div class="card-middle">

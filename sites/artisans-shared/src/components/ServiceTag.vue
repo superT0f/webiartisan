@@ -33,9 +33,9 @@ defineEmits(['toggle'])
   font-size: 0.85rem;
 }
 .service-tag.active {
-  background: #2d6a4f;
+  background: var(--c-green);
   color: #fff;
-  border-color: #2d6a4f;
+  border-color: var(--c-green);
 }
 .service-tag__icon {
   font-size: 0.9rem;

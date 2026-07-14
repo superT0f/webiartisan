@@ -29,7 +29,7 @@ defineProps({
   flex-direction: column;
 }
 .game-card.premium {
-  border-color: #f5a623;
+  border-color: var(--c-gold);
   background: #fffbf2;
 }
 .game-card__badge {
@@ -38,12 +38,12 @@ defineProps({
   font-weight: bold;
   padding: 0.15rem 0.4rem;
   border-radius: 0.25rem;
-  background: #2d6a4f;
+  background: var(--c-green);
   color: #fff;
   margin-bottom: 0.5rem;
 }
 .game-card.premium .game-card__badge {
-  background: #f5a623;
+  background: var(--c-gold);
 }
 .game-card__title {
   margin: 0 0 0.25rem;
@@ -67,7 +67,7 @@ defineProps({
   display: inline-block;
   text-align: center;
   padding: 0.5rem;
-  background: #2d6a4f;
+  background: var(--c-green);
   color: #fff;
   border-radius: 0.5rem;
   text-decoration: none;

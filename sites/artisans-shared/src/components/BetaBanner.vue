@@ -24,7 +24,7 @@ defineProps({
   font-size: 0.85rem;
 }
 .beta-banner__badge {
-  background: #f5a623;
+  background: var(--c-gold);
   color: #fff;
   padding: 0.15rem 0.4rem;
   border-radius: 0.25rem;

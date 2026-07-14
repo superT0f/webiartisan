@@ -16,7 +16,7 @@
 
     <template v-else-if="artisan">
       <!-- HERO artisan -->
-      <div class="artisan-hero" :style="{ background: artisan.category_color || '#2D6A4F' }">
+      <div class="artisan-hero" :style="{ background: artisan.category_color || '#C07A2E' }">
         <div class="container artisan-hero-content">
           <RouterLink to="/" class="back-link">← Retour à l'annuaire</RouterLink>
           <div class="artisan-hero-main">
@@ -450,7 +450,7 @@ onMounted(loadArtisan)
 .service-item h3 { font-size: 0.95rem; margin-bottom: 4px; }
 .service-item p  { font-size: 0.83rem; color: var(--c-text-2); }
 .service-item-meta { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; flex-shrink: 0; }
-.price-tag    { background: #D8F3DC; color: var(--c-green-dark); padding: 3px 10px; border-radius: var(--r-full); font-size: 0.8rem; font-weight: 600; }
+.price-tag    { background: var(--c-green-tint); color: var(--c-green-dark); padding: 3px 10px; border-radius: var(--r-full); font-size: 0.8rem; font-weight: 600; }
 .duration-tag { font-size: 0.78rem; color: var(--c-text-3); }
 
 /* Reviews */
@@ -476,7 +476,7 @@ onMounted(loadArtisan)
   margin-bottom: 10px; font-weight: 500; font-size: 0.9rem;
   transition: background 0.2s;
 }
-.contact-phone { background: #D8F3DC; color: var(--c-green-dark); }
+.contact-phone { background: var(--c-green-tint); color: var(--c-green-dark); }
 .contact-email { background: #E3F2FD; color: #0D47A1; }
 .contact-web   { background: var(--c-cream-2); color: var(--c-text-2); }
 .contact-btn:hover { filter: brightness(0.95); }

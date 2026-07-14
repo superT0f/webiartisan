@@ -187,7 +187,7 @@ async function enableBiometricAuth() {
       throw new Error('Authentification biométrique annulée')
     }
 
-    const res = await enableBiometric(token, result.deviceId, result.secret, 'Smartphone WebIArtisan')
+    const res = await enableBiometric(token, result.deviceId, result.secret, 'Smartphone WebiArtisan')
     if (res.success) {
       localStorage.setItem('biometric_enabled', '1')
       localStorage.setItem('biometric_device_id', result.deviceId)
@@ -304,7 +304,7 @@ onUnmounted(() => {
 .form-message.error { background: #fdecea; color: #c5221f; }
 
 .badges-list { display: flex; flex-wrap: wrap; gap: 8px; }
-.badge { background: #1a1a2e; color: #fff; padding: 6px 12px; border-radius: 20px; font-size: 13px; }
+.badge { background: var(--c-text); color: #fff; padding: 6px 12px; border-radius: 20px; font-size: 13px; }
 
 .btn-danger { border-color: #b71c1c; color: #b71c1c; }
 .btn-danger:hover { background: #b71c1c; color: #fff; }

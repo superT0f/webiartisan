@@ -146,9 +146,9 @@ async function submit() {
   display: inline-block;
   margin: 0.25rem 0.25rem 0 0;
   padding: 0.35rem 0.6rem;
-  border: 1px solid #2d6a4f;
+  border: 1px solid var(--c-green);
   background: #fff;
-  color: #2d6a4f;
+  color: var(--c-green);
   border-radius: 999px;
   cursor: pointer;
   font-size: 0.8rem;
