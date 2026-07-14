@@ -176,7 +176,7 @@ $cities = [
 
     <nav class="cities" aria-label="Choix de la ville">
       <?php foreach ($cities as $city): ?>
-      <a class="city" href="<?php echo htmlspecialchars($city['url'], ENT_QUOTES, 'UTF-8'); ?>" style="--accent: <?php echo $city['accent']; ?>">
+      <a class="city" href="<?php echo htmlspecialchars($city['url'], ENT_QUOTES, 'UTF-8'); ?>" style="--accent: <?php echo htmlspecialchars($city['accent'], ENT_QUOTES, 'UTF-8'); ?>">
         <div class="city-icon"><?php echo $city['icon']; ?></div>
         <div class="city-info">
           <div class="city-name"><?php echo htmlspecialchars($city['name'], ENT_QUOTES, 'UTF-8'); ?></div>
