@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="360" viewBox="0 0 900 360">
+  <g transform="translate(170,160) rotate(-35)">
+    <rect x="-56" y="-15" width="112" height="30" rx="15" fill="#FFFFFF"/>
+    <rect x="-30.5" y="-11" width="5" height="22" rx="2.5" fill="#FFFFFF" opacity="0.5" transform="rotate(28 -28 0)"/>
+    <rect x="-2.5"  y="-11" width="5" height="22" rx="2.5" fill="#FFFFFF" opacity="0.5" transform="rotate(28 0 0)"/>
+    <rect x="25.5"  y="-11" width="5" height="22" rx="2.5" fill="#FFFFFF" opacity="0.5" transform="rotate(28 28 0)"/>
+  </g>
+  <text x="300" y="175" font-family="Outfit, Inter, sans-serif" font-weight="800" font-size="78" letter-spacing="-2" fill="#FFFFFF">WebiArtisan</text>
+  <text x="303" y="220" font-family="Outfit, Inter, sans-serif" font-weight="500" font-size="24" fill="#FFFFFF" opacity="0.8">L&#8217;annuaire libre des artisans de proximité</text>
+</svg>
