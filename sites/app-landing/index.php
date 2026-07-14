@@ -1,6 +1,6 @@
 <?php
 /**
- * WebIArtisan — Landing page for app.prigent.tech
+ * WebiArtisan — Landing page for app.prigent.tech
  *
  * Simple PHP entry point so we can add logging, geolocation-based
  * redirects, or dynamic routes later.
@@ -28,25 +28,28 @@ $logLine = sprintf(
 // Cities data
 $cities = [
     [
-        'slug'  => 'livry',
-        'name'  => 'Livry',
-        'desc'  => 'Artisans, commerçants et bons plans du 14240',
-        'icon'  => '🌳',
-        'url'   => 'https://artisans-livry.prigent.tech/',
+        'slug'   => 'livry',
+        'name'   => 'Livry',
+        'desc'   => 'Artisans, commerçants et bons plans du 14240',
+        'icon'   => '🌳',
+        'accent' => '#2D6A4F',
+        'url'    => 'https://artisans-livry.prigent.tech/',
     ],
     [
-        'slug'  => 'combs-la-ville',
-        'name'  => 'Combs-la-Ville',
-        'desc'  => 'Services locaux et artisans du 77380',
-        'icon'  => '🏠',
-        'url'   => 'https://artisans-combs.prigent.tech/',
+        'slug'   => 'combs-la-ville',
+        'name'   => 'Combs-la-Ville',
+        'desc'   => 'Services locaux et artisans du 77380',
+        'icon'   => '🏠',
+        'accent' => '#2F4E8C',
+        'url'    => 'https://artisans-combs.prigent.tech/',
     ],
     [
-        'slug'  => 'vert-saint-denis',
-        'name'  => 'Vert-Saint-Denis',
-        'desc'  => 'Artisans et commerces du 77240',
-        'icon'  => '🌻',
-        'url'   => 'https://artisans-vert-saint-denis.prigent.tech/',
+        'slug'   => 'vert-saint-denis',
+        'name'   => 'Vert-Saint-Denis',
+        'desc'   => 'Artisans et commerces du 77240',
+        'icon'   => '🌻',
+        'accent' => '#E9B949',
+        'url'    => 'https://artisans-vert-saint-denis.prigent.tech/',
     ],
 ];
 
@@ -56,24 +59,29 @@ $cities = [
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="description" content="WebIArtisan — Choisissez votre ville pour découvrir les artisans locaux, faire des check-ins et gagner des récompenses." />
-  <title>WebIArtisan — Choix de la ville</title>
+  <meta name="description" content="WebiArtisan — Choisissez votre ville pour découvrir les artisans locaux, faire des check-ins et gagner des récompenses." />
+  <title>WebiArtisan — Choix de la ville</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <meta name="theme-color" content="#C07A2E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg: #f6f7f9;
+      --bg: #FEF8EC;
       --card: #ffffff;
-      --text: #1a1a2e;
-      --muted: #6b7280;
-      --primary: #2d6a4f;
-      --primary-light: #d8f3dc;
+      --text: #2B2118;
+      --muted: #6B5D4F;
+      --primary: #C07A2E;
+      --primary-light: #F5E5D0;
       --radius: 16px;
       --shadow: 0 4px 24px rgba(0,0,0,0.08);
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
@@ -89,10 +97,12 @@ $cities = [
       text-align: center;
     }
     .logo {
-      font-size: 3rem;
-      margin-bottom: 12px;
+      width: 260px;
+      max-width: 80%;
+      margin: 0 auto 16px;
     }
     h1 {
+      font-family: 'Outfit', sans-serif;
       font-size: 1.5rem;
       margin: 0 0 8px;
     }
@@ -111,7 +121,8 @@ $cities = [
       align-items: center;
       gap: 16px;
       background: var(--card);
-      border: 1px solid #e5e7eb;
+      border: 1px solid #E7DAC4;
+      border-left: 4px solid var(--accent, var(--primary));
       border-radius: var(--radius);
       padding: 18px 20px;
       text-decoration: none;
@@ -121,7 +132,7 @@ $cities = [
     }
     .city:hover, .city:focus {
       transform: translateY(-2px);
-      border-color: var(--primary);
+      border-color: var(--accent, var(--primary));
       outline: none;
     }
     .city-icon {
@@ -136,11 +147,18 @@ $cities = [
     }
     .city-info { text-align: left; }
     .city-name {
+      font-family: 'Outfit', sans-serif;
       font-weight: 700;
       font-size: 1.05rem;
     }
     .city-desc {
       font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .trust-badge {
+      margin-top: 24px;
+      font-size: 0.85rem;
+      font-weight: 600;
       color: var(--muted);
     }
     .footer {
@@ -152,13 +170,13 @@ $cities = [
 </head>
 <body>
   <div class="container">
-    <div class="logo">🏘️</div>
-    <h1>Bienvenue sur WebIArtisan</h1>
+    <img class="logo" src="/logo.svg" alt="WebiArtisan — L'annuaire libre des artisans de proximité" />
+    <h1>Bienvenue sur WebiArtisan</h1>
     <p>Choisissez votre commune pour faire un check-in chez vos artisans et gagner de l'XP, profiter de coupons offerts par vos commerçants et faire tourner l'avatar des boutiques partenaires pour gagner des offres.</p>
 
     <nav class="cities" aria-label="Choix de la ville">
       <?php foreach ($cities as $city): ?>
-      <a class="city" href="<?php echo htmlspecialchars($city['url'], ENT_QUOTES, 'UTF-8'); ?>">
+      <a class="city" href="<?php echo htmlspecialchars($city['url'], ENT_QUOTES, 'UTF-8'); ?>" style="--accent: <?php echo $city['accent']; ?>">
         <div class="city-icon"><?php echo $city['icon']; ?></div>
         <div class="city-info">
           <div class="city-name"><?php echo htmlspecialchars($city['name'], ENT_QUOTES, 'UTF-8'); ?></div>
@@ -168,8 +186,10 @@ $cities = [
       <?php endforeach; ?>
     </nav>
 
+    <div class="trust-badge">🇫🇷 Conçu en France</div>
+
     <div class="footer">
-      © WebIArtisan — Faites vivre le commerce local
+      © WebiArtisan — Faites vivre le commerce local
     </div>
   </div>
 </body>

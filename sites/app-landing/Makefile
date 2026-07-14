@@ -3,7 +3,7 @@
 PROD_DIR := $(HOME)/mnt/gandi/vhosts/app.prigent.tech/htdocs
 
 help:
-	@echo "WebIArtisan — App landing page (app.prigent.tech)"
+	@echo "WebiArtisan — App landing page (app.prigent.tech)"
 	@echo "  make push  — Deploy landing page to Gandi"
 	@echo "  make test  — Quick HTTP check"
 	@echo "  make clean — Remove production logs backup"
