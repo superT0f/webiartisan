@@ -155,6 +155,7 @@ function user_magic_link(PDO $pdo, array $body): void
         'https://artisans-combs.prigent.tech',
         'https://artisans-vert-saint-denis.prigent.tech',
         'https://artisans-livry.prigent.tech',
+        'https://artisans-lieusaint.prigent.tech',
     ];
 
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
