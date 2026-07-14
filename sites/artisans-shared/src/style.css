@@ -1,23 +1,24 @@
 /* ============================================================
-   Webi Artisans
+   WebiArtisan
    Design system : Local · Chaleureux · Premium · Mobile-first
    ============================================================ */
 
 /* --- Tokens ------------------------------------------------- */
 :root {
-  --c-green:      #2D6A4F;
-  --c-green-dark: #1B4332;
-  --c-green-light:#52B788;
-  --c-gold:       #F4A261;
-  --c-gold-dark:  #E76F51;
-  --c-cream:      #FEFAE0;
-  --c-cream-2:    #F8F4E3;
+  --c-green:      #C07A2E;
+  --c-green-dark: #B5712B;
+  --c-green-light:#D9A45B;
+  --c-gold:       #D9A45B;
+  --c-gold-dark:  #B5712B;
+  --c-green-tint: #F5E5D0;
+  --c-cream:      #FEF8EC;
+  --c-cream-2:    #F5F0E6;
   --c-white:      #FFFFFF;
-  --c-text:       #1A1A2E;
-  --c-text-2:     #4A5568;
-  --c-text-3:     #718096;
+  --c-text:       #2B2118;
+  --c-text-2:     #6B5D4F;
+  --c-text-3:     #8A7B6C;
   --c-border:     #E2D9C8;
-  --c-shadow:     rgba(45, 106, 79, 0.12);
+  --c-shadow:     rgba(192, 122, 46, 0.12);
 
   --r-sm:   8px;
   --r-md:   14px;
@@ -100,7 +101,7 @@ h3 { font-size: 1.25rem; }
 .btn-gold {
   background: var(--c-gold);
   color: var(--c-white);
-  box-shadow: 0 4px 16px rgba(244, 162, 97, 0.3);
+  box-shadow: 0 4px 16px rgba(217, 164, 91, 0.3);
 }
 .btn-gold:hover {
   background: var(--c-gold-dark);
@@ -153,7 +154,7 @@ h3 { font-size: 1.25rem; }
   font-weight: 600;
   font-family: var(--font-title);
 }
-.badge-green  { background: #D8F3DC; color: var(--c-green-dark); }
+.badge-green  { background: var(--c-green-tint); color: var(--c-green-dark); }
 .badge-gold   { background: #FFF3E0; color: var(--c-gold-dark); }
 .badge-grey   { background: #F0EDE8; color: var(--c-text-2); }
 .badge-open   { background: #D8F3DC; color: #1B5E20; }
@@ -166,7 +167,7 @@ h3 { font-size: 1.25rem; }
 
 /* --- Skeleton loader ---------------------------------------- */
 .skeleton {
-  background: linear-gradient(90deg, #EFE9D8 25%, #F8F4E3 50%, #EFE9D8 75%);
+  background: linear-gradient(90deg, #EFE9D8 25%, #F5F0E6 50%, #EFE9D8 75%);
   background-size: 200% 100%;
   animation: shimmer 1.4s infinite;
   border-radius: var(--r-sm);
@@ -237,7 +238,7 @@ h3 { font-size: 1.25rem; }
   font-size: 0.9rem;
   margin: 16px 0;
 }
-.alert-success { background: #D8F3DC; color: #1B5E20; border-left: 4px solid var(--c-green); }
+.alert-success { background: #D8F3DC; color: #1B5E20; border-left: 4px solid #1B5E20; }
 .alert-error   { background: #FFEBEE; color: #B71C1C; border-left: 4px solid #E53935; }
 .alert-info    { background: #E3F2FD; color: #0D47A1; border-left: 4px solid #1E88E5; }
 
