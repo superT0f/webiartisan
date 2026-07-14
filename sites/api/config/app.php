@@ -28,6 +28,7 @@ function getAppConfig(): array {
             'https://artisans-livry.prigent.tech/espace',
             'https://artisans-combs.prigent.tech/espace',
             'https://artisans-vert-saint-denis.prigent.tech/espace',
+            'https://artisans-lieusaint.prigent.tech/espace',
         ],
     ];
 
