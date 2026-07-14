@@ -31,8 +31,8 @@ WebiArtisan met en relation artisans et habitants à l’échelle locale. La pla
 - **Multi-villes / multi-tenant** : un même socle technique alimente plusieurs annuaires locaux (Livry, Combs-la-Ville, Vert-Saint-Denis, etc.).
 - **Catalogue de services artisanaux** : chaque artisan peut définir et activer ses propres services (plomberie, coiffure, jardinage, couture, recettes locales…).
 - **Témoignages / recommandations génériques** : les habitants publient des recommandations sur un service utilisé, avec modération, notation et signalement.
-- **Mini-jeux** : hub de jeux locaux (coupon, quiz, tirage au sort, vote, battle…) avec système d’XP et de niveaux.
-- **Gamification** : roue de la fortune, actions récompensées, avatars débloquables et niveaux pour animer la communauté.
+- **Jeux sur la carte** : check-in GPS gratuit (100 XP par jour et par point, puis 10 XP toutes les 10 minutes), coupons offerts par les commerçants, et le jeu premium « Tournez l'avatar » en boutique.
+- **Gamification** : XP, niveaux, badges, séries de connexion et avatars débloquables pour animer la communauté.
 
 ## Stack technique
 
@@ -84,7 +84,7 @@ L’application est accessible sur `http://localhost` et l’API sur `http://loc
 make test-api
 ```
 
-Le script `scripts/test-api.sh` vérifie les endpoints publics, l’authentification artisan, l’authentification consommateur, la roue, les profils utilisateurs, la gamification, les témoignages et les mini-jeux.
+Le script `scripts/test-api.sh` vérifie les endpoints publics, l’authentification artisan, l’authentification consommateur, le jeu de l'avatar (spin), les profils utilisateurs, la gamification, les témoignages, les mini-jeux (coupon) et les check-ins GPS.
 
 ## Authentification consommateur
 
@@ -97,7 +97,7 @@ Les visiteurs peuvent créer un compte et se connecter de plusieurs façons :
 La case **"Rester connecté"** est cochée par défaut et crée un cookie `user_token` valable 365 jours.  
 Le logout invalide le token côté serveur.
 
-Les artisans connectés à leur espace peuvent cliquer sur **"Jouer aux mini-jeux"** pour obtenir un compte visiteur lié et participer aux jeux comme un habitant.
+Les artisans connectés à leur espace peuvent cliquer sur **"Jouer sur la carte"** pour obtenir un compte visiteur lié et participer aux jeux comme un habitant.
 
 ## Déploiement production (Gandi)
 

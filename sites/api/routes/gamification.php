@@ -56,6 +56,12 @@ function gamification_user_profile_endpoint(PDO $pdo, int $userId): void
         echo json_encode(['success' => false, 'error' => 'Utilisateur non trouvé']);
         return;
     }
+    // Endpoint public : ne pas exposer l'email, même via le fallback display_name
+    $emailLocal = isset($profile['email']) ? strstr($profile['email'], '@', true) : false;
+    if (empty($profile['display_name']) || ($emailLocal !== false && $profile['display_name'] === $emailLocal)) {
+        $profile['display_name'] = 'Utilisateur';
+    }
+    unset($profile['email']);
     echo json_encode(['success' => true, 'data' => $profile]);
 }
 

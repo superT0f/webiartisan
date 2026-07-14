@@ -123,7 +123,7 @@ function renderMarkers() {
     if (!a.latitude || !a.longitude) return
     const el = document.createElement('div')
     el.className = 'artisan-marker'
-    el.innerHTML = `<span>${categoryIcon(a.category_slug)}</span>`
+    el.innerHTML = `<span>${categoryIcon(a.category_slug)}</span>${a.has_active_game ? '<i class="marker-gift">🎁</i>' : ''}`
 
     const popupHtml = `
       <div class="map-popup artisan-popup">
@@ -239,6 +239,15 @@ function poiIcon(type) {
 :deep(.artisan-marker span) {
   transform: rotate(45deg);
   font-size: 1.2rem;
+}
+:deep(.marker-gift) {
+  position: absolute;
+  top: -10px;
+  right: -12px;
+  transform: rotate(45deg);
+  font-size: 0.95rem;
+  font-style: normal;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
 }
 :deep(.poi-marker) {
   width: 34px;

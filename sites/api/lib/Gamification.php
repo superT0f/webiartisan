@@ -14,6 +14,8 @@ const XP_ACTIONS = [
     'share'                => ['xp' => 15, 'cooldown' => 'daily',  'limit' => 3],
     'daily_visit'          => ['xp' => 10, 'cooldown' => 'daily',  'limit' => 1, 'internal' => true],
     'streak_3days'         => ['xp' => 30, 'cooldown' => 'daily',  'limit' => 1, 'internal' => true],
+    'poi_checkin'          => ['xp' => 100, 'cooldown' => 'none', 'limit' => null, 'internal' => true],
+    'poi_checkin_recharge' => ['xp' => 10,  'cooldown' => 'none', 'limit' => null, 'internal' => true],
 ];
 
 const LEVEL_TITLES = [

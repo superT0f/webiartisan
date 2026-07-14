@@ -56,7 +56,7 @@ $cities = [
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="description" content="WebIArtisan — Choisissez votre ville pour découvrir les artisans locaux et jouer aux mini-jeux." />
+  <meta name="description" content="WebIArtisan — Choisissez votre ville pour découvrir les artisans locaux, faire des check-ins et gagner des récompenses." />
   <title>WebIArtisan — Choix de la ville</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <style>
@@ -154,7 +154,7 @@ $cities = [
   <div class="container">
     <div class="logo">🏘️</div>
     <h1>Bienvenue sur WebIArtisan</h1>
-    <p>Choisissez votre commune pour découvrir les artisans locaux, leurs offres et jouer aux mini-jeux.</p>
+    <p>Choisissez votre commune pour faire un check-in chez vos artisans et gagner de l'XP, profiter de coupons offerts par vos commerçants et faire tourner l'avatar des boutiques partenaires pour gagner des offres.</p>
 
     <nav class="cities" aria-label="Choix de la ville">
       <?php foreach ($cities as $city): ?>

@@ -5,7 +5,7 @@
 
 require_once __DIR__ . '/UserAuth.php';
 
-const FREE_TIER_MAX_ACTIVE_GAMES = 2;
+const FREE_TIER_MAX_ACTIVE_GAMES = 1;
 const FREE_TIER_MAX_ACTIVE_SERVICES = 5;
 
 function artisanIsPremium(PDO $pdo, int $artisanId): bool

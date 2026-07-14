@@ -263,7 +263,7 @@ function testimonials_create(PDO $pdo, array $body): void
     $pdo->prepare("
         INSERT INTO local_testimonials
             (artisan_id, user_id, artisan_service_id, service_type, rating, title, content, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'approved')
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
     ")->execute([$artisanId, $user['id'], $artisanServiceId, $serviceType, $rating, $title, $content]);
 
     $id = (int)$pdo->lastInsertId();
@@ -288,7 +288,7 @@ function testimonials_create(PDO $pdo, array $body): void
         }
     }
 
-    echo json_encode(['success' => true, 'data' => ['id' => $id]]);
+    echo json_encode(['success' => true, 'data' => ['id' => $id, 'message' => 'Témoignage envoyé, il sera visible après validation.']]);
 }
 
 function testimonials_update(PDO $pdo, int $id, array $body): void

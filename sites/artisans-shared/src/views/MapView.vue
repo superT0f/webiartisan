@@ -1,32 +1,47 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import ImmersiveMap from '../components/ImmersiveMap.vue'
 import ArtisanSheet from '../components/ArtisanSheet.vue'
 import MapWeatherBadge from '../components/MapWeatherBadge.vue'
-import { fetchArtisans, fetchCityPois, CITY_LAT, CITY_LNG } from '../api.js'
+import CheckinButton from '../components/CheckinButton.vue'
+import GameOverlay from '../components/GameOverlay.vue'
+import AuthForm from '../components/AuthForm.vue'
+import GameRenderer from '../components/GameRenderer.vue'
+import SpinOverlay from '../components/games/SpinOverlay.vue'
+import {
+  fetchArtisans, fetchCityPois, fetchGames,
+  getUserToken, setUserToken, authUser, authEvents,
+  postCheckin, getCheckinStatus,
+  CITY_LAT, CITY_LNG,
+} from '../api.js'
 import { useWeather } from '../composables/useWeather.js'
+import { useGeolocation, haversineM } from '../composables/useGeolocation.js'
+import { useGamification } from '../composables/useGamification.js'
+
+const route = useRoute()
+const router = useRouter()
 
 const artisans = ref([])
 const pois = ref([])
+const games = ref([])
 const selected = ref(null)
 const loading = ref(true)
 const { weather, load: loadWeather } = useWeather(CITY_LAT, CITY_LNG)
+const { position, start: startGeolocation, stop: stopGeolocation } = useGeolocation()
+const { showToast } = useGamification()
+
+const userToken = ref(getUserToken())
+const statusTargets = ref([])
+const checkinLoading = ref(false)
+const overlay = ref(null) // null | 'coupon' | 'spin' | 'auth'
 
 const categoryFilter = ref('')
 const poiTypeFilter = ref('')
 const showArtisans = ref(true)
 const showPois = ref(true)
 
-onMounted(async () => {
-  await loadWeather()
-  const [artRes, poiRes] = await Promise.all([
-    fetchArtisans({ limit: 200 }),
-    fetchCityPois(),
-  ])
-  artisans.value = artRes.data || []
-  pois.value = poiRes.data || []
-  loading.value = false
-})
+const authenticated = computed(() => !!userToken.value)
 
 const categories = computed(() => {
   const map = {}
@@ -60,6 +75,98 @@ const filteredPois = computed(() => {
   return pois.value.filter(p => p.type === poiTypeFilter.value)
 })
 
+const gameByArtisan = computed(() => {
+  const map = {}
+  for (const g of games.value) {
+    if (g.game_type_key !== 'coupon') continue
+    map[Number(g.artisan_id)] = g
+  }
+  return map
+})
+
+const selectedGame = computed(() => {
+  if (!selected.value) return null
+  return gameByArtisan.value[Number(selected.value.id)] || null
+})
+
+// Nearest in-range point (server sorts by distance) — drives the floating button
+const nearestTarget = computed(() => statusTargets.value[0] || null)
+
+// Check-in state for the artisan shown in the sheet
+const selectedCheckin = computed(() => {
+  if (!selected.value || !position.value) return null
+  const distanceM = Math.round(haversineM(
+    position.value.latitude, position.value.longitude,
+    Number(selected.value.latitude), Number(selected.value.longitude)
+  ))
+  const st = statusTargets.value.find(
+    t => t.target_type === 'artisan' && t.target_id === Number(selected.value.id)
+  )
+  return {
+    inRange: distanceM <= 200,
+    distanceM,
+    dailyAvailable: st ? st.daily_available : null,
+    nextSpinAt: st ? st.next_spin_at : null,
+  }
+})
+
+let lastStatusAt = 0
+watch(position, () => {
+  const now = Date.now()
+  if (now - lastStatusAt < 5000) return
+  lastStatusAt = now
+  refreshStatus()
+})
+
+async function refreshStatus() {
+  if (!position.value) return
+  const res = await getCheckinStatus(position.value.latitude, position.value.longitude)
+  if (res.success) statusTargets.value = res.data || []
+}
+
+async function doCheckin(targetType, targetId) {
+  if (!authenticated.value) {
+    overlay.value = 'auth'
+    return
+  }
+  if (!position.value) {
+    showToast('Position indisponible')
+    return
+  }
+  checkinLoading.value = true
+  const res = await postCheckin({
+    target_type: targetType,
+    target_id: targetId,
+    lat: position.value.latitude,
+    lng: position.value.longitude,
+  })
+  checkinLoading.value = false
+
+  if (res.success) {
+    showToast(`+${res.data.xp_awarded} XP`)
+    if (res.data.level_up) showToast('Niveau supérieur !')
+    for (const b of res.data.new_badges || []) showToast(`Badge débloqué : ${b.name}`)
+    await refreshStatus()
+  } else if (res.status === 401) {
+    overlay.value = 'auth'
+  } else if (res.status === 429) {
+    showToast('Point en recharge, réessayez dans quelques minutes')
+  } else if (res.status === 422) {
+    showToast(`Trop loin du point (${res.data?.distance_m ?? '?'} m, 200 m max)`)
+  } else {
+    showToast(res.error || 'Check-in impossible')
+  }
+}
+
+function onFabCheckin(target) {
+  doCheckin(target.target_type, target.target_id)
+}
+
+function onSheetCheckin() {
+  if (!selected.value) return
+  doCheckin('artisan', Number(selected.value.id))
+}
+
 function openSheet(artisan) { selected.value = artisan }
 function closeSheet() { selected.value = null }
 
@@ -67,6 +174,55 @@ function navigate(artisan) {
   const url = `https://www.google.com/maps/dir/?api=1&destination=${artisan.latitude},${artisan.longitude}`
   window.open(url, '_blank')
 }
+
+async function exchangeMagicToken() {
+  if (!route.query.token) return
+  try {
+    const res = await authUser(route.query.token, true)
+    if (res.success && res.token) {
+      setUserToken(res.token, true)
+      userToken.value = res.token
+      showToast('Connexion réussie !')
+    } else {
+      showToast(res.error || 'Lien invalide')
+    }
+  } catch (e) {
+    showToast('Erreur réseau.')
+  } finally {
+    router.replace({ path: '/carte' })
+  }
+}
+
+function onAuthChange() {
+  userToken.value = getUserToken()
+}
+
+onMounted(async () => {
+  authEvents.addEventListener('change', onAuthChange)
+  await exchangeMagicToken()
+
+  await loadWeather()
+  const [artRes, poiRes] = await Promise.all([
+    fetchArtisans({ limit: 200 }),
+    fetchCityPois(),
+  ])
+  artisans.value = artRes.data || []
+  pois.value = poiRes.data || []
+  try {
+    const gamesRes = await fetchGames()
+    games.value = gamesRes.data || []
+  } catch (e) {
+    games.value = []
+  }
+  loading.value = false
+
+  startGeolocation()
+})
+
+onUnmounted(() => {
+  authEvents.removeEventListener('change', onAuthChange)
+  stopGeolocation()
+})
 </script>
 
 <template>
@@ -100,7 +256,37 @@ function navigate(artisan) {
     </div>
 
     <MapWeatherBadge :weather="weather" />
-    <ArtisanSheet :artisan="selected" @close="closeSheet" @navigate="navigate" />
+
+    <CheckinButton :target="nearestTarget" :loading="checkinLoading" @checkin="onFabCheckin" />
+
+    <ArtisanSheet
+      :artisan="selected"
+      :game="selectedGame"
+      :checkin-state="selectedCheckin"
+      :authenticated="authenticated"
+      @close="closeSheet"
+      @navigate="navigate"
+      @checkin="onSheetCheckin"
+      @play-coupon="overlay = 'coupon'"
+      @play-spin="overlay = 'spin'"
+    />
+
+    <GameOverlay v-if="overlay === 'coupon'" :title="selectedGame?.title || 'Coupon'" @close="overlay = null">
+      <AuthForm v-if="!authenticated" />
+      <GameRenderer
+        v-else-if="selectedGame"
+        :instance-id="selectedGame.id"
+        :game-type="selectedGame.game_type_key"
+        :config="selectedGame.config"
+        @played="showToast('🎁 Coupon débloqué !')"
+      />
+    </GameOverlay>
+
+    <SpinOverlay v-if="overlay === 'spin'" :artisan="selected" @close="overlay = null" />
+
+    <GameOverlay v-if="overlay === 'auth'" title="Connexion" @close="overlay = null">
+      <AuthForm @authenticated="overlay = null" />
+    </GameOverlay>
   </div>
 </template>
 

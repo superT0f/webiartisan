@@ -23,14 +23,14 @@
 
       <section class="dashboard-section card">
         <FreemiumLimitBanner
-          v-if="activeCount >= 2"
-          message="Limite de 2 jeux actifs atteinte en version gratuite."
+          v-if="!isPremium && activeCount >= 1"
+          message="Limite de 1 jeu actif atteinte en version gratuite."
           @upgrade="startCheckout"
         />
 
         <div v-if="!isPremium && !loadingSubscription" class="upgrade-cta">
           <p class="text-muted">
-            Passez Premium pour débloquer les types de jeux avancés et plus de fonctionnalités.
+            Passez Premium pour proposer le jeu « Tournez l'avatar » à vos clients (offres gérées dans « Mes offres roue »).
           </p>
           <button type="button" class="btn btn-gold" @click="startCheckout" :disabled="subscribing">
             {{ subscribing ? 'Redirection…' : 'Passer Premium' }}
@@ -63,18 +63,7 @@
             <input id="reveal_text" v-model="newGame.config.reveal_text" type="text" class="form-input" />
           </div>
 
-          <template v-if="newGame.game_type_key === 'poll' || newGame.game_type_key === 'vote'">
-            <div class="form-group">
-              <label for="question">Question</label>
-              <input id="question" v-model="newGame.config.question" type="text" class="form-input" />
-            </div>
-            <div class="form-group">
-              <label for="options">Options (séparées par virgule)</label>
-              <input id="options" v-model="optionsInput" type="text" class="form-input" />
-            </div>
-          </template>
-
-          <button type="submit" class="btn btn-primary" :disabled="activeCount >= 2 || saving">
+          <button type="submit" class="btn btn-primary" :disabled="(!isPremium && activeCount >= 1) || saving">
             {{ saving ? 'Création…' : 'Créer le jeu' }}
           </button>
         </form>
@@ -83,7 +72,7 @@
       <section class="dashboard-section card">
         <div class="section-title">
           <h2>Jeux créés</h2>
-          <span class="badge badge-grey">{{ activeCount }} actif{{ activeCount > 1 ? 's' : '' }} / 2</span>
+          <span class="badge badge-grey">{{ activeCount }} actif{{ isPremium ? '' : ' / 1' }}</span>
         </div>
 
         <ul v-if="games.length" class="game-list">
@@ -121,7 +110,6 @@ const artisanToken = computed(() => props.token || localStorage.getItem('artisan
 
 const types = ref([])
 const games = ref([])
-const optionsInput = ref('')
 const saving = ref(false)
 const error = ref('')
 const success = ref('')
@@ -136,9 +124,8 @@ const newGame = ref({
 })
 
 const isPremium = computed(() => subscriptionStatus.value?.plan === 'premium')
-const availableTypes = computed(() =>
-  isPremium.value ? types.value : types.value.filter(t => !t.is_premium)
-)
+// Only the coupon is created here; the wheel (premium) is managed via /espace/spin-offers
+const availableTypes = computed(() => types.value.filter(t => t.key === 'coupon'))
 const activeCount = computed(() => games.value.filter(g => g.is_active).length)
 
 async function load() {
@@ -187,15 +174,15 @@ async function startCheckout() {
 }
 
 async function createGame() {
-  if (activeCount.value >= 2) return
+  if (!isPremium.value && activeCount.value >= 1) {
+    error.value = 'Limite de 1 jeu actif atteinte.'
+    return
+  }
   error.value = ''
   success.value = ''
   saving.value = true
   try {
     const config = { ...newGame.value.config }
-    if (newGame.value.game_type_key === 'poll' || newGame.value.game_type_key === 'vote') {
-      config.options = optionsInput.value.split(',').map(s => s.trim()).filter(Boolean)
-    }
     const res = await createArtisanGame(artisanToken.value, {
       game_type_key: newGame.value.game_type_key,
       title: newGame.value.title,
@@ -207,7 +194,6 @@ async function createGame() {
       return
     }
     newGame.value = { game_type_key: 'coupon', title: '', description: '', config: {} }
-    optionsInput.value = ''
     success.value = 'Jeu créé.'
     await load()
   } catch (e) {
@@ -219,8 +205,8 @@ async function createGame() {
 }
 
 async function toggleActive(g) {
-  if (!g.is_active && activeCount.value >= 2) {
-    error.value = 'Limite de 2 jeux actifs atteinte.'
+  if (!g.is_active && !isPremium.value && activeCount.value >= 1) {
+    error.value = 'Limite de 1 jeu actif atteinte.'
     return
   }
   error.value = ''

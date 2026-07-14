@@ -259,15 +259,15 @@ if ($module === 'games') {
     exit;
 }
 
-if ($module === 'actions') {
-    applyRateLimit($pdo, 'login');
-    require_once __DIR__ . '/routes/actions.php';
-    exit;
-}
-
 if ($module === 'gamification') {
     applyRateLimit($pdo, 'login');
     require_once __DIR__ . '/routes/gamification.php';
+    exit;
+}
+
+if ($module === 'checkin') {
+    applyRateLimit($pdo, 'public');
+    require_once __DIR__ . '/routes/checkins.php';
     exit;
 }
 
