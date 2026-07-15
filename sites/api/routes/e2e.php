@@ -46,9 +46,9 @@ switch ($method) {
             $id = (int) $param;
 
             try {
-                $pdo->prepare('DELETE FROM local_users WHERE id = ? AND email LIKE "e2e-%@prigent.tech"')
-                    ->execute([$id]);
                 $pdo->prepare('DELETE la FROM local_artisans la INNER JOIN local_users lu ON la.user_id = lu.id WHERE la.user_id = ? AND lu.email LIKE "e2e-%@prigent.tech"')
+                    ->execute([$id]);
+                $pdo->prepare('DELETE FROM local_users WHERE id = ? AND email LIKE "e2e-%@prigent.tech"')
                     ->execute([$id]);
 
                 app_log('info', '[E2E-CLEANUP] test account cleaned', ['id' => $id]);
