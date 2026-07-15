@@ -1,20 +1,20 @@
 import { Router } from 'express';
 import { spawn } from 'child_process';
+import path from 'path';
 
 const router = Router();
 
-router.post('/', (req, res) => {
-  const { tag = 'manual' } = req.body;
+router.post('/', (_req, res) => {
+  const cwd = path.resolve('.');
+  const child = spawn('npm', ['run', 'test:prod'], { cwd, shell: true });
 
-  const proc = spawn('npm', ['run', 'test'], {
-    cwd: process.cwd(),
-    detached: true,
-    stdio: 'ignore',
-    env: { ...process.env, E2E_RUN_TAG: tag },
+  let output = '';
+  child.stdout.on('data', (d) => { output += d.toString(); });
+  child.stderr.on('data', (d) => { output += d.toString(); });
+
+  child.on('close', (code) => {
+    res.json({ exitCode: code, output });
   });
-  proc.unref();
-
-  res.status(202).json({ ok: true, pid: proc.pid, tag });
 });
 
 export default router;
