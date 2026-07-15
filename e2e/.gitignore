@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+.reports/
+data/*.sqlite
+data/*.sqlite-journal
+reports/latest.json
+reports/latest-logs.jsonl
+screenshots/
