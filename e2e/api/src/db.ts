@@ -1,7 +1,9 @@
 import Database from 'better-sqlite3';
+import fs from 'fs';
 import path from 'path';
 
 const dbPath = process.env.E2E_DB_PATH || path.resolve('data/runs.sqlite');
+fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 export const db = new Database(dbPath);
 
 db.exec(`

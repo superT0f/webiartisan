@@ -45,10 +45,13 @@ describe('auth loop', () => {
 
       const loginPage = new LoginPage(page, baseUrl);
       await loginPage.goto();
-      await loginPage.login(consumerEmail, consumerPassword);
+      await Promise.all([
+        page.waitForNavigation({ waitUntil: 'networkidle0' }),
+        loginPage.login(consumerEmail, consumerPassword),
+      ]);
 
       const mapPage = new MapPage(page, baseUrl);
-      await mapPage.isVisible();
+      expect(await mapPage.isVisible()).toBe(true);
 
       const loginCount = redirects.filter((u) => u.includes('/login')).length;
       expect(loginCount).toBeLessThanOrEqual(1);
