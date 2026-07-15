@@ -1061,8 +1061,10 @@ function requireE2EAuth(): void {
 $router->delete('/e2e/cleanup/:id', function ($params) use ($db) {
     requireE2EAuth();
     $id = (int) $params['id'];
+    // Delete artisan record first, guarded by JOIN to test user
+    $db->prepare('DELETE la FROM local_artisans la INNER JOIN local_users lu ON la.user_id = lu.id WHERE la.user_id = ? AND lu.email LIKE "e2e-%@prigent.tech"')->execute([$id]);
+    // Then delete the test user
     $db->prepare('DELETE FROM local_users WHERE id = ? AND email LIKE "e2e-%@prigent.tech"')->execute([$id]);
-    $db->prepare('DELETE FROM local_artisans WHERE user_id = ?')->execute([$id]);
     echo json_encode(['ok' => true]);
 });
 
@@ -1075,9 +1077,12 @@ $router->get('/e2e/magic-link/:email', function ($params) use ($db) {
         exit;
     }
     $code = bin2hex(random_bytes(16));
-    $db->prepare('INSERT INTO local_magic_codes (email, code, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 15 MINUTE))')
-       ->execute([$email, $code]);
-    echo json_encode(['code' => $code, 'url' => "https://artisans-livry.prigent.tech/login?magic={$code}"]);
+    $hash = hash('sha256', $code);
+    $expiry = date('Y-m-d H:i:s', strtotime('+15 minutes'));
+    // Reuse existing local_users.magic_token column (no local_magic_codes table)
+    $db->prepare('UPDATE local_users SET magic_token = ?, magic_token_exp = ? WHERE email = ?')
+       ->execute([$hash, $expiry, $email]);
+    echo json_encode(['code' => $code, 'url' => "https://artisans-livry.prigent.tech/login?token={$code}"]);
 });
 ```
 
