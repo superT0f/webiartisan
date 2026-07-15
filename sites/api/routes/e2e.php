@@ -48,7 +48,7 @@ switch ($method) {
             try {
                 $pdo->prepare('DELETE FROM local_users WHERE id = ? AND email LIKE "e2e-%@prigent.tech"')
                     ->execute([$id]);
-                $pdo->prepare('DELETE FROM local_artisans WHERE user_id = ?')
+                $pdo->prepare('DELETE la FROM local_artisans la INNER JOIN local_users lu ON la.user_id = lu.id WHERE la.user_id = ? AND lu.email LIKE "e2e-%@prigent.tech"')
                     ->execute([$id]);
 
                 app_log('info', '[E2E-CLEANUP] test account cleaned', ['id' => $id]);
@@ -101,7 +101,7 @@ switch ($method) {
                 app_log('info', '[E2E-MAGIC-LINK] code generated', ['email' => $email, 'user_id' => $userId]);
                 echo json_encode([
                     'code' => $code,
-                    'url'  => "https://artisans-livry.prigent.tech/login?magic={$code}",
+                    'url'  => "https://artisans-livry.prigent.tech/login?token={$code}",
                 ]);
             } catch (Throwable $e) {
                 app_log('error', '[E2E-MAGIC-LINK] database error', ['email' => $email, 'error' => $e->getMessage()]);
