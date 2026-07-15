@@ -1,4 +1,4 @@
-.PHONY: help up down migrate seed build dev test-api push-api push-app push-livry build-combs push-combs build-vsd push-vsd deploy-all console console-exec
+.PHONY: help up down migrate seed build dev test-api push-api push-app push-livry build-combs push-combs build-vsd push-vsd deploy-all console console-exec e2e-test e2e-dashboard-dev push-e2e
 
 APP_VERSION := $(shell cat .version 2>/dev/null || echo 2.0.1)
 
@@ -76,3 +76,14 @@ console:
 
 console-exec:
 	@python3 scripts/gpaas-console.py exec '$(CMD)'
+
+e2e-test:
+	@cd e2e && npm run test:prod
+
+e2e-dashboard-dev:
+	@cd e2e && npm run dashboard
+
+push-e2e:
+	@cd e2e/dashboard && npm run build
+	@rsync -avz e2e/dashboard/dist/ sites/e2e-dashboard/htdocs/
+	@$(MAKE) -C sites/e2e-dashboard push
