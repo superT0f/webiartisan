@@ -11,7 +11,8 @@ import triggerRouter from './routes/trigger';
 const app = express();
 const PORT = process.env.E2E_DASHBOARD_PORT || 4000;
 
-app.use(cors({ origin: true, credentials: true }));
+const allowedOrigins = (process.env.E2E_ALLOWED_ORIGINS || 'http://localhost:5173,http://localhost:4000').split(',');
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json());
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
@@ -26,7 +27,7 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 app.use('/api/runs', authMiddleware as express.RequestHandler, runsRouter);
-app.use('/api/logs', authMiddleware as express.RequestHandler, logsRouter);
+app.use('/api/logs', logsRouter);
 app.use('/api/runs/trigger', authMiddleware as express.RequestHandler, triggerRouter);
 
 app.listen(PORT, () => {

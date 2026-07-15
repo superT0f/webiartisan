@@ -8,17 +8,21 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
-import { API_URL, streamLogs } from '../api';
+import { streamLogs, triggerRun } from '../api';
 
 const logs = ref<string[]>([]);
 const running = ref(false);
 let cleanup = () => {};
 
+const token = localStorage.getItem('e2e_token');
+
 onMounted(() => {
-  cleanup = streamLogs((data) => {
-    logs.value.push(JSON.stringify(data));
-    if (logs.value.length > 200) logs.value.shift();
-  });
+  if (token) {
+    cleanup = streamLogs(token, (data) => {
+      logs.value.push(JSON.stringify(data));
+      if (logs.value.length > 200) logs.value.shift();
+    });
+  }
 });
 
 onUnmounted(() => cleanup());
@@ -26,10 +30,8 @@ onUnmounted(() => cleanup());
 async function trigger() {
   running.value = true;
   try {
-    await fetch(`${API_URL}/runs/trigger`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const t = localStorage.getItem('e2e_token');
+    if (t) await triggerRun(t);
   } finally {
     running.value = false;
   }

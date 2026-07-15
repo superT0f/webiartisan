@@ -10,11 +10,19 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, onMounted, watch } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
 
-const token = computed(() => localStorage.getItem('e2e_token'));
+const token = ref<string | null>(null);
 const router = useRouter();
+const route = useRoute();
+
+function readToken() {
+  token.value = localStorage.getItem('e2e_token');
+}
+
+onMounted(readToken);
+watch(() => route.path, readToken);
 
 function logout() {
   localStorage.removeItem('e2e_token');

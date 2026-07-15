@@ -5,29 +5,49 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+async function parseJson<T = any>(res: Response): Promise<T> {
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(text || res.statusText || `Request failed with status ${res.status}`);
+  }
+  return res.json() as Promise<T>;
+}
+
 export async function login(username: string, password: string): Promise<string> {
   const res = await fetch(`${API_URL}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Login failed');
+  const data = await parseJson<{ token: string }>(res);
   return data.token;
 }
 
 export async function fetchRuns() {
   const res = await fetch(`${API_URL}/runs`, { headers: authHeaders() });
-  return res.json();
+  return parseJson(res);
 }
 
 export async function fetchRun(id: number) {
   const res = await fetch(`${API_URL}/runs/${id}`, { headers: authHeaders() });
-  return res.json();
+  return parseJson(res);
 }
 
-export function streamLogs(onMessage: (data: unknown) => void): () => void {
-  const es = new EventSource(`${API_URL}/logs/stream`, { withCredentials: true });
+export async function triggerRun(token: string) {
+  const res = await fetch(`${API_URL}/runs/trigger`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  await parseJson(res);
+}
+
+export function streamLogs(token: string, onMessage: (data: unknown) => void): () => void {
+  const es = new EventSource(`${API_URL}/logs/stream?token=${encodeURIComponent(token)}`, {
+    withCredentials: false,
+  });
   es.onmessage = (event) => onMessage(JSON.parse(event.data));
   return () => es.close();
 }

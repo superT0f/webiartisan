@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import jwt from 'jsonwebtoken';
 import { LogWatcher } from '../../../src/helpers/logWatcher';
 import { env } from '../../../src/config/env';
 import fs from 'fs';
@@ -12,7 +13,23 @@ const logFiles = [
 const watcher = new LogWatcher(logFiles);
 let connectionCount = 0;
 
+function verifyQueryToken(req: { url?: string }): { username: string } | null {
+  const url = new URL(req.url || '/', 'http://localhost');
+  const token = url.searchParams.get('token');
+  if (!token) return null;
+  try {
+    return jwt.verify(token, env.jwtSecret) as { username: string };
+  } catch {
+    return null;
+  }
+}
+
 router.get('/stream', (req, res) => {
+  if (!verifyQueryToken(req)) {
+    res.status(401).json({ error: 'Missing or invalid token' });
+    return;
+  }
+
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
