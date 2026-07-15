@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { env } from './env';
 
 describe('env', () => {
@@ -11,11 +11,9 @@ describe('env', () => {
   });
 
   it('throws if prod mode lacks required vars', async () => {
-    const previous = process.env.E2E_RUN_AGAINST_PROD;
-    process.env.E2E_RUN_AGAINST_PROD = 'true';
+    vi.stubEnv('E2E_RUN_AGAINST_PROD', 'true');
     delete process.env.E2E_ADMIN_USER;
     vi.resetModules();
     await expect(import('./env')).rejects.toThrow();
-    process.env.E2E_RUN_AGAINST_PROD = previous;
   });
 });
