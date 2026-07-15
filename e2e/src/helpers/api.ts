@@ -43,11 +43,30 @@ export class ApiClient {
     }) as Promise<AuthResponse>;
   }
 
-  async registerArtisan(email: string, password: string, citySlug: string): Promise<AuthResponse> {
+  async registerArtisan(
+    email: string,
+    password: string,
+    citySlug: string,
+    options: { companyName: string; categorySlug: string; phone: string }
+  ): Promise<{ success: boolean; data?: { id: number; status: string }; message?: string; error?: string }> {
     return this.request('/artisans/register', {
       method: 'POST',
-      body: JSON.stringify({ email, password, city_slug: citySlug }),
-    }) as Promise<AuthResponse>;
+      body: JSON.stringify({
+        email,
+        password,
+        city_slug: citySlug,
+        company_name: options.companyName,
+        category_slug: options.categorySlug,
+        phone: options.phone,
+      }),
+    });
+  }
+
+  async activateTestArtisan(artisanId: number, e2eToken: string): Promise<void> {
+    await this.request(`/e2e/activate-artisan/${artisanId}`, {
+      method: 'POST',
+      headers: { 'X-E2E-Token': e2eToken },
+    });
   }
 
   async loginArtisan(email: string, password: string): Promise<AuthResponse> {

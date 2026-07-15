@@ -64,6 +64,38 @@ switch ($method) {
         }
         break;
 
+    case 'POST':
+        if ($action === 'activate-artisan' && $param !== null && is_numeric($param)) {
+            requireE2EAuth();
+            $id = (int) $param;
+
+            try {
+                $stmt = $pdo->prepare('SELECT email FROM local_artisans WHERE id = ?');
+                $stmt->execute([$id]);
+                $email = $stmt->fetchColumn();
+
+                if (!$email || !isTestEmail($email)) {
+                    http_response_code(404);
+                    echo json_encode(['error' => 'Test artisan not found']);
+                    exit;
+                }
+
+                $pdo->prepare("UPDATE local_artisans SET status = 'active', email_verified = 1 WHERE id = ?")
+                    ->execute([$id]);
+
+                app_log('info', '[E2E-ACTIVATE-ARTISAN] test artisan activated', ['id' => $id]);
+                echo json_encode(['ok' => true]);
+            } catch (Throwable $e) {
+                app_log('error', '[E2E-ACTIVATE-ARTISAN] database error', ['id' => $id, 'error' => $e->getMessage()]);
+                http_response_code(500);
+                echo json_encode(['error' => 'Server error']);
+            }
+        } else {
+            http_response_code(404);
+            echo json_encode(['error' => 'Endpoint inconnu']);
+        }
+        break;
+
     case 'GET':
         if ($action === 'magic-link' && $param !== null) {
             requireE2EAuth();

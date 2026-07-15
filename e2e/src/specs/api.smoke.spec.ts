@@ -22,11 +22,11 @@ describe('api smoke', () => {
     const email = ApiClient.generateTestEmail();
     const password = env.testAccounts.password;
     const register = await api.registerConsumer(email, password);
-    expect(register.token).toBeDefined();
-    registeredUserId = register.user?.id;
+    expect(register.success).toBe(true);
 
     const login = await api.loginConsumer(email, password);
     expect(login.token).toBeDefined();
+    registeredUserId = login.user?.id;
   });
 
   it('protected route returns 401 without token', async () => {

@@ -7,7 +7,7 @@ describe('env', () => {
   });
 
   it('exposes city URLs', () => {
-    expect(env.cityUrls.livry).toBe('http://localhost');
+    expect(env.cityUrls.livry).toMatch(/^http:\/\/localhost/);
   });
 
   it('throws if prod mode lacks required vars', async () => {

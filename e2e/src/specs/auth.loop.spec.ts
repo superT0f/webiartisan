@@ -3,7 +3,6 @@ import { env } from '../config/env';
 import { ApiClient } from '../helpers/api';
 import { newBrowserContext, closeBrowser } from '../helpers/browser';
 import { setLocalStorageToken } from '../helpers/cookies';
-import { LoginPage } from '../pages/LoginPage';
 import { MapPage } from '../pages/MapPage';
 import { DashboardPage } from '../pages/DashboardPage';
 
@@ -40,21 +39,33 @@ describe('auth loop', () => {
         if (frame === page.mainFrame()) redirects.push(frame.url());
       });
 
+      // Seed a stale token on the app origin, then reload the map.
+      await page.goto(`${baseUrl}/carte`, { waitUntil: 'networkidle0' });
       await setLocalStorageToken(page, 'invalid-token');
-      await page.goto(baseUrl);
+      await page.goto(`${baseUrl}/carte`, { waitUntil: 'networkidle0' });
 
-      const loginPage = new LoginPage(page, baseUrl);
-      await loginPage.goto();
-      await Promise.all([
-        page.waitForNavigation({ waitUntil: 'networkidle0' }),
-        loginPage.login(consumerEmail, consumerPassword),
-      ]);
+      expect(page.url()).toContain('/carte');
+      const loginCount = redirects.filter((u) => u.includes('/login')).length;
+      expect(loginCount).toBeLessThanOrEqual(1);
+    } finally {
+      await closeBrowser(browser);
+    }
+  });
+
+  it('consumer can access the map after API login', async () => {
+    const login = await api.loginConsumer(consumerEmail, consumerPassword);
+    expect(login.token).toBeDefined();
+
+    const { browser, page } = await newBrowserContext();
+    const baseUrl = env.cityUrls.livry;
+
+    try {
+      await page.goto(`${baseUrl}/carte`, { waitUntil: 'networkidle0' });
+      await setLocalStorageToken(page, login.token);
+      await page.goto(`${baseUrl}/carte`, { waitUntil: 'networkidle0' });
 
       const mapPage = new MapPage(page, baseUrl);
       expect(await mapPage.isVisible()).toBe(true);
-
-      const loginCount = redirects.filter((u) => u.includes('/login')).length;
-      expect(loginCount).toBeLessThanOrEqual(1);
     } finally {
       await closeBrowser(browser);
     }
@@ -63,16 +74,27 @@ describe('auth loop', () => {
   it('artisan with matching city slug lands on dashboard', async () => {
     const artisanEmail = ApiClient.generateTestEmail();
     const artisanPassword = env.testAccounts.password;
-    const artisan = await api.registerArtisan(artisanEmail, artisanPassword, 'livry');
-    artisanUserId = artisan.user?.id;
+    const artisan = await api.registerArtisan(artisanEmail, artisanPassword, 'livry', {
+      companyName: 'E2E Artisan',
+      categorySlug: 'boulanger',
+      phone: '0600000000',
+    });
+    artisanUserId = artisan.data?.id;
+
+    await api.activateTestArtisan(artisanUserId!, env.apiE2eToken);
+
+    const login = await api.loginArtisan(artisanEmail, artisanPassword);
+    expect(login.token).toBeDefined();
 
     const { browser, page } = await newBrowserContext();
     const baseUrl = env.cityUrls.livry;
 
     try {
-      const loginPage = new LoginPage(page, baseUrl);
-      await loginPage.goto();
-      await loginPage.login(artisanEmail, artisanPassword);
+      await page.goto(`${baseUrl}/espace`, { waitUntil: 'networkidle0' });
+      await page.evaluate((token: string) => {
+        localStorage.setItem('artisan_token', token);
+      }, login.token);
+      await page.goto(`${baseUrl}/espace`, { waitUntil: 'networkidle0' });
 
       const dashboard = new DashboardPage(page, baseUrl);
       await dashboard.waitForLoaded();

@@ -9,12 +9,18 @@ export class DashboardPage {
 
   async waitForLoaded(): Promise<void> {
     await this.page.waitForFunction(
-      () => document.body.innerText.includes('Tableau de bord') || document.body.innerText.includes('Dashboard'),
+      () =>
+        document.body.innerText.includes('Mon espace artisan') ||
+        document.body.innerText.includes('Tableau de bord') ||
+        document.body.innerText.includes('Dashboard'),
       { timeout: 10_000 }
     );
   }
 
   async isVisible(): Promise<boolean> {
-    return this.page.evaluate(() => document.body.innerText.includes('Tableau de bord'));
+    return this.page.evaluate(() =>
+      document.body.innerText.includes('Mon espace artisan') ||
+      document.body.innerText.includes('Tableau de bord')
+    );
   }
 }
