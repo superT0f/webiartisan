@@ -294,6 +294,11 @@ if ($module === 'weather') {
     exit;
 }
 
+if ($module === 'e2e') {
+    require_once __DIR__ . '/routes/e2e.php';
+    exit;
+}
+
 // Route to the correct module
 $routeFile = __DIR__ . "/routes/{$module}.php";
 
