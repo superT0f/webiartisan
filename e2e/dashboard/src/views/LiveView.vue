@@ -8,7 +8,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
-import { streamLogs } from '../api';
+import { API_URL, streamLogs } from '../api';
 
 const logs = ref<string[]>([]);
 const running = ref(false);
@@ -25,7 +25,13 @@ onUnmounted(() => cleanup());
 
 async function trigger() {
   running.value = true;
-  await fetch('/api/runs/trigger', { method: 'POST' });
-  running.value = false;
+  try {
+    await fetch(`${API_URL}/runs/trigger`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } finally {
+    running.value = false;
+  }
 }
 </script>

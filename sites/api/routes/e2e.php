@@ -85,12 +85,12 @@ switch ($method) {
                 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
                 if (!$user) {
-                    $insert = $pdo->prepare('INSERT INTO local_users (email) VALUES (?)');
-                    $insert->execute([$email]);
-                    $userId = (int) $pdo->lastInsertId();
-                } else {
-                    $userId = (int) $user['id'];
+                    http_response_code(404);
+                    echo json_encode(['error' => 'Test user not found']);
+                    exit;
                 }
+
+                $userId = (int) $user['id'];
 
                 $pdo->prepare('
                     UPDATE local_users

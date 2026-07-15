@@ -11,11 +11,23 @@ describe('auth loop', () => {
   const api = new ApiClient(env.apiUrl);
   let consumerEmail: string;
   let consumerPassword: string;
+  let consumerUserId: number | undefined;
+  let artisanUserId: number | undefined;
 
   beforeAll(async () => {
     consumerEmail = ApiClient.generateTestEmail();
     consumerPassword = env.testAccounts.password;
-    await api.registerConsumer(consumerEmail, consumerPassword);
+    const consumer = await api.registerConsumer(consumerEmail, consumerPassword);
+    consumerUserId = consumer.user?.id;
+  });
+
+  afterAll(async () => {
+    if (consumerUserId) {
+      await api.cleanupTestAccount(consumerUserId, env.apiE2eToken);
+    }
+    if (artisanUserId) {
+      await api.cleanupTestAccount(artisanUserId, env.apiE2eToken);
+    }
   });
 
   it('does not loop when localStorage token is stale', async () => {
@@ -23,13 +35,13 @@ describe('auth loop', () => {
     const baseUrl = env.cityUrls.livry;
 
     try {
-      await setLocalStorageToken(page, 'invalid-token');
-      await page.goto(baseUrl);
-
       const redirects: string[] = [];
       page.on('framenavigated', (frame) => {
         if (frame === page.mainFrame()) redirects.push(frame.url());
       });
+
+      await setLocalStorageToken(page, 'invalid-token');
+      await page.goto(baseUrl);
 
       const loginPage = new LoginPage(page, baseUrl);
       await loginPage.goto();
@@ -48,7 +60,8 @@ describe('auth loop', () => {
   it('artisan with matching city slug lands on dashboard', async () => {
     const artisanEmail = ApiClient.generateTestEmail();
     const artisanPassword = env.testAccounts.password;
-    await api.registerArtisan(artisanEmail, artisanPassword, 'livry');
+    const artisan = await api.registerArtisan(artisanEmail, artisanPassword, 'livry');
+    artisanUserId = artisan.user?.id;
 
     const { browser, page } = await newBrowserContext();
     const baseUrl = env.cityUrls.livry;

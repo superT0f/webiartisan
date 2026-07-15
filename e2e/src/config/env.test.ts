@@ -12,7 +12,7 @@ describe('env', () => {
 
   it('throws if prod mode lacks required vars', async () => {
     vi.stubEnv('E2E_RUN_AGAINST_PROD', 'true');
-    delete process.env.E2E_ADMIN_USER;
+    vi.stubEnv('E2E_ADMIN_USER', undefined);
     vi.resetModules();
     await expect(import('./env')).rejects.toThrow();
   });

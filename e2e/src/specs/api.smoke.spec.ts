@@ -1,9 +1,17 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { env } from '../config/env';
 import { ApiClient } from '../helpers/api';
 
 describe('api smoke', () => {
   const api = new ApiClient(env.apiUrl);
+  let registeredUserId: number | undefined;
+
+  afterEach(async () => {
+    if (registeredUserId) {
+      await api.cleanupTestAccount(registeredUserId, env.apiE2eToken);
+      registeredUserId = undefined;
+    }
+  });
 
   it('health endpoint returns 200', async () => {
     const result = await api.health();
@@ -15,6 +23,7 @@ describe('api smoke', () => {
     const password = env.testAccounts.password;
     const register = await api.registerConsumer(email, password);
     expect(register.token).toBeDefined();
+    registeredUserId = register.user?.id;
 
     const login = await api.loginConsumer(email, password);
     expect(login.token).toBeDefined();

@@ -10,6 +10,7 @@ const logFiles = [
   `${env.logPaths.app}/visits-${today}.log`,
 ].filter(fs.existsSync);
 const watcher = new LogWatcher(logFiles);
+let connectionCount = 0;
 
 router.get('/stream', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
@@ -20,10 +21,19 @@ router.get('/stream', (req, res) => {
     res.write(`data: ${JSON.stringify({ line, source, ts: new Date().toISOString() })}\n\n`);
   };
   watcher.on('line', onLine);
-  watcher.start();
+
+  if (connectionCount === 0) {
+    watcher.start();
+  }
+  connectionCount++;
 
   req.on('close', () => {
     watcher.off('line', onLine);
+    connectionCount--;
+    if (connectionCount <= 0) {
+      connectionCount = 0;
+      watcher.stop();
+    }
   });
 });
 
