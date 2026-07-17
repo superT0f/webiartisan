@@ -83,6 +83,7 @@ let userMarker = null
 const USER_POS_SOURCE = 'user-pos'
 
 function upsertUserPosition() {
+  if (!map.value?.isStyleLoaded?.()) return
   if (!map.value) return
   const pos = props.userPosition
   if (!pos || !pos.latitude || !pos.longitude) {

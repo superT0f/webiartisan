@@ -11,6 +11,7 @@ import SpinOverlay from '../components/games/SpinOverlay.vue'
 import {
   fetchArtisans, fetchCityPois, fetchGames,
   getUserToken, authEvents,
+  getArtisanToken, fetchMe,
   postCheckin, getCheckinStatus,
   CITY_LAT, CITY_LNG,
 } from '../api.js'
@@ -28,6 +29,12 @@ const { position, start: startGeolocation, stop: stopGeolocation } = useGeolocat
 const { showToast } = useGamification()
 
 const userToken = ref(getUserToken())
+const isAdmin = ref(false)
+const adminHalo = ref(true)
+const mockPosition = ref(null)
+const teleportArmed = ref(false)
+
+const effectivePosition = computed(() => mockPosition.value || position.value)
 const statusTargets = ref([])
 const checkinLoading = ref(false)
 const overlay = ref(null) // null | 'coupon' | 'spin' | 'auth'
@@ -90,9 +97,9 @@ const nearestTarget = computed(() => statusTargets.value[0] || null)
 
 // Check-in state for the artisan shown in the sheet
 const selectedCheckin = computed(() => {
-  if (!selected.value || !position.value) return null
+  if (!selected.value || !effectivePosition.value) return null
   const distanceM = Math.round(haversineM(
-    position.value.latitude, position.value.longitude,
+    effectivePosition.value.latitude, effectivePosition.value.longitude,
     Number(selected.value.latitude), Number(selected.value.longitude)
   ))
   const st = statusTargets.value.find(
@@ -107,7 +114,7 @@ const selectedCheckin = computed(() => {
 })
 
 let lastStatusAt = 0
-watch(position, () => {
+watch(effectivePosition, () => {
   const now = Date.now()
   if (now - lastStatusAt < 5000) return
   lastStatusAt = now
@@ -115,8 +122,8 @@ watch(position, () => {
 })
 
 async function refreshStatus() {
-  if (!position.value) return
-  const res = await getCheckinStatus(position.value.latitude, position.value.longitude)
+  if (!effectivePosition.value) return
+  const res = await getCheckinStatus(effectivePosition.value.latitude, effectivePosition.value.longitude)
   if (res.success) statusTargets.value = res.data || []
 }
 
@@ -125,7 +132,7 @@ async function doCheckin(targetType, targetId) {
     overlay.value = 'auth'
     return
   }
-  if (!position.value) {
+  if (!effectivePosition.value) {
     showToast('Position indisponible')
     return
   }
@@ -133,8 +140,8 @@ async function doCheckin(targetType, targetId) {
   const res = await postCheckin({
     target_type: targetType,
     target_id: targetId,
-    lat: position.value.latitude,
-    lng: position.value.longitude,
+    lat: effectivePosition.value.latitude,
+    lng: effectivePosition.value.longitude,
   })
   checkinLoading.value = false
 
@@ -175,8 +182,41 @@ function onAuthChange() {
   userToken.value = getUserToken()
 }
 
+async function loadAdminStatus() {
+  const artisanToken = getArtisanToken()
+  if (!artisanToken) return
+  try {
+    const res = await fetchMe(artisanToken)
+    if (res.success) isAdmin.value = res.data.is_admin === 1 || res.data.is_admin === true
+  } catch (e) {
+    console.warn('Admin status check failed', e)
+  }
+}
+
+function armTeleport() {
+  teleportArmed.value = true
+  showToast('Cliquez sur la carte pour définir votre position')
+}
+
+function onMapClick(pos) {
+  if (!teleportArmed.value) return
+  mockPosition.value = { latitude: pos.latitude, longitude: pos.longitude, accuracy: 5 }
+  teleportArmed.value = false
+  showToast('Position fictive définie')
+}
+
+function resetPosition() {
+  mockPosition.value = null
+  showToast('Position réelle restaurée')
+}
+
+function onCouponPlayed(data) {
+  showToast(data?.reward ? '🎁 Coupon débloqué !' : '+10 XP, merci d\'avoir joué !')
+}
+
 onMounted(async () => {
   authEvents.addEventListener('change', onAuthChange)
+  loadAdminStatus()
 
   await loadWeather()
   const [artRes, poiRes] = await Promise.all([
@@ -204,7 +244,14 @@ onUnmounted(() => {
 
 <template>
   <div class="map-view">
-    <ImmersiveMap :artisans="filteredArtisans" :pois="filteredPois" @select="openSheet" />
+    <ImmersiveMap
+      :artisans="filteredArtisans"
+      :pois="filteredPois"
+      :user-position="effectivePosition"
+      :halo="isAdmin && adminHalo"
+      @select="openSheet"
+      @map-click="onMapClick"
+    />
 
     <div class="map-controls card">
       <div v-if="loading" class="loading-bar">Chargement de la carte…</div>
@@ -228,6 +275,16 @@ onUnmounted(() => {
             <option value="">Tous les types</option>
             <option v-for="t in poiTypes" :key="t.type" :value="t.type">{{ t.name }}</option>
           </select>
+        </div>
+        <div v-if="isAdmin" class="control-row admin-row">
+          <label class="toggle">
+            <input v-model="adminHalo" type="checkbox" />
+            <span>🛡️ Halo 200 m</span>
+          </label>
+          <button v-if="!mockPosition" type="button" class="btn btn-outline btn-sm" :disabled="teleportArmed" @click="armTeleport">
+            {{ teleportArmed ? 'Cliquez sur la carte…' : '📍 Déplacer ma position' }}
+          </button>
+          <button v-else type="button" class="btn btn-outline btn-sm" @click="resetPosition">↩︎ Position réelle</button>
         </div>
       </template>
     </div>
@@ -255,7 +312,7 @@ onUnmounted(() => {
         :instance-id="selectedGame.id"
         :game-type="selectedGame.game_type_key"
         :config="selectedGame.config"
-        @played="showToast('🎁 Coupon débloqué !')"
+        @played="onCouponPlayed"
       />
     </GameOverlay>
 
@@ -290,6 +347,7 @@ onUnmounted(() => {
   margin-bottom: 12px;
 }
 .control-row:last-child { margin-bottom: 0; }
+.admin-row { border-top: 1px solid var(--c-border); padding-top: 12px; }
 .toggle {
   display: flex;
   align-items: center;
