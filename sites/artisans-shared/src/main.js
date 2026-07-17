@@ -3,6 +3,9 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { createPinia } from 'pinia'
 import App from './App.vue'
 import './style.css'
+import { authUser } from './api.js'
+import { consumeTokenFromQuery } from './auth.js'
+import { useGamification } from './composables/useGamification.js'
 
 const routes = [
   { path: '/', component: () => import('./views/Home.vue'), meta: { title: 'Artisans de ' + import.meta.env.VITE_CITY_NAME } },
@@ -41,6 +44,21 @@ const router = createRouter({
   history: createWebHistory(),
   routes,
   scrollBehavior: () => ({ top: 0 })
+})
+
+// Connexion automatique par lien magique : consomme ?token= sur n'importe
+// quelle page, puis redirige vers la même URL nettoyée.
+router.beforeEach(async (to) => {
+  const result = await consumeTokenFromQuery(to, authUser)
+  if (!result) return true
+  const query = { ...to.query }
+  delete query.token
+  delete query.rememberMe
+  if (result.type === 'user') {
+    const { showToast } = useGamification()
+    showToast(result.success ? 'Connexion réussie !' : (result.error || 'Lien invalide'))
+  }
+  return { path: to.path, query, hash: to.hash, replace: true }
 })
 
 router.afterEach((to) => {

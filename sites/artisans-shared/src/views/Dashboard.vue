@@ -311,11 +311,10 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { useRouter } from 'vue-router'
 import { requestMagicLink, loginArtisan, fetchMe, updateMe, getMyProspects, getArtisanToken, setArtisanToken, removeArtisanToken, fetchArtisanConsumerToken, setUserToken, logoutArtisan, getSubscriptionStatus, createSubscriptionCheckout, createSubscriptionPortal, changeArtisanPassword } from '../api.js'
 
-const route = useRoute()
 const router = useRouter()
 
 const token = ref(getArtisanToken())
@@ -379,23 +378,6 @@ function abortAllPending() {
 function setMessage(text, type = 'info') {
   message.value = text
   messageType.value = type
-}
-
-function handleTokenFromQuery() {
-  const linkToken = Array.isArray(route.query.token) ? route.query.token[0] : route.query.token
-  if (linkToken) {
-    const linkRememberMe = route.query.rememberMe === '1' || route.query.rememberMe === 'true'
-    rememberMe.value = linkRememberMe
-    token.value = linkToken
-    artisan.value = null
-    myProspects.value = []
-    setArtisanToken(linkToken, linkRememberMe)
-    router.replace('/espace')
-    loadProfile()
-    loadMyProspects()
-    return true
-  }
-  return false
 }
 
 async function sendMagicLink() {
@@ -674,8 +656,7 @@ async function playAsConsumer() {
 
 onMounted(() => {
   isMounted = true
-  const consumed = handleTokenFromQuery()
-  if (token.value && !consumed) {
+  if (token.value) {
     loadProfile()
     loadMyProspects()
     loadSubscription()
@@ -685,12 +666,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   isMounted = false
   abortAllPending()
-})
-
-watch(() => route.query.token, () => {
-  if (isMounted) {
-    handleTokenFromQuery()
-  }
 })
 </script>
 

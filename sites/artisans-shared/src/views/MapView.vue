@@ -1,6 +1,5 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
 import ImmersiveMap from '../components/ImmersiveMap.vue'
 import ArtisanSheet from '../components/ArtisanSheet.vue'
 import MapWeatherBadge from '../components/MapWeatherBadge.vue'
@@ -11,16 +10,13 @@ import GameRenderer from '../components/GameRenderer.vue'
 import SpinOverlay from '../components/games/SpinOverlay.vue'
 import {
   fetchArtisans, fetchCityPois, fetchGames,
-  getUserToken, setUserToken, authUser, authEvents,
+  getUserToken, authEvents,
   postCheckin, getCheckinStatus,
   CITY_LAT, CITY_LNG,
 } from '../api.js'
 import { useWeather } from '../composables/useWeather.js'
 import { useGeolocation, haversineM } from '../composables/useGeolocation.js'
 import { useGamification } from '../composables/useGamification.js'
-
-const route = useRoute()
-const router = useRouter()
 
 const artisans = ref([])
 const pois = ref([])
@@ -175,31 +171,12 @@ function navigate(artisan) {
   window.open(url, '_blank')
 }
 
-async function exchangeMagicToken() {
-  if (!route.query.token) return
-  try {
-    const res = await authUser(route.query.token, true)
-    if (res.success && res.token) {
-      setUserToken(res.token, true)
-      userToken.value = res.token
-      showToast('Connexion réussie !')
-    } else {
-      showToast(res.error || 'Lien invalide')
-    }
-  } catch (e) {
-    showToast('Erreur réseau.')
-  } finally {
-    router.replace({ path: '/carte' })
-  }
-}
-
 function onAuthChange() {
   userToken.value = getUserToken()
 }
 
 onMounted(async () => {
   authEvents.addEventListener('change', onAuthChange)
-  await exchangeMagicToken()
 
   await loadWeather()
   const [artRes, poiRes] = await Promise.all([
