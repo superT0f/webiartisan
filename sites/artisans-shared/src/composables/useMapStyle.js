@@ -24,7 +24,7 @@ export function useMapStyle(apiKey) {
         type: 'raster',
         source: 'osm',
         paint: {
-          'raster-brightness-max': 1.1,
+          'raster-brightness-max': 1,
           'raster-saturation': 0.4,
           'raster-contrast': 0.1
         }
