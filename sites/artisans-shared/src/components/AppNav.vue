@@ -9,45 +9,22 @@
         </span>
       </RouterLink>
 
-      <div class="nav-links">
-        <RouterLink to="/" class="nav-link">Annuaire</RouterLink>
-        <RouterLink to="/carte" class="nav-link nav-link-featured">🗺️ Carte des artisans</RouterLink>
-        <RouterLink to="/temoignages" class="nav-link">Avis</RouterLink>
-        <RouterLink to="/prospection" class="nav-link">Prospection</RouterLink>
-        <RouterLink to="/#services-locaux" class="nav-link" @click.prevent="scrollTo('services-locaux')">Services locaux</RouterLink>
-        <RouterLink v-if="!user" to="/profil" class="nav-link">Se connecter / Mon compte</RouterLink>
-        <RouterLink to="/espace" class="nav-link">Mon espace</RouterLink>
-        <RouterLink v-if="isAdmin" to="/espace/admin" class="nav-admin-badge">
-          🛡️ Admin
-        </RouterLink>
-
-        <RouterLink to="/inscrire" class="btn btn-primary btn-sm">
-          <span>+ Inscrire mon entreprise</span>
-        </RouterLink>
-
-        <button v-if="user" type="button" class="nav-profile" :aria-label="`Mon profil, niveau ${user.level}`" @click="goToProfile">
-          <img v-if="avatarUrl" :src="avatarUrl" class="nav-avatar" alt="" />
-          <span v-else class="nav-avatar-placeholder">🙂</span>
-          <span class="nav-level">Lv.{{ user.level }}</span>
-        </button>
-      </div>
-
-      <button class="nav-burger" @click="menuOpen = !menuOpen" :aria-label="menuOpen ? 'Fermer' : 'Menu'">
+      <button class="nav-burger" @click="menuOpen = !menuOpen" :aria-label="menuOpen ? 'Fermer' : 'Menu'" :aria-expanded="menuOpen">
         <span :class="{ open: menuOpen }"></span>
         <span :class="{ open: menuOpen }"></span>
         <span :class="{ open: menuOpen }"></span>
       </button>
     </div>
 
-    <!-- Mobile menu -->
+    <!-- Menu déroulant — toutes tailles d'écran -->
     <Transition name="slide-down">
       <div v-if="menuOpen" class="nav-mobile" @click="menuOpen = false">
-        <RouterLink to="/" class="nav-mobile-link">🏠 Annuaire des artisans</RouterLink>
+        <RouterLink to="/annuaire" class="nav-mobile-link">🏠 Annuaire des artisans</RouterLink>
         <RouterLink to="/carte" class="nav-mobile-link nav-link-featured">🗺️ Carte des artisans</RouterLink>
         <RouterLink to="/temoignages" class="nav-mobile-link">💬 Avis locaux</RouterLink>
         <RouterLink to="/prospection" class="nav-mobile-link">🎯 Prospection</RouterLink>
-        <a href="/#meteo" class="nav-mobile-link">🌤️ Météo locale</a>
-        <a href="/#services-locaux" class="nav-mobile-link">🏙️ Services locaux</a>
+        <RouterLink to="/annuaire#meteo" class="nav-mobile-link">🌤️ Météo locale</RouterLink>
+        <RouterLink to="/annuaire#services-locaux" class="nav-mobile-link">🏙️ Services locaux</RouterLink>
         <RouterLink v-if="!user" to="/profil" class="nav-mobile-link">👤 Se connecter / Mon compte</RouterLink>
         <RouterLink to="/espace" class="nav-mobile-link">🔐 Mon espace</RouterLink>
         <RouterLink v-if="isAdmin" to="/espace/admin" class="nav-mobile-link nav-link-featured">🛡️ Administration</RouterLink>
@@ -62,23 +39,16 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { CITY_NAME, getUserToken, getArtisanToken, fetchUserMe, fetchMe, removeUserToken, resolveAvatarUrl, authEvents } from '../api.js'
+import { CITY_NAME, getUserToken, getArtisanToken, fetchUserMe, fetchMe, removeUserToken, authEvents } from '../api.js'
 
-const router = useRouter()
 const scrolled   = ref(false)
 const menuOpen   = ref(false)
 const user = ref(null)
 const artisan = ref(null)
 
-const avatarUrl = computed(() => resolveAvatarUrl(user.value?.avatar_url))
 const isAdmin = computed(() => artisan.value?.is_admin === 1 || artisan.value?.is_admin === true)
 
 function onScroll() { scrolled.value = window.scrollY > 20 }
-function scrollTo(id) {
-  menuOpen.value = false
-  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
-}
 
 let isMounted = true
 let abortController = null
@@ -113,7 +83,7 @@ async function loadUser() {
     }
   }
 
-  // Charger le profil artisan (pour badge admin et accès rapide)
+  // Charger le profil artisan (pour badge admin)
   const artisanToken = getArtisanToken()
   if (artisanToken) {
     try {
@@ -141,10 +111,6 @@ onUnmounted(() => {
   isMounted = false
   abortController?.abort()
 })
-
-function goToProfile() {
-  router.push('/profil')
-}
 </script>
 
 <style scoped>
@@ -179,19 +145,6 @@ function goToProfile() {
 .logo-title { font-family: var(--font-title); font-weight: 800; font-size: 1.05rem; color: var(--c-green); }
 .logo-city  { font-size: 0.72rem; color: var(--c-text-3); font-weight: 500; }
 
-.nav-links {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-}
-.nav-link {
-  font-weight: 500;
-  font-size: 0.9rem;
-  color: var(--c-text-2);
-  transition: color 0.2s;
-}
-.nav-link:hover { color: var(--c-green); }
-
 .nav-link-featured {
   background: rgba(45, 106, 79, 0.1);
   color: var(--c-green) !important;
@@ -203,67 +156,9 @@ function goToProfile() {
   background: rgba(45, 106, 79, 0.18);
 }
 
-.nav-admin-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: #B71C1C;
-  color: #fff;
-  font-size: 0.78rem;
-  font-weight: 700;
-  padding: 5px 10px;
-  border-radius: 999px;
-  text-decoration: none;
-}
-.nav-admin-badge:hover {
-  background: #9b1515;
-  color: #fff;
-}
-
-.nav-profile {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  background: none;
-  border: none;
-  padding: 0;
-  margin: 0;
-  font: inherit;
-  color: inherit;
-  border-radius: 999px;
-}
-.nav-profile:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--c-green);
-}
-.nav-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid var(--c-green);
-}
-.nav-avatar-placeholder {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  border: 2px solid var(--c-green);
-  font-size: 1rem;
-  background: var(--c-cream-2);
-}
-.nav-level {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--c-green);
-}
-
-/* Burger */
+/* Burger — toujours visible, à droite */
 .nav-burger {
-  display: none;
+  display: flex;
   flex-direction: column;
   gap: 5px;
   padding: 8px;
@@ -280,7 +175,7 @@ function goToProfile() {
 .nav-burger span.open:nth-child(2) { opacity: 0; }
 .nav-burger span.open:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
 
-/* Mobile menu */
+/* Panneau déroulant */
 .nav-mobile {
   background: var(--c-cream);
   border-top: 1px solid var(--c-border);
@@ -300,9 +195,4 @@ function goToProfile() {
 
 .slide-down-enter-active, .slide-down-leave-active { transition: all 0.3s; }
 .slide-down-enter-from, .slide-down-leave-to { opacity: 0; transform: translateY(-10px); }
-
-@media (max-width: 768px) {
-  .nav-links { display: none; }
-  .nav-burger { display: flex; }
-}
 </style>
