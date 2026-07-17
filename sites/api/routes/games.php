@@ -97,6 +97,8 @@ function games_list(PDO $pdo): void
         $item['id'] = (int)$item['id'];
         $item['is_premium'] = (bool)$item['is_premium'];
         $item['config'] = json_decode($item['config'], true);
+        // Ne jamais exposer le code promo publiquement : il est révélé par POST /games/:id/play
+        unset($item['config']['reward_code']);
         unset($item['game_type_id']);
     }
 
@@ -127,6 +129,8 @@ function games_get(PDO $pdo, int $id): void
     $item['id'] = (int)$item['id'];
     $item['is_premium'] = (bool)$item['is_premium'];
     $item['config'] = json_decode($item['config'], true);
+    // Ne jamais exposer le code promo publiquement : il est révélé par POST /games/:id/play
+    unset($item['config']['reward_code']);
     $item['is_playable'] = games_instance_is_playable($item);
 
     // User play state

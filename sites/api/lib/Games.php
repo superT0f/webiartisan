@@ -97,6 +97,7 @@ function games_instance_is_playable(array $instance): bool
  * Fallback récompense pour les jeux coupon sans lignes local_game_rewards :
  * utilise la config de l'instance (reward_label / reward_code) saisie par
  * l'artisan dans le formulaire de création du jeu.
+ * Toute ligne de local_game_rewards est prioritaire sur ce fallback de config.
  */
 function games_config_reward(array $instance): ?array
 {

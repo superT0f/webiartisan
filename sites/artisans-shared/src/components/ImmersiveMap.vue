@@ -70,7 +70,7 @@ async function centerOnUser() {
       return
     }
 
-    const { latitude, longitude, accuracy } = position
+    const { latitude, longitude } = position
     if (!map.value || !latitude || !longitude) return
 
     map.value.flyTo({ center: [longitude, latitude], zoom: 16 })
@@ -84,7 +84,6 @@ const USER_POS_SOURCE = 'user-pos'
 
 function upsertUserPosition() {
   if (!map.value?.isStyleLoaded?.()) return
-  if (!map.value) return
   const pos = props.userPosition
   if (!pos || !pos.latitude || !pos.longitude) {
     if (userMarker) { userMarker.remove(); userMarker = null }
