@@ -6,6 +6,16 @@ export const CITY_LNG   = parseFloat(import.meta.env.VITE_CITY_LNG   || '-0.7658
 export const CITY_CP    = import.meta.env.VITE_CITY_CP    || '14240'
 export const APP_VERSION = import.meta.env.VITE_APP_VERSION || '1.0.0'
 
+// L'authentification (stockage des tokens, événements, bridge Flutter) vit
+// dans ./auth.js. Ré-export pour compatibilité : les consommateurs existants
+// importent tout depuis api.js.
+import { getUserToken, removeUserToken, postMessageToFlutter, getArtisanToken } from './auth.js'
+export {
+  getUserToken, setUserToken, removeUserToken,
+  getArtisanToken, setArtisanToken, removeArtisanToken,
+  authEvents, notifyAuthChanged, postMessageToFlutter,
+} from './auth.js'
+
 export async function fetchArtisans(params = {}) {
   const qs = new URLSearchParams({ city: CITY_SLUG, ...params }).toString()
   const res = await fetch(`${API_BASE}/artisans?${qs}`)
@@ -77,44 +87,6 @@ export async function contactArtisan(artisanId, data) {
 }
 
 // --- Authentification artisan ------------------------------------
-
-const ARTISAN_TOKEN_KEY = 'artisan_token'
-const ARTISAN_TOKEN_COOKIE = 'artisan_token'
-
-function setCookie(name, value, days) {
-  const date = new Date()
-  date.setTime(date.getTime() + days * 24 * 60 * 60 * 1000)
-  const secure = location.protocol === 'https:' ? '; Secure' : ''
-  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${date.toUTCString()}; path=/; SameSite=Lax${secure}`
-}
-
-function getCookie(name) {
-  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'))
-  return match ? decodeURIComponent(match[2]) : null
-}
-
-function deleteCookie(name) {
-  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Lax`
-}
-
-export function getArtisanToken() {
-  return localStorage.getItem(ARTISAN_TOKEN_KEY) || getCookie(ARTISAN_TOKEN_COOKIE) || ''
-}
-
-export function setArtisanToken(token, remember = false) {
-  if (remember) {
-    setCookie(ARTISAN_TOKEN_COOKIE, token, 365)
-    localStorage.removeItem(ARTISAN_TOKEN_KEY)
-  } else {
-    localStorage.setItem(ARTISAN_TOKEN_KEY, token)
-    deleteCookie(ARTISAN_TOKEN_COOKIE)
-  }
-}
-
-export function removeArtisanToken() {
-  localStorage.removeItem(ARTISAN_TOKEN_KEY)
-  deleteCookie(ARTISAN_TOKEN_COOKIE)
-}
 
 export async function logoutArtisan(token, options = {}) {
   return requestJson(`${API_BASE}/artisans/logout`, {
@@ -309,49 +281,6 @@ export async function archiveRecipe(token, recipeId) {
 }
 
 // --- Authentification consommateur ------------------------------
-
-const USER_TOKEN_KEY = 'spin_user_token'
-const USER_TOKEN_COOKIE = 'user_token'
-
-export const authEvents = new EventTarget()
-export function notifyAuthChanged() {
-  authEvents.dispatchEvent(new Event('change'))
-}
-
-/**
- * Envoie un message au conteneur Flutter via le JavaScriptChannel FlutterBridge.
- * Nécessite que l'application Flutter ait enregistré le channel `FlutterBridge`.
- */
-export function postMessageToFlutter(action, payload = null) {
-  if (typeof window !== 'undefined' && window.FlutterBridge && typeof window.FlutterBridge.postMessage === 'function') {
-    try {
-      window.FlutterBridge.postMessage(JSON.stringify({ action, payload }))
-    } catch (e) {
-      // Ignorer silencieusement si le bridge n'est pas disponible (navigateur web classique)
-    }
-  }
-}
-
-export function getUserToken() {
-  return localStorage.getItem(USER_TOKEN_KEY) || getCookie(USER_TOKEN_COOKIE) || ''
-}
-
-export function setUserToken(token, remember = false) {
-  if (remember) {
-    setCookie(USER_TOKEN_COOKIE, token, 365)
-    localStorage.removeItem(USER_TOKEN_KEY)
-  } else {
-    localStorage.setItem(USER_TOKEN_KEY, token)
-    deleteCookie(USER_TOKEN_COOKIE)
-  }
-  notifyAuthChanged()
-}
-
-export function removeUserToken() {
-  localStorage.removeItem(USER_TOKEN_KEY)
-  deleteCookie(USER_TOKEN_COOKIE)
-  notifyAuthChanged()
-}
 
 function userHeaders() {
   const token = getUserToken()
