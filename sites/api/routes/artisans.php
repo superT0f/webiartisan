@@ -1056,7 +1056,7 @@ function artisan_me(PDO $pdo): void
             a.phone, a.email, a.website, a.address,
             a.latitude, a.longitude,
             a.logo_url, a.cover_url,
-            a.is_verified, a.is_featured, a.status,
+            a.is_verified, a.is_featured, a.is_admin, a.status,
             a.auth_token_hash,
             c.slug AS city_slug, c.name AS city_name, c.postal_code,
             cat.slug AS category_slug, cat.name AS category_name,
@@ -1089,6 +1089,7 @@ function artisan_me(PDO $pdo): void
     unset($artisan['password_hash'], $artisan['auth_token'], $artisan['auth_token_exp'], $artisan['auth_token_hash']);
     $artisan['is_featured']    = (bool)$artisan['is_featured'];
     $artisan['is_verified']    = (bool)$artisan['is_verified'];
+    $artisan['is_admin']       = (bool)$artisan['is_admin'];
     $artisan['email_verified'] = (bool)($artisan['email_verified'] ?? 0);
     $artisan['rating_avg']     = (float)$artisan['rating_avg'];
     $artisan['rating_count']   = (int)$artisan['rating_count'];
