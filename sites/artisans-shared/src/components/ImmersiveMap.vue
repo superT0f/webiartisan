@@ -3,11 +3,10 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { Map, NavigationControl, GeolocateControl, Marker, Popup } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useMapStyle } from '../composables/useMapStyle.js'
-import { getPosition } from '../utils/flutterBridge.js'
 import { escapeHtml } from '@/utils/escapeHtml.js'
 
 const props = defineProps({
-  center: { type: Array, default: () => [49.1081, -0.7658] },
+  center: { type: Array, default: () => [-0.7658, 49.1081] },
   zoom: { type: Number, default: 14 },
   artisans: { type: Array, default: () => [] },
   pois: { type: Array, default: () => [] },
@@ -42,42 +41,9 @@ onMounted(async () => {
 
   map.value.on('load', () => {
     renderMarkers()
-    centerOnUser()
     upsertUserPosition()
   })
 })
-
-async function centerOnUser() {
-  try {
-    const isFlutter = typeof FlutterBridge !== 'undefined' && FlutterBridge.postMessage
-    let position
-
-    if (isFlutter) {
-      position = await getPosition({ accuracy: 'best', timeout: 15000, maxAccuracy: 20 })
-    } else if (navigator.geolocation) {
-      position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-          pos => resolve({
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-            accuracy: pos.coords.accuracy
-          }),
-          reject,
-          { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-        )
-      })
-    } else {
-      return
-    }
-
-    const { latitude, longitude } = position
-    if (!map.value || !latitude || !longitude) return
-
-    map.value.flyTo({ center: [longitude, latitude], zoom: 16 })
-  } catch (err) {
-    console.warn('[ImmersiveMap] Impossible d\'obtenir la position', err)
-  }
-}
 
 let userMarker = null
 const USER_POS_SOURCE = 'user-pos'
@@ -244,12 +210,6 @@ function poiIcon(type) {
 
 <template>
   <div ref="mapEl" class="immersive-map"></div>
-  <div class="map-legend">
-    <div class="legend-title">Légende</div>
-    <div class="legend-item"><span class="legend-dot artisan"></span> Artisans</div>
-    <div class="legend-item"><span class="legend-dot poi"></span> Services publics</div>
-    <div class="legend-item"><span class="legend-dot user"></span> Votre position</div>
-  </div>
 </template>
 
 <style scoped>
@@ -307,39 +267,6 @@ function poiIcon(type) {
   border-radius: 50%;
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
-
-.map-legend {
-  position: absolute;
-  bottom: 24px;
-  left: 24px;
-  z-index: 10;
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 12px;
-  padding: 14px 16px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-  font-size: 0.85rem;
-  min-width: 140px;
-}
-.legend-title {
-  font-weight: 700;
-  margin-bottom: 8px;
-  color: var(--c-text);
-}
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-  color: var(--c-text-2);
-}
-.legend-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-}
-.legend-dot.artisan { background: #16a34a; }
-.legend-dot.poi { background: #1a73e8; }
-.legend-dot.user { background: #3b82f6; }
 
 :deep(.map-popup) {
   font-family: inherit;
