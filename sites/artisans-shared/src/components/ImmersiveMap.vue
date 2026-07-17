@@ -10,10 +10,12 @@ const props = defineProps({
   center: { type: Array, default: () => [49.1081, -0.7658] },
   zoom: { type: Number, default: 14 },
   artisans: { type: Array, default: () => [] },
-  pois: { type: Array, default: () => [] }
+  pois: { type: Array, default: () => [] },
+  userPosition: { type: Object, default: null },
+  halo: { type: Boolean, default: false }
 })
 
-const emit = defineEmits(['select'])
+const emit = defineEmits(['select', 'map-click'])
 const mapEl = ref(null)
 const map = ref(null)
 const markers = []
@@ -34,9 +36,14 @@ onMounted(async () => {
     'bottom-right'
   )
 
+  map.value.on('click', (e) => {
+    emit('map-click', { latitude: e.lngLat.lat, longitude: e.lngLat.lng })
+  })
+
   map.value.on('load', () => {
     renderMarkers()
     centerOnUser()
+    upsertUserPosition()
   })
 })
 
@@ -67,44 +74,72 @@ async function centerOnUser() {
     if (!map.value || !latitude || !longitude) return
 
     map.value.flyTo({ center: [longitude, latitude], zoom: 16 })
+  } catch (err) {
+    console.warn('[ImmersiveMap] Impossible d\'obtenir la position', err)
+  }
+}
 
+let userMarker = null
+const USER_POS_SOURCE = 'user-pos'
+
+function upsertUserPosition() {
+  if (!map.value) return
+  const pos = props.userPosition
+  if (!pos || !pos.latitude || !pos.longitude) {
+    if (userMarker) { userMarker.remove(); userMarker = null }
+    if (map.value.getSource(USER_POS_SOURCE)) {
+      map.value.getSource(USER_POS_SOURCE).setData({ type: 'FeatureCollection', features: [] })
+    }
+    return
+  }
+  const lngLat = [pos.longitude, pos.latitude]
+  if (!userMarker) {
     const el = document.createElement('div')
     el.className = 'user-location-marker'
-
-    new Marker({ element: el, anchor: 'center' })
-      .setLngLat([longitude, latitude])
-      .addTo(map.value)
-
-    map.value.addSource('user-accuracy', {
-      type: 'geojson',
-      data: {
-        type: 'Feature',
-        geometry: {
-          type: 'Point',
-          coordinates: [longitude, latitude]
-        }
-      }
-    })
-
+    userMarker = new Marker({ element: el, anchor: 'center' }).setLngLat(lngLat).addTo(map.value)
+  } else {
+    userMarker.setLngLat(lngLat)
+  }
+  const data = { type: 'Feature', geometry: { type: 'Point', coordinates: lngLat } }
+  if (map.value.getSource(USER_POS_SOURCE)) {
+    map.value.getSource(USER_POS_SOURCE).setData(data)
+  } else {
+    map.value.addSource(USER_POS_SOURCE, { type: 'geojson', data })
     map.value.addLayer({
       id: 'user-accuracy-circle',
       type: 'circle',
-      source: 'user-accuracy',
+      source: USER_POS_SOURCE,
       paint: {
-        'circle-radius': {
-          stops: [[10, accuracy / 30], [16, accuracy / 5], [20, accuracy / 2]],
-          base: 2
-        },
+        'circle-radius': { stops: [[10, (pos.accuracy || 20) / 30], [16, (pos.accuracy || 20) / 5], [20, (pos.accuracy || 20) / 2]], base: 2 },
         'circle-color': '#3b82f6',
         'circle-opacity': 0.15,
         'circle-stroke-width': 1,
         'circle-stroke-color': '#3b82f6'
       }
     })
-  } catch (err) {
-    console.warn('[ImmersiveMap] Impossible d\'obtenir la position', err)
+    map.value.addLayer({
+      id: 'admin-halo',
+      type: 'circle',
+      source: USER_POS_SOURCE,
+      layout: { visibility: props.halo ? 'visible' : 'none' },
+      paint: {
+        'circle-radius': { stops: [[10, 200 / 30], [16, 200 / 5], [20, 200 / 2]], base: 2 },
+        'circle-color': '#C07A2E',
+        'circle-opacity': 0.12,
+        'circle-stroke-width': 2,
+        'circle-stroke-color': '#C07A2E'
+      }
+    })
   }
 }
+
+function syncHalo() {
+  if (!map.value || !map.value.getLayer('admin-halo')) return
+  map.value.setLayoutProperty('admin-halo', 'visibility', props.halo ? 'visible' : 'none')
+}
+
+watch(() => props.userPosition, upsertUserPosition, { deep: true })
+watch(() => props.halo, syncHalo)
 
 onUnmounted(() => {
   markers.forEach(m => m.remove())
