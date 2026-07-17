@@ -58,10 +58,20 @@
             <textarea id="game_description" v-model="newGame.description" class="form-input" rows="2"></textarea>
           </div>
 
-          <div v-if="newGame.game_type_key === 'coupon'" class="form-group">
-            <label for="reveal_text">Texte de révélation</label>
-            <input id="reveal_text" v-model="newGame.config.reveal_text" type="text" class="form-input" />
-          </div>
+          <template v-if="newGame.game_type_key === 'coupon'">
+            <div class="form-group">
+              <label for="reveal_text">Texte de révélation</label>
+              <input id="reveal_text" v-model="newGame.config.reveal_text" type="text" class="form-input" placeholder="Découvrez votre offre !" />
+            </div>
+            <div class="form-group">
+              <label for="reward_label">Libellé de l'offre</label>
+              <input id="reward_label" v-model="newGame.config.reward_label" type="text" class="form-input" placeholder="-10 % sur la 1re intervention" />
+            </div>
+            <div class="form-group">
+              <label for="reward_code">Code promo</label>
+              <input id="reward_code" v-model="newGame.config.reward_code" type="text" class="form-input" placeholder="BIENVENUE10" />
+            </div>
+          </template>
 
           <button type="submit" class="btn btn-primary" :disabled="(!isPremium && activeCount >= 1) || saving">
             {{ saving ? 'Création…' : 'Créer le jeu' }}
