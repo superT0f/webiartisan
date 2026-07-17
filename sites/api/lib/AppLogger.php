@@ -36,8 +36,8 @@ class AppLogger
                 true,
                 true
             ));
-
-            $logger->pushHandler($handler);
+            // Un problème d'écriture de log ne doit jamais faire échouer une requête
+            $logger->pushHandler(new \Monolog\Handler\WhatFailureGroupHandler([$handler]));
             self::$logger = $logger;
         }
 

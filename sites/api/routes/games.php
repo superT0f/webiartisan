@@ -190,7 +190,7 @@ function games_play(PDO $pdo, int $id, array $body): void
     }
 
     $result = match ($instance['game_type_key']) {
-        'coupon' => ['reward' => games_resolve_reward($pdo, $id)],
+        'coupon' => ['reward' => games_resolve_reward($pdo, $id) ?? games_config_reward($instance)],
         'poll' => ['choice' => $body['choice'] ?? null],
         'vote' => ['choice' => $body['choice'] ?? null],
         default => [],

@@ -68,9 +68,11 @@ function games_resolve_reward(PDO $pdo, int $instanceId): ?array
     // Probabilistic selection can be added later for wheel.
     foreach ($rewards as $r) {
         if ($r['reward_type'] === 'coupon') {
+            $r['reward_value'] = json_decode($r['reward_value'] ?? '', true);
             return $r;
         }
     }
+    $rewards[0]['reward_value'] = json_decode($rewards[0]['reward_value'] ?? '', true);
     return $rewards[0];
 }
 
@@ -89,4 +91,23 @@ function games_instance_is_playable(array $instance): bool
     if (isset($instance['starts_at']) && $instance['starts_at'] && strtotime($instance['starts_at']) > $now) return false;
     if (isset($instance['ends_at']) && $instance['ends_at'] && strtotime($instance['ends_at']) < $now) return false;
     return true;
+}
+
+/**
+ * Fallback récompense pour les jeux coupon sans lignes local_game_rewards :
+ * utilise la config de l'instance (reward_label / reward_code) saisie par
+ * l'artisan dans le formulaire de création du jeu.
+ */
+function games_config_reward(array $instance): ?array
+{
+    $config = json_decode($instance['config'] ?? '', true) ?: [];
+    $code = trim((string)($config['reward_code'] ?? ''));
+    $label = trim((string)($config['reward_label'] ?? ''));
+    if ($code === '' && $label === '') return null;
+    return [
+        'id' => null,
+        'label' => $label !== '' ? $label : ($instance['title'] ?? 'Offre'),
+        'reward_type' => 'coupon',
+        'reward_value' => ['code' => $code],
+    ];
 }
