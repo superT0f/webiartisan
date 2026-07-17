@@ -88,6 +88,10 @@ describe('extractLinkToken', () => {
   it('accepte un token sous forme de tableau (query dupliquée)', () => {
     expect(extractLinkToken({ path: '/carte', query: { token: ['abc', 'def'] } })?.token).toBe('abc')
   })
+
+  it('ignore /reinitialiser (token de reset mot de passe, pas un lien magique)', () => {
+    expect(extractLinkToken({ path: '/reinitialiser', query: { token: 'abc' } })).toBeNull()
+  })
 })
 
 describe('consumeTokenFromQuery', () => {
@@ -124,5 +128,11 @@ describe('consumeTokenFromQuery', () => {
     const exchange = vi.fn().mockRejectedValue(new Error('network'))
     const res = await consumeTokenFromQuery({ path: '/carte', query: { token: 'tmp' } }, exchange)
     expect(res).toEqual({ type: 'user', success: false, error: 'Erreur réseau.' })
+  })
+
+  it('ignore /reinitialiser sans appeler l\'échange', async () => {
+    const exchange = vi.fn()
+    expect(await consumeTokenFromQuery({ path: '/reinitialiser', query: { token: 'abc' } }, exchange)).toBeNull()
+    expect(exchange).not.toHaveBeenCalled()
   })
 })

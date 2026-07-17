@@ -48,6 +48,7 @@ const router = createRouter({
 
 // Connexion automatique par lien magique : consomme ?token= sur n'importe
 // quelle page, puis redirige vers la même URL nettoyée.
+// (/reinitialiser?token= est exclu : reset mot de passe, géré par ResetPassword.vue)
 router.beforeEach(async (to) => {
   const result = await consumeTokenFromQuery(to, authUser)
   if (!result) return true

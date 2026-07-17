@@ -110,6 +110,9 @@ export function removeUserToken() {
 export function extractLinkToken(to) {
   const raw = Array.isArray(to.query?.token) ? to.query.token[0] : to.query?.token
   if (!raw) return null
+  // Les liens de réinitialisation de mot de passe (/reinitialiser?token=…)
+  // ne sont PAS des liens magiques : le token est consommé par ResetPassword.vue.
+  if (to.path === '/reinitialiser') return null
   const isArtisan = to.path.startsWith('/espace')
   const rememberMe = isArtisan
     ? to.query.rememberMe === '1' || to.query.rememberMe === 'true'
