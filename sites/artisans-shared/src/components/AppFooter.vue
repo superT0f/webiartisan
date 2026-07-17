@@ -32,9 +32,9 @@
         <div class="footer-col">
           <h4>Services Locaux</h4>
           <ul>
-            <li><a href="/#meteo">Météo locale</a></li>
-            <li><a href="/#horaires">Horaires</a></li>
-            <li><a href="/#bus">Transports en commun</a></li>
+            <li><a href="/annuaire#meteo">Météo locale</a></li>
+            <li><a href="/annuaire#horaires">Horaires</a></li>
+            <li><a href="/annuaire#bus">Transports en commun</a></li>
             <li><a v-if="CITY_SLUG" :href="'https://www.' + CITY_SLUG + '.fr'" target="_blank" rel="noopener">Site de la ville ↗</a></li>
           </ul>
         </div>

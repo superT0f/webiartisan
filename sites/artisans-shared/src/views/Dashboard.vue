@@ -290,7 +290,7 @@
           <button type="submit" class="btn btn-primary" :disabled="saving">
             {{ saving ? 'Enregistrement…' : 'Enregistrer les modifications' }}
           </button>
-          <RouterLink to="/" class="btn btn-outline">Retour à l'annuaire</RouterLink>
+          <RouterLink to="/annuaire" class="btn btn-outline">Retour à l'annuaire</RouterLink>
         </div>
 
         <div v-if="message" class="auth-message" :class="messageType">

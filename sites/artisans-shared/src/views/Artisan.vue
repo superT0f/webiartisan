@@ -11,14 +11,14 @@
       <div style="font-size:3rem;">😕</div>
       <h2>Artisan non trouvé</h2>
       <p class="text-muted">Ce profil n'existe pas ou n'est plus disponible.</p>
-      <RouterLink to="/" class="btn btn-primary" style="margin-top:20px;">← Retour à l'annuaire</RouterLink>
+      <RouterLink to="/annuaire" class="btn btn-primary" style="margin-top:20px;">← Retour à l'annuaire</RouterLink>
     </div>
 
     <template v-else-if="artisan">
       <!-- HERO artisan -->
       <div class="artisan-hero" :style="{ background: artisan.category_color || '#C07A2E' }">
         <div class="container artisan-hero-content">
-          <RouterLink to="/" class="back-link">← Retour à l'annuaire</RouterLink>
+          <RouterLink to="/annuaire" class="back-link">← Retour à l'annuaire</RouterLink>
           <div class="artisan-hero-main">
             <div class="artisan-avatar">{{ artisan.category_icon || '🔧' }}</div>
             <div class="artisan-hero-info">

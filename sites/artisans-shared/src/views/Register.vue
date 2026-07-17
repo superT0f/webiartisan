@@ -2,7 +2,7 @@
   <div class="register-page">
     <div class="register-hero">
       <div class="container">
-        <RouterLink to="/" class="back-link">← Retour à l'annuaire</RouterLink>
+        <RouterLink to="/annuaire" class="back-link">← Retour à l'annuaire</RouterLink>
         <div class="register-hero-content">
           <div class="register-icon">🏗️</div>
           <h1>Inscrivez votre entreprise</h1>
@@ -20,7 +20,7 @@
             <div class="success-icon">🎉</div>
             <h2>Inscription reçue !</h2>
             <p>Votre profil est en cours de validation. Vous recevrez un email de confirmation sous 24h.</p>
-            <RouterLink to="/" class="btn btn-primary" style="margin-top:24px;">Voir l'annuaire</RouterLink>
+            <RouterLink to="/annuaire" class="btn btn-primary" style="margin-top:24px;">Voir l'annuaire</RouterLink>
           </div>
 
           <form v-else @submit.prevent="submit" class="register-form">
