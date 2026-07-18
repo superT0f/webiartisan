@@ -192,8 +192,12 @@ async function bridgeConsumerIfNeeded(artisanToken, force = false) {
       setUserToken(res.data.token, true)
       userToken.value = res.data.token
       postMessageToFlutter('set-token', { token: res.data.token })
+    } else {
+      // DEBUG temporaire : remonter la cause exacte de l'échec du pont
+      showToast(`Pont joueur KO: ${res.error || 'statut ' + res.status}`)
     }
   } catch (e) {
+    showToast(`Pont joueur KO: ${e.message || 'réseau'}`)
     console.warn('Consumer bridge failed', e)
   }
 }
