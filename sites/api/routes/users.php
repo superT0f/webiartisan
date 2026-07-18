@@ -31,7 +31,7 @@ $authActions = ['magic-link', 'auth', 'register', 'login', 'forgot-password', 'r
 if (in_array($action, $authActions, true)) {
     applyRateLimit($pdo, 'login');
 } else {
-    applyRateLimit($pdo, 'public');
+    applyRateLimit($pdo, 'public:users');
 }
 
 switch ($method) {

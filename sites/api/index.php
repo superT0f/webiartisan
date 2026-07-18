@@ -188,39 +188,39 @@ if ($module === 'auth') {
 
 // Routes publiques artisans locaux (pas d'auth requise pour lecture)
 if ($module === 'cities') {
-    applyRateLimit($pdo, 'public');
+    applyRateLimit($pdo, 'public:' . $module);
     require_once __DIR__ . '/routes/cities.php';
     exit;
 }
 
 if ($module === 'artisans') {
     // Rate limit plus strict sur le register
-    $rlEndpoint = ($action === 'register') ? 'login' : 'public';
+    $rlEndpoint = ($action === 'register') ? 'login' : 'public:artisans';
     applyRateLimit($pdo, $rlEndpoint);
     require_once __DIR__ . '/routes/artisans.php';
     exit;
 }
 
 if ($module === 'prospects') {
-    applyRateLimit($pdo, 'public');
+    applyRateLimit($pdo, 'public:' . $module);
     require_once __DIR__ . '/routes/prospects.php';
     exit;
 }
 
 if ($module === 'recipes') {
-    applyRateLimit($pdo, 'public');
+    applyRateLimit($pdo, 'public:' . $module);
     require_once __DIR__ . '/routes/recipes.php';
     exit;
 }
 
 if ($module === 'testimonials') {
-    applyRateLimit($pdo, 'public');
+    applyRateLimit($pdo, 'public:' . $module);
     require_once __DIR__ . '/routes/testimonials.php';
     exit;
 }
 
 if ($module === 'service-catalog') {
-    applyRateLimit($pdo, 'public');
+    applyRateLimit($pdo, 'public:' . $module);
     require_once __DIR__ . '/routes/services.php';
     exit;
 }
@@ -231,7 +231,7 @@ if ($module === 'users') {
 }
 
 if ($module === 'avatars') {
-    applyRateLimit($pdo, 'public');
+    applyRateLimit($pdo, 'public:' . $module);
     require_once __DIR__ . '/routes/avatars.php';
     exit;
 }
@@ -243,7 +243,7 @@ if ($module === 'auth' && $action === 'avatar' && $method === 'GET' && $param !=
 }
 
 if ($module === 'spin') {
-    applyRateLimit($pdo, 'public');
+    applyRateLimit($pdo, 'public:' . $module);
     require_once __DIR__ . '/routes/spin.php';
     exit;
 }
@@ -254,7 +254,7 @@ if ($module === 'cron') {
 }
 
 if ($module === 'games') {
-    applyRateLimit($pdo, 'public');
+    applyRateLimit($pdo, 'public:' . $module);
     require_once __DIR__ . '/routes/games.php';
     exit;
 }
@@ -266,7 +266,7 @@ if ($module === 'gamification') {
 }
 
 if ($module === 'checkin') {
-    applyRateLimit($pdo, 'public');
+    applyRateLimit($pdo, 'public:' . $module);
     require_once __DIR__ . '/routes/checkins.php';
     exit;
 }
@@ -289,7 +289,7 @@ if ($module === 'webhooks' && $action === 'stripe') {
 }
 
 if ($module === 'weather') {
-    applyRateLimit($pdo, 'public');
+    applyRateLimit($pdo, 'public:' . $module);
     require_once __DIR__ . '/routes/weather.php';
     exit;
 }

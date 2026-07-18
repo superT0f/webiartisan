@@ -3,10 +3,11 @@
  * RateLimit Middleware
  * Simple MySQL-based sliding window rate limiter.
  *
- * Limits par endpoint (requêtes / 60s par IP) :
- *   login     → 10
- *   public/hit → 60
- *   public/*  → 120
+ * Limits par bucket (requêtes / 60s par IP) :
+ *   login       → 10  (partagé entre les endpoints sensibles, voulu)
+ *   public/hit  → 60
+ *   public:<module> → 120 par module (buckets séparés pour éviter qu'un
+ *   endpoint en rafale sature les autres)
  */
 
 class RateLimit

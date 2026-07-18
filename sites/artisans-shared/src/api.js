@@ -464,6 +464,7 @@ export async function requestJson(url, options = {}, networkError = null) {
     data: json.data,
     status: res.status,
     error: json.error,
+    code: json.code,
   }
 }
 

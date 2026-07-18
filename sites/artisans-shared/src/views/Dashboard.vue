@@ -457,10 +457,13 @@ async function loadProfile() {
           console.warn('Lien compte joueur impossible', e)
         }
       }
-    } else if (token.value === currentToken) {
+    } else if (token.value === currentToken && (res.status === 401 || res.status === 403)) {
       await logout()
       if (!isMounted || token.value) return
       setMessage(res.error || 'Votre session a expiré. Veuillez vous reconnecter.', 'error')
+    } else if (token.value === currentToken) {
+      // Erreur transitoire (réseau, rate limit) : ne pas déconnecter
+      setMessage(res.error || 'Erreur de chargement, vérifiez votre connexion et réessayez.', 'error')
     }
   } catch (e) {
     if (isMounted && e.name !== 'AbortError' && token.value === currentToken) {

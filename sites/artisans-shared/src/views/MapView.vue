@@ -128,7 +128,9 @@ async function doCheckin(targetType, targetId, retried = false) {
     }
     overlay.value = 'auth'
   } else if (res.status === 429) {
-    showToast('Point en recharge, réessayez dans quelques minutes')
+    showToast(res.code === 'rate_limited'
+      ? 'Trop de requêtes, réessayez dans une minute'
+      : 'Point en recharge, réessayez dans quelques minutes')
   } else if (res.status === 422) {
     showToast(`Trop loin du point (${res.data?.distance_m ?? '?'} m, 200 m max)`)
   } else {
