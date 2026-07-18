@@ -137,6 +137,9 @@ function checkin_create(PDO $pdo, array $body): void
 
     $distance = checkin_distance_m($lat, $lng, (float)$target['latitude'], (float)$target['longitude']);
     if ($distance > CHECKIN_RANGE_M) {
+        if (function_exists('app_log')) {
+            app_log('info', '[CHECKIN] 422 trop loin', ['target' => "{$targetType}:{$targetId}", 'distance_m' => (int)round($distance)]);
+        }
         http_response_code(422);
         echo json_encode([
             'success' => false,
@@ -164,6 +167,9 @@ function checkin_create(PDO $pdo, array $body): void
             $spin = checkin_cooldown_state($pdo, $userId, 'poi_spin', $resourceKey, CHECKIN_RECHARGE_SECONDS);
             if (!$spin['available']) {
                 $pdo->rollBack();
+                if (function_exists('app_log')) {
+                    app_log('info', '[CHECKIN] 429 cooldown', ['user_id' => $userId, 'target' => $resourceKey, 'next_at' => $spin['next_at']]);
+                }
                 http_response_code(429);
                 echo json_encode([
                     'success' => false,
@@ -193,6 +199,9 @@ function checkin_create(PDO $pdo, array $body): void
         );
 
         $pdo->commit();
+        if (function_exists('app_log')) {
+            app_log('info', '[CHECKIN] success', ['user_id' => $userId, 'target' => $resourceKey, 'xp' => $xp, 'distance_m' => (int)round($distance)]);
+        }
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();

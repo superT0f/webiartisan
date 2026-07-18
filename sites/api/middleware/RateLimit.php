@@ -67,6 +67,9 @@ class RateLimit
     public function deny(string $endpoint): void
     {
         $limit = $this->getLimit($endpoint);
+        if (function_exists('app_log')) {
+            app_log('info', '[RATE-LIMIT] deny', ['endpoint' => $endpoint, 'ip' => clientIp(), 'limit' => $limit]);
+        }
         http_response_code(429);
         header('Retry-After: 60');
         header('X-RateLimit-Limit: ' . $limit);
