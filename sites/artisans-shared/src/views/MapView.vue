@@ -12,7 +12,7 @@ import {
   fetchArtisans, fetchCityPois, fetchGames,
   getUserToken, setUserToken, removeUserToken, authEvents,
   getArtisanToken, fetchMe, fetchUserMe, fetchArtisanConsumerToken,
-  postCheckin, getCheckinStatus,
+  postCheckin, getCheckinStatus, postMessageToFlutter,
   CITY_LAT, CITY_LNG,
 } from '../api.js'
 import { useWeather } from '../composables/useWeather.js'
@@ -182,6 +182,8 @@ async function loadAdminStatus() {
 
 // Pont artisan → compte joueur : un artisan connecté ne doit pas voir la
 // popin de connexion pour jouer/check-in si son token consommateur manque.
+// Le token frais est aussi poussé vers l'app Flutter (remplace un token mort
+// côté AuthService, sinon il serait ré-injecté au prochain chargement).
 async function bridgeConsumerIfNeeded(artisanToken, force = false) {
   if (!force && getUserToken()) return
   try {
@@ -189,6 +191,7 @@ async function bridgeConsumerIfNeeded(artisanToken, force = false) {
     if (res.success && res.data?.token) {
       setUserToken(res.data.token, true)
       userToken.value = res.data.token
+      postMessageToFlutter('set-token', { token: res.data.token })
     }
   } catch (e) {
     console.warn('Consumer bridge failed', e)
