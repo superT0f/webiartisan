@@ -42,7 +42,10 @@ function user_require_auth(PDO $pdo): array
     if (!$user) {
         error_log("[USER-AUTH] invalid or expired session, ip={$ip}");
         if (function_exists('app_log')) {
-            app_log('info', '[USER-AUTH] invalid or expired session', ['ip' => $ip]);
+            app_log('info', '[USER-AUTH] invalid or expired session', [
+                'ip' => $ip,
+                'path' => $_SERVER['REQUEST_URI'] ?? '',
+            ]);
         }
         http_response_code(401);
         echo json_encode(['success' => false, 'error' => 'Session invalide']);
