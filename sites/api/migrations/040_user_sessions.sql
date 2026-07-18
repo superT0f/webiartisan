@@ -13,7 +13,8 @@ CREATE TABLE IF NOT EXISTS local_user_sessions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Backfill : préserver les sessions existantes (personne n'est déconnecté)
-INSERT INTO local_user_sessions (user_id, token_hash, device_label, created_at, expires_at)
+-- INSERT IGNORE : migration rejouable (le runner n'a pas de tracking)
+INSERT IGNORE INTO local_user_sessions (user_id, token_hash, device_label, created_at, expires_at)
 SELECT id, session_token, 'legacy', NOW(), session_exp
 FROM local_users
 WHERE session_token IS NOT NULL AND session_exp > NOW();

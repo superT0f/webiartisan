@@ -86,7 +86,7 @@ function user_create_session(PDO $pdo, int $userId, bool $rememberMe): string
     $pdo->prepare("DELETE FROM local_user_sessions WHERE user_id = ? AND expires_at <= NOW()")
         ->execute([$userId]);
 
-    $deviceLabel = substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 100) ?: null;
+    $deviceLabel = mb_substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 100) ?: null;
     $stmt = $pdo->prepare("
         INSERT INTO local_user_sessions (user_id, token_hash, device_label, expires_at)
         VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL ? DAY))
