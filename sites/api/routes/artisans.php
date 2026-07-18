@@ -1006,15 +1006,9 @@ function artisan_add_review(PDO $pdo, int $id, array $body): void
     $stmt->execute([$id, $name, $email ?: null, $rating, $comment]);
 
     $artisanId = $id;
-    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
-    $token = str_replace('Bearer ', '', $authHeader);
-    if ($token) {
-        $usr = $pdo->prepare("SELECT id FROM local_users WHERE session_token = ? AND session_exp > NOW() LIMIT 1");
-        $usr->execute([$token]);
-        $uid = $usr->fetchColumn();
-        if ($uid) {
-            gamificationRecordAction($pdo, (int)$uid, 'testimonial_post', "artisan:$artisanId", ['artisan_id' => $artisanId]);
-        }
+    $uid = user_optional_auth($pdo);
+    if ($uid) {
+        gamificationRecordAction($pdo, (int)$uid, 'testimonial_post', "artisan:$artisanId", ['artisan_id' => $artisanId]);
     }
 
     echo json_encode([

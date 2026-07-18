@@ -227,13 +227,7 @@ function checkin_status(PDO $pdo): void
     $lng = (float)$lng;
 
     // Optional auth: cooldown state is only computed for a connected user
-    $userId = null;
-    $token = user_get_session_token();
-    if ($token) {
-        $stmt = $pdo->prepare("SELECT id FROM local_users WHERE session_token = ? AND session_exp > NOW() LIMIT 1");
-        $stmt->execute([hash('sha256', $token)]);
-        $userId = $stmt->fetchColumn() ?: null;
-    }
+    $userId = user_optional_auth($pdo);
 
     // Bounding-box prefilter (~250 m: 0.0025° lat, 0.0035° lng at ~49° latitude)
     $candidates = [];

@@ -134,13 +134,7 @@ function games_get(PDO $pdo, int $id): void
     $item['is_playable'] = games_instance_is_playable($item);
 
     // User play state
-    $userId = null;
-    $token = user_get_session_token();
-    if ($token) {
-        $usr = $pdo->prepare("SELECT id FROM local_users WHERE session_token = ? AND session_exp > NOW() LIMIT 1");
-        $usr->execute([$token]);
-        $userId = $usr->fetchColumn();
-    }
+    $userId = user_optional_auth($pdo);
 
     $maxPlays = (int)$item['max_plays_per_user'];
     $item['user_plays_count'] = $userId ? games_count_user_plays($pdo, $id, (int)$userId) : 0;

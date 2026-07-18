@@ -830,6 +830,11 @@ function user_reset_password(PDO $pdo, array $body): void
 
         // Invalidate all existing sessions for this user.
         $pdo->prepare("
+            DELETE s FROM local_user_sessions s
+            JOIN local_users u ON u.id = s.user_id
+            WHERE u.email = ?
+        ")->execute([$reset['email']]);
+        $pdo->prepare("
             UPDATE local_users
             SET session_token = NULL, session_exp = NULL
             WHERE email = ?
@@ -911,12 +916,15 @@ function user_change_password(PDO $pdo, array $body): void
         $pdo->prepare("UPDATE local_users SET password_hash = ? WHERE id = ?")
             ->execute([$passwordHash, (int)$user['id']]);
 
-        // Invalider les sessions existantes (sauf la session actuelle)
+        // Invalider les autres sessions (la session actuelle est conservée)
+        $currentHash = hash('sha256', user_get_session_token() ?? '');
+        $pdo->prepare("DELETE FROM local_user_sessions WHERE user_id = ? AND token_hash != ?")
+            ->execute([(int)$user['id'], $currentHash]);
         $pdo->prepare("
             UPDATE local_users
             SET session_token = NULL, session_exp = NULL
             WHERE id = ? AND session_token != ?
-        ")->execute([(int)$user['id'], hash('sha256', user_get_session_token() ?? '')]);
+        ")->execute([(int)$user['id'], $currentHash]);
 
         // Invalider les tokens magiques
         $pdo->prepare("
