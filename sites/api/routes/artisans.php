@@ -1088,14 +1088,14 @@ function artisan_me(PDO $pdo): void
     $artisan['rating_avg']     = (float)$artisan['rating_avg'];
     $artisan['rating_count']   = (int)$artisan['rating_count'];
 
-    // Garantir un compte consommateur lié et créer sa session
-    $userId = artisan_ensure_user($pdo, (int)$artisan['id'], $artisan['email'], $artisan['company_name']);
-    $userToken = $userId ? user_create_session($pdo, $userId, true) : null;
+    // Garantir qu'un compte consommateur lié existe (sans créer de session :
+    // le pont vers le compte joueur passe par POST /artisans/me/consumer-token,
+    // sinon chaque appel à cet endpoint fuyait une session inutilisée)
+    artisan_ensure_user($pdo, (int)$artisan['id'], $artisan['email'], $artisan['company_name']);
 
     echo json_encode([
         'success' => true,
         'data' => $artisan,
-        'userToken' => $userToken,
     ]);
 }
 

@@ -83,8 +83,11 @@ function user_create_session(PDO $pdo, int $userId, bool $rememberMe): string
     $expiryDays = $rememberMe ? 365 : 30;
 
     // GC : purge des sessions expirées du compte
-    $pdo->prepare("DELETE FROM local_user_sessions WHERE user_id = ? AND expires_at <= NOW()")
-        ->execute([$userId]);
+    $deleted = $pdo->prepare("DELETE FROM local_user_sessions WHERE user_id = ? AND expires_at <= NOW()");
+    $deleted->execute([$userId]);
+    if ($deleted->rowCount() > 0 && function_exists('app_log')) {
+        app_log('info', '[USER-AUTH] expired sessions purged', ['user_id' => $userId, 'count' => $deleted->rowCount()]);
+    }
 
     $deviceLabel = mb_substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 100) ?: null;
     $stmt = $pdo->prepare("

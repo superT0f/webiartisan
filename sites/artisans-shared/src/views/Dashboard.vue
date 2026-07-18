@@ -313,7 +313,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
-import { requestMagicLink, loginArtisan, fetchMe, updateMe, getMyProspects, getArtisanToken, setArtisanToken, removeArtisanToken, fetchArtisanConsumerToken, setUserToken, logoutArtisan, getSubscriptionStatus, createSubscriptionCheckout, createSubscriptionPortal, changeArtisanPassword } from '../api.js'
+import { requestMagicLink, loginArtisan, fetchMe, updateMe, getMyProspects, getArtisanToken, getUserToken, setArtisanToken, removeArtisanToken, fetchArtisanConsumerToken, setUserToken, logoutArtisan, getSubscriptionStatus, createSubscriptionCheckout, createSubscriptionPortal, changeArtisanPassword } from '../api.js'
 
 const router = useRouter()
 
@@ -445,9 +445,17 @@ async function loadProfile() {
         address: res.data.address || '',
         description: res.data.description || '',
       })
-      // Lier automatiquement le compte consommateur
-      if (res.userToken) {
-        setUserToken(res.userToken, true)
+      // Lier le compte consommateur uniquement si absent (création via
+      // l'endpoint dédié — GET /artisans/me ne fournit plus de userToken)
+      if (!getUserToken()) {
+        try {
+          const link = await fetchArtisanConsumerToken(currentToken, { signal })
+          if (link.success && link.data?.token) {
+            setUserToken(link.data.token, true)
+          }
+        } catch (e) {
+          console.warn('Lien compte joueur impossible', e)
+        }
       }
     } else if (token.value === currentToken) {
       await logout()
