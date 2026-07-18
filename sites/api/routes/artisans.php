@@ -786,6 +786,9 @@ HTML;
 function artisan_consumer_token(PDO $pdo): void
 {
     $artisan = artisan_require_auth($pdo);
+    if (function_exists('app_log')) {
+        app_log('info', '[CONSUMER-TOKEN] attempt', ['artisan_id' => (int)($artisan['id'] ?? 0)]);
+    }
 
     $stmt = $pdo->prepare("SELECT email, company_name FROM local_artisans WHERE id = ?");
     $stmt->execute([$artisan['id']]);
