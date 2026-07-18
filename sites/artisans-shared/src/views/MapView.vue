@@ -10,8 +10,8 @@ import GameRenderer from '../components/GameRenderer.vue'
 import SpinOverlay from '../components/games/SpinOverlay.vue'
 import {
   fetchArtisans, fetchCityPois, fetchGames,
-  getUserToken, authEvents,
-  getArtisanToken, fetchMe,
+  getUserToken, setUserToken, authEvents,
+  getArtisanToken, fetchMe, fetchArtisanConsumerToken,
   postCheckin, getCheckinStatus,
   CITY_LAT, CITY_LNG,
 } from '../api.js'
@@ -90,8 +90,14 @@ async function refreshStatus() {
   if (res.success) statusTargets.value = res.data || []
 }
 
-async function doCheckin(targetType, targetId) {
+async function doCheckin(targetType, targetId, retried = false) {
   if (!authenticated.value) {
+    // Pont artisan → joueur avant d'ouvrir la popin de connexion
+    const artisanToken = getArtisanToken()
+    if (!retried && artisanToken) {
+      await bridgeConsumerIfNeeded(artisanToken)
+      if (authenticated.value) return doCheckin(targetType, targetId, true)
+    }
     overlay.value = 'auth'
     return
   }
@@ -114,6 +120,12 @@ async function doCheckin(targetType, targetId) {
     for (const b of res.data.new_badges || []) showToast(`Badge débloqué : ${b.name}`)
     await refreshStatus()
   } else if (res.status === 401) {
+    // Session consommateur invalide : tenter le pont artisan → joueur une fois
+    const artisanToken = getArtisanToken()
+    if (!retried && artisanToken) {
+      await bridgeConsumerIfNeeded(artisanToken, true)
+      if (getUserToken()) return doCheckin(targetType, targetId, true)
+    }
     overlay.value = 'auth'
   } else if (res.status === 429) {
     showToast('Point en recharge, réessayez dans quelques minutes')
@@ -153,6 +165,22 @@ async function loadAdminStatus() {
     if (res.success) isAdmin.value = res.data.is_admin === 1 || res.data.is_admin === true
   } catch (e) {
     console.warn('Admin status check failed', e)
+  }
+  await bridgeConsumerIfNeeded(artisanToken)
+}
+
+// Pont artisan → compte joueur : un artisan connecté ne doit pas voir la
+// popin de connexion pour jouer/check-in si son token consommateur manque.
+async function bridgeConsumerIfNeeded(artisanToken, force = false) {
+  if (!force && getUserToken()) return
+  try {
+    const res = await fetchArtisanConsumerToken(artisanToken)
+    if (res.success && res.data?.token) {
+      setUserToken(res.data.token, true)
+      userToken.value = res.data.token
+    }
+  } catch (e) {
+    console.warn('Consumer bridge failed', e)
   }
 }
 
