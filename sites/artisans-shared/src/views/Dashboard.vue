@@ -313,7 +313,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
-import { requestMagicLink, loginArtisan, fetchMe, updateMe, getMyProspects, getArtisanToken, getUserToken, setArtisanToken, removeArtisanToken, fetchArtisanConsumerToken, setUserToken, logoutArtisan, getSubscriptionStatus, createSubscriptionCheckout, createSubscriptionPortal, changeArtisanPassword } from '../api.js'
+import { requestMagicLink, loginArtisan, fetchMe, updateMe, getMyProspects, getArtisanToken, getUserToken, removeUserToken, fetchUserMe, postMessageToFlutter, setArtisanToken, removeArtisanToken, fetchArtisanConsumerToken, setUserToken, logoutArtisan, getSubscriptionStatus, createSubscriptionCheckout, createSubscriptionPortal, changeArtisanPassword } from '../api.js'
 
 const router = useRouter()
 
@@ -445,13 +445,21 @@ async function loadProfile() {
         address: res.data.address || '',
         description: res.data.description || '',
       })
-      // Lier le compte consommateur uniquement si absent (création via
-      // l'endpoint dédié — GET /artisans/me ne fournit plus de userToken)
+      // Lier le compte consommateur : si le token présent est périmé (401),
+      // le purger d'abord, puis créer la session joueur via l'endpoint dédié.
+      const existingUserToken = getUserToken()
+      if (existingUserToken) {
+        try {
+          const check = await fetchUserMe(existingUserToken, { signal })
+          if (check.status === 401) removeUserToken()
+        } catch (e) { /* tolérance réseau */ }
+      }
       if (!getUserToken()) {
         try {
           const link = await fetchArtisanConsumerToken(currentToken, { signal })
           if (link.success && link.data?.token) {
             setUserToken(link.data.token, true)
+            postMessageToFlutter('set-token', { token: link.data.token })
           }
         } catch (e) {
           console.warn('Lien compte joueur impossible', e)
