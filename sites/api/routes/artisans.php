@@ -811,6 +811,10 @@ function artisan_consumer_token(PDO $pdo): void
 
     $sessionToken = user_create_session($pdo, $userId, true);
 
+    if (function_exists('app_log')) {
+        app_log('info', '[CONSUMER-TOKEN] session bridged', ['artisan_id' => (int)$artisan['id'], 'user_id' => (int)$userId, 'email' => $email]);
+    }
+
     echo json_encode([
         'success' => true,
         'data'    => ['id' => (int)$userId, 'email' => $email, 'token' => $sessionToken],

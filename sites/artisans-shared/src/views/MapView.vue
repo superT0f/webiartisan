@@ -10,8 +10,8 @@ import GameRenderer from '../components/GameRenderer.vue'
 import SpinOverlay from '../components/games/SpinOverlay.vue'
 import {
   fetchArtisans, fetchCityPois, fetchGames,
-  getUserToken, setUserToken, authEvents,
-  getArtisanToken, fetchMe, fetchArtisanConsumerToken,
+  getUserToken, setUserToken, removeUserToken, authEvents,
+  getArtisanToken, fetchMe, fetchUserMe, fetchArtisanConsumerToken,
   postCheckin, getCheckinStatus,
   CITY_LAT, CITY_LNG,
 } from '../api.js'
@@ -167,6 +167,15 @@ async function loadAdminStatus() {
     if (res.success) isAdmin.value = res.data.is_admin === 1 || res.data.is_admin === true
   } catch (e) {
     console.warn('Admin status check failed', e)
+  }
+  // Valider le token consommateur existant : s'il est périmé, le purger
+  // pour déclencher le pont artisan → joueur immédiatement.
+  const existing = getUserToken()
+  if (existing) {
+    try {
+      const check = await fetchUserMe(existing)
+      if (check.status === 401) removeUserToken()
+    } catch (e) { /* tolérance réseau : on conserve le token */ }
   }
   await bridgeConsumerIfNeeded(artisanToken)
 }
