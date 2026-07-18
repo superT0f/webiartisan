@@ -829,11 +829,15 @@ function user_reset_password(PDO $pdo, array $body): void
             ->execute([$passwordHash, $reset['email']]);
 
         // Invalidate all existing sessions for this user.
-        $pdo->prepare("
+        $del = $pdo->prepare("
             DELETE s FROM local_user_sessions s
             JOIN local_users u ON u.id = s.user_id
             WHERE u.email = ?
-        ")->execute([$reset['email']]);
+        ");
+        $del->execute([$reset['email']]);
+        if ($del->rowCount() > 0 && function_exists('app_log')) {
+            app_log('info', '[USER-AUTH] sessions deleted on password reset', ['email' => $reset['email'], 'count' => $del->rowCount()]);
+        }
         $pdo->prepare("
             UPDATE local_users
             SET session_token = NULL, session_exp = NULL
@@ -918,8 +922,11 @@ function user_change_password(PDO $pdo, array $body): void
 
         // Invalider les autres sessions (la session actuelle est conservée)
         $currentHash = hash('sha256', user_get_session_token() ?? '');
-        $pdo->prepare("DELETE FROM local_user_sessions WHERE user_id = ? AND token_hash != ?")
-            ->execute([(int)$user['id'], $currentHash]);
+        $del = $pdo->prepare("DELETE FROM local_user_sessions WHERE user_id = ? AND token_hash != ?");
+        $del->execute([(int)$user['id'], $currentHash]);
+        if ($del->rowCount() > 0 && function_exists('app_log')) {
+            app_log('info', '[USER-AUTH] other sessions deleted on password change', ['user_id' => (int)$user['id'], 'count' => $del->rowCount()]);
+        }
         $pdo->prepare("
             UPDATE local_users
             SET session_token = NULL, session_exp = NULL
