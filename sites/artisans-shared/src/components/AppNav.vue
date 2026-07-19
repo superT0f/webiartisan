@@ -19,16 +19,21 @@
     <!-- Menu déroulant — toutes tailles d'écran -->
     <Transition name="slide-down">
       <div v-if="menuOpen" class="nav-mobile" @click="menuOpen = false">
+        <RouterLink v-if="weather" to="/annuaire#meteo" class="nav-weather" :title="`Météo à ${CITY_NAME}`">
+          <span class="nav-weather-icon">{{ weatherIcon(weather.weathercode) }}</span>
+          <span class="nav-weather-temp">{{ Math.round(weather.temperature) }}°</span>
+          <span class="nav-weather-city">à {{ CITY_NAME }}</span>
+        </RouterLink>
+        <RouterLink to="/carte" class="nav-mobile-link nav-link-featured">🗺️ Carte</RouterLink>
         <RouterLink to="/annuaire" class="nav-mobile-link">🏠 Annuaire des artisans</RouterLink>
-        <RouterLink to="/carte" class="nav-mobile-link nav-link-featured">🗺️ Carte des artisans</RouterLink>
         <RouterLink to="/temoignages" class="nav-mobile-link">💬 Avis locaux</RouterLink>
-        <RouterLink to="/prospection" class="nav-mobile-link">🎯 Prospection</RouterLink>
-        <RouterLink to="/annuaire#meteo" class="nav-mobile-link">🌤️ Météo locale</RouterLink>
+        <RouterLink to="/recettes" class="nav-mobile-link">🍳 Recettes locales</RouterLink>
         <RouterLink to="/annuaire#services-locaux" class="nav-mobile-link">🏙️ Services locaux</RouterLink>
+        <div class="nav-separator" role="separator"></div>
         <RouterLink v-if="!user" to="/profil" class="nav-mobile-link">👤 Se connecter / Mon compte</RouterLink>
+        <RouterLink v-if="user" to="/profil" class="nav-mobile-link">👤 Mon profil (Lv.{{ user.level }})</RouterLink>
         <RouterLink to="/espace" class="nav-mobile-link">🔐 Mon espace</RouterLink>
         <RouterLink v-if="isAdmin" to="/espace/admin" class="nav-mobile-link nav-link-featured">🛡️ Administration</RouterLink>
-        <RouterLink v-if="user" to="/profil" class="nav-mobile-link">👤 Mon profil (Lv.{{ user.level }})</RouterLink>
         <RouterLink to="/inscrire" class="btn btn-primary" style="margin: 12px 20px;">
           + Inscrire mon entreprise
         </RouterLink>
@@ -39,7 +44,8 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { CITY_NAME, getUserToken, getArtisanToken, fetchUserMe, fetchMe, removeUserToken, authEvents } from '../api.js'
+import { CITY_NAME, CITY_LAT, CITY_LNG, getUserToken, getArtisanToken, fetchUserMe, fetchMe, removeUserToken, authEvents } from '../api.js'
+import { useWeather } from '../composables/useWeather.js'
 
 const scrolled   = ref(false)
 const menuOpen   = ref(false)
@@ -47,6 +53,19 @@ const user = ref(null)
 const artisan = ref(null)
 
 const isAdmin = computed(() => artisan.value?.is_admin === 1 || artisan.value?.is_admin === true)
+
+// Météo affichée en petit en tête du menu (cache partagé 15 min)
+const { weather, load: loadWeather } = useWeather(CITY_LAT, CITY_LNG)
+function weatherIcon(code) {
+  if (code == null) return '🌤️'
+  if (code <= 3) return '☀️'
+  if (code <= 48) return '☁️'
+  if (code <= 67) return '🌧️'
+  if (code <= 77) return '🌨️'
+  if (code <= 82) return '🌦️'
+  if (code <= 86) return '🌨️'
+  return '⛈️'
+}
 
 function onScroll() { scrolled.value = window.scrollY > 20 }
 
@@ -103,6 +122,7 @@ onMounted(() => {
   window.addEventListener('scroll', onScroll)
   authEvents.addEventListener('change', loadUser)
   loadUser()
+  loadWeather()
 })
 
 onUnmounted(() => {
@@ -192,6 +212,29 @@ onUnmounted(() => {
 }
 .nav-mobile-link:last-of-type { border-bottom: none; }
 .nav-mobile-link:hover { background: var(--c-cream-2); }
+
+/* Météo inline en tête de menu */
+.nav-weather {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  font-size: 0.9rem;
+  color: var(--c-text-2);
+  border-bottom: 1px solid var(--c-border);
+  transition: background 0.2s;
+}
+.nav-weather:hover { background: var(--c-cream-2); }
+.nav-weather-icon { font-size: 1.1rem; }
+.nav-weather-temp { font-weight: 700; color: var(--c-text); }
+.nav-weather-city { color: var(--c-text-3); }
+
+/* Séparateur avant la section compte */
+.nav-separator {
+  height: 8px;
+  background: var(--c-cream-2);
+  border-bottom: 1px solid var(--c-border);
+}
 
 .slide-down-enter-active, .slide-down-leave-active { transition: all 0.3s; }
 .slide-down-enter-from, .slide-down-leave-to { opacity: 0; transform: translateY(-10px); }
