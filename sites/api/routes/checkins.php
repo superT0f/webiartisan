@@ -9,6 +9,7 @@
 
 require_once __DIR__ . '/../lib/UserAuth.php';
 require_once __DIR__ . '/../lib/Gamification.php';
+require_once __DIR__ . '/../lib/AppLogger.php';
 
 const CHECKIN_RANGE_M = 200.0;
 const CHECKIN_DAILY_SECONDS = 86400;   // 24 h
