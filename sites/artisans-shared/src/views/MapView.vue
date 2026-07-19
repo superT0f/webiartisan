@@ -13,7 +13,8 @@ import {
   getUserToken, setUserToken, removeUserToken, authEvents,
   getArtisanToken, fetchMe, fetchUserMe, fetchArtisanConsumerToken,
   postCheckin, getCheckinStatus, postMessageToFlutter,
-  CITY_LAT, CITY_LNG,
+  haptic, shareText,
+  CITY_LAT, CITY_LNG, CITY_NAME,
 } from '../api.js'
 import { useWeather } from '../composables/useWeather.js'
 import { useGeolocation, haversineM } from '../composables/useGeolocation.js'
@@ -131,8 +132,12 @@ async function doCheckin(targetType, targetId, retried = false) {
   checkinLoading.value = false
 
   if (res.success) {
+    haptic('medium')
     showToast(`+${res.data.xp_awarded} XP`)
-    if (res.data.level_up) showToast('Niveau supérieur !')
+    if (res.data.level_up) {
+      haptic('heavy')
+      showToast('Niveau supérieur !')
+    }
     for (const b of res.data.new_badges || []) showToast(`Badge débloqué : ${b.name}`)
     await refreshStatus()
   } else if (res.status === 401) {
@@ -239,8 +244,41 @@ function onCouponPlayed(data) {
   showToast(data?.reward ? '🎁 Coupon débloqué !' : '+10 XP, merci d\'avoir joué !')
 }
 
+function onShareArtisan(artisan) {
+  const url = `${window.location.origin}/artisan/${artisan.id}`
+  shareText(`Découvre ${artisan.company_name}, artisan à ${CITY_NAME} :\n${url}`, `Artisan à ${CITY_NAME}`)
+}
+
+function onCouponShare(reward) {
+  const artisanName = selected.value?.company_name || 'un artisan local'
+  const code = reward?.reward_value?.code ? ` (code ${reward.reward_value.code})` : ''
+  shareText(`J'ai gagné : ${reward?.label || 'un coupon'} chez ${artisanName}${code} 🎁\n${window.location.origin}/carte`, 'Mon coupon WebiArtisan')
+}
+
+// Pull-to-refresh : tirer vers le bas depuis le haut de l'écran recharge la page
+const PULL_ZONE_Y = 100
+const PULL_TRIGGER = 90
+let pullStartY = null
+
+function onTouchStart(e) {
+  const t = e.touches[0]
+  pullStartY = (t.clientY < PULL_ZONE_Y && window.scrollY === 0) ? t.clientY : null
+}
+function onTouchMove(e) {
+  if (pullStartY === null) return
+  if (e.touches[0].clientY - pullStartY > PULL_TRIGGER) {
+    pullStartY = null
+    showToast('Actualisation…')
+    setTimeout(() => window.location.reload(), 300)
+  }
+}
+function onTouchEnd() { pullStartY = null }
+
 onMounted(async () => {
   authEvents.addEventListener('change', onAuthChange)
+  document.addEventListener('touchstart', onTouchStart, { passive: true })
+  document.addEventListener('touchmove', onTouchMove, { passive: true })
+  document.addEventListener('touchend', onTouchEnd, { passive: true })
   loadAdminStatus()
 
   await loadWeather()
@@ -263,6 +301,9 @@ onMounted(async () => {
 
 onUnmounted(() => {
   authEvents.removeEventListener('change', onAuthChange)
+  document.removeEventListener('touchstart', onTouchStart)
+  document.removeEventListener('touchmove', onTouchMove)
+  document.removeEventListener('touchend', onTouchEnd)
   stopGeolocation()
 })
 </script>
@@ -308,6 +349,7 @@ onUnmounted(() => {
       @checkin="onSheetCheckin"
       @play-coupon="overlay = 'coupon'"
       @play-spin="overlay = 'spin'"
+      @share="onShareArtisan"
     />
 
     <GameOverlay v-if="overlay === 'coupon'" :title="selectedGame?.title || 'Coupon'" @close="overlay = null">
@@ -318,6 +360,7 @@ onUnmounted(() => {
         :game-type="selectedGame.game_type_key"
         :config="selectedGame.config"
         @played="onCouponPlayed"
+        @share="onCouponShare"
       />
     </GameOverlay>
 

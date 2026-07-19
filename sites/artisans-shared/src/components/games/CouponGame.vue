@@ -7,6 +7,9 @@
     <div v-else class="coupon-game__result">
       <h4>{{ result.reward?.label || 'Merci d\'avoir joué !' }}</h4>
       <p v-if="result.reward?.reward_value?.code">Code : <strong>{{ result.reward.reward_value.code }}</strong></p>
+      <button v-if="result.reward" type="button" class="coupon-game__share" @click="$emit('share', result.reward)">
+        ↗ Partager mon coupon
+      </button>
     </div>
     <p v-if="errorMessage" class="coupon-game__error">{{ errorMessage }}</p>
   </div>
@@ -17,7 +20,7 @@ import { ref, watch } from 'vue'
 import { playGame } from '../../api.js'
 
 const props = defineProps({ instanceId: { type: [String, Number], required: true }, config: Object })
-const emit = defineEmits(['played'])
+const emit = defineEmits(['played', 'share'])
 
 const result = ref(null)
 const loading = ref(false)
@@ -76,4 +79,16 @@ async function play() {
   margin-top: 0.75rem;
   font-size: 0.9rem;
 }
+.coupon-game__share {
+  margin-top: 0.75rem;
+  padding: 0.5rem 1rem;
+  background: transparent;
+  color: var(--c-green);
+  border: 1px solid var(--c-green);
+  border-radius: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.coupon-game__share:hover { background: rgba(45, 106, 79, 0.08); }
 </style>

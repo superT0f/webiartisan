@@ -7,7 +7,7 @@ const props = defineProps({
   checkinState: { type: Object, default: null },
   authenticated: { type: Boolean, default: false },
 })
-defineEmits(['close', 'navigate', 'checkin', 'play-coupon', 'play-spin'])
+defineEmits(['close', 'navigate', 'checkin', 'play-coupon', 'play-spin', 'share'])
 
 const checkinLabel = computed(() => {
   const s = props.checkinState
@@ -56,6 +56,7 @@ const checkinDisabled = computed(() => {
         <div class="actions">
           <button class="btn btn-primary" @click="$emit('navigate', artisan)">Itinéraire</button>
           <RouterLink :to="`/artisan/${artisan.id}`" class="btn btn-secondary">Voir la fiche</RouterLink>
+          <button class="btn btn-secondary btn-share" @click="$emit('share', artisan)" aria-label="Partager">↗</button>
         </div>
       </div>
     </div>
@@ -93,6 +94,7 @@ const checkinDisabled = computed(() => {
 .category { color: #16a34a; font-weight: 600; font-size: 0.85rem; }
 .address { color: #666; margin: 12px 0; }
 .actions { display: flex; gap: 10px; margin-top: 16px; }
+.btn-share { flex-shrink: 0; width: 44px; padding: 0; font-size: 1.1rem; }
 
 .play-section {
   margin-top: 16px;

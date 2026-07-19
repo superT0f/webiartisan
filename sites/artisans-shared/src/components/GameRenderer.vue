@@ -5,6 +5,7 @@
     :instance-id="instanceId"
     :config="config"
     @played="$emit('played', $event)"
+    @share="$emit('share', $event)"
   />
   <p v-else>Moteur de jeu non disponible.</p>
 </template>
@@ -18,7 +19,7 @@ const props = defineProps({
   gameType: { type: String, required: true },
   config: { type: Object, default: () => ({}) },
 })
-defineEmits(['played'])
+defineEmits(['played', 'share'])
 
 const engineComponent = computed(() => props.gameType === 'coupon' ? CouponGame : null)
 </script>

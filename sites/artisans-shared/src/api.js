@@ -339,6 +339,16 @@ export async function logoutUser(token) {
   return res.json()
 }
 
+/** Vibration native via le bridge Flutter (no-op hors app). */
+export function haptic(type = 'medium') {
+  postMessageToFlutter('haptic', { type })
+}
+
+/** Partage natif (share sheet Android) via le bridge Flutter (no-op hors app). */
+export function shareText(text, subject = null) {
+  postMessageToFlutter('share', { text, subject })
+}
+
 export async function requestPasswordReset(email) {
   const res = await fetch(`${API_BASE}/users/forgot-password`, {
     method: 'POST',
