@@ -10,8 +10,21 @@
       </div>
       <template v-else>
         <div class="profile-card">
-          <img v-if="avatarUrl" :src="avatarUrl" :alt="`Avatar de ${displayName}`" class="profile-avatar" />
-          <div v-else class="profile-avatar-placeholder">🙂</div>
+          <div class="avatar-ring">
+            <svg class="avatar-ring-svg" viewBox="0 0 132 132" aria-hidden="true">
+              <circle class="ring-bg" cx="66" cy="66" r="63" />
+              <circle
+                class="ring-fill"
+                cx="66" cy="66" r="63"
+                :stroke-dasharray="ringCircumference"
+                :stroke-dashoffset="ringOffset"
+                transform="rotate(-90 66 66)"
+              />
+            </svg>
+            <img v-if="avatarUrl" :src="avatarUrl" :alt="`Avatar de ${displayName}`" class="profile-avatar" />
+            <div v-else class="profile-avatar-placeholder">🙂</div>
+            <span class="level-badge">Nv.{{ user?.level }}</span>
+          </div>
           <h1>{{ displayName }}</h1>
           <p class="profile-title">{{ user?.title || 'Explorateur local' }}</p>
           <div class="profile-level">
@@ -125,6 +138,8 @@ const biometricMessageType = ref('info')
 
 const displayName = computed(() => user.value?.display_name || user.value?.email?.split('@')[0] || 'Explorateur')
 const xpPercent = computed(() => user.value ? Math.min(100, (user.value.xp / user.value.xp_needed) * 100) : 0)
+const ringCircumference = 2 * Math.PI * 63
+const ringOffset = computed(() => ringCircumference * (1 - xpPercent.value / 100))
 const avatarUrl = computed(() => resolveAvatarUrl(user.value?.avatar_url))
 
 const badgeIcons = {
@@ -282,6 +297,35 @@ onUnmounted(() => {
 .user-profile { max-width: 680px; margin: 0 auto; padding: 24px; }
 .profile-card { text-align: center; background: #f8fafc; border-radius: 16px; padding: 32px; margin-bottom: 24px; }
 .profile-avatar, .profile-avatar-placeholder { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 48px; background: #e2e8f0; }
+
+/* Anneau de progression XP autour de l'avatar */
+.avatar-ring { position: relative; width: 132px; height: 132px; margin: 0 auto; }
+.avatar-ring .profile-avatar, .avatar-ring .profile-avatar-placeholder {
+  position: absolute; top: 6px; left: 6px; margin: 0;
+}
+.avatar-ring-svg { position: absolute; inset: 0; width: 132px; height: 132px; }
+.ring-bg { fill: none; stroke: var(--c-border, #e5e2d8); stroke-width: 6; }
+.ring-fill {
+  fill: none;
+  stroke: var(--c-gold, #C07A2E);
+  stroke-width: 6;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.6s ease;
+}
+.level-badge {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--c-green, #2d6a4f);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  white-space: nowrap;
+}
 .profile-title { color: #64748b; margin-top: 4px; }
 .profile-level { margin: 16px 0; }
 .xp-bar { width: 100%; max-width: 280px; margin: 8px auto; height: 12px; background: #e2e8f0; border-radius: 6px; overflow: hidden; }

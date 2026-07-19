@@ -41,7 +41,7 @@
       </fieldset>
 
       <label for="avatar-file">Avatar personnel</label>
-      <input id="avatar-file" ref="fileInput" type="file" accept="image/png,image/jpeg" @change="onFileChange" />
+      <input id="avatar-file" ref="fileInput" type="file" accept="image/*" @change="onFileChange" />
 
       <img v-if="avatarPreviewUrl" :src="avatarPreviewUrl" alt="Aperçu de l'avatar" class="upload-preview" />
 
@@ -204,32 +204,43 @@ function onFileChange(e) {
   error.value = ''
   const file = e.target.files[0]
   if (!file) return
-  if (!['image/png', 'image/jpeg', 'image/jpg'].includes(file.type)) {
-    error.value = 'Format accepté : PNG ou JPEG.'
+  if (!file.type.startsWith('image/')) {
+    error.value = 'Format accepté : une image (PNG, JPEG, WebP…).'
     e.target.value = ''
     avatarPreviewUrl.value = null
     uploadedBase64.value = null
     return
   }
-  if (file.size > 2 * 1024 * 1024) {
-    error.value = 'Image trop lourde (max 2 Mo).'
-    e.target.value = ''
-    avatarPreviewUrl.value = null
-    uploadedBase64.value = null
-    return
-  }
-  const reader = new FileReader()
-  reader.onload = () => {
-    uploadedBase64.value = reader.result
-    avatarPreviewUrl.value = reader.result
+  // Compression côté client : les photos de téléphone (plusieurs Mo, WebP…)
+  // sont recadrées en carré et réencodées en JPEG ~512 px avant l'envoi.
+  const url = URL.createObjectURL(file)
+  const img = new Image()
+  img.onload = () => {
+    URL.revokeObjectURL(url)
+    const size = 512
+    const min = Math.min(img.width, img.height)
+    const sx = (img.width - min) / 2
+    const sy = (img.height - min) / 2
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, size, size)
+    ctx.drawImage(img, sx, sy, min, min, 0, 0, size, size)
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+    uploadedBase64.value = dataUrl
+    avatarPreviewUrl.value = dataUrl
     selectedAvatar.value = null
   }
-  reader.onerror = () => {
-    error.value = 'Impossible de lire le fichier.'
+  img.onerror = () => {
+    URL.revokeObjectURL(url)
+    error.value = 'Impossible de lire cette image (format non supporté, ex. HEIC). Choisissez une photo JPEG ou PNG.'
     avatarPreviewUrl.value = null
     uploadedBase64.value = null
+    e.target.value = ''
   }
-  reader.readAsDataURL(file)
+  img.src = url
 }
 
 function handleAuthError() {
