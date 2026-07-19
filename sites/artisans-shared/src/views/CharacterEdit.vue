@@ -40,8 +40,11 @@
         </div>
       </fieldset>
 
-      <label for="avatar-file">Avatar personnel</label>
-      <input id="avatar-file" ref="fileInput" type="file" accept="image/*" @change="onFileChange" />
+      <label>Avatar personnel</label>
+      <button v-if="inFlutterApp" type="button" class="btn-pick-photo" :disabled="pickingImage" @click="pickFromApp">
+        {{ pickingImage ? 'Ouverture…' : '📷 Choisir une photo' }}
+      </button>
+      <input v-else id="avatar-file" ref="fileInput" type="file" accept="image/*" @change="onFileChange" />
 
       <img v-if="avatarPreviewUrl" :src="avatarPreviewUrl" alt="Aperçu de l'avatar" class="upload-preview" />
 
@@ -55,6 +58,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getUserToken, removeUserToken, fetchUserMe, fetchAvatars, updateUserProfile, updateUserAvatar, resolveAvatarUrl, notifyAuthChanged } from '../api.js'
+import { pickImage, isFlutterApp } from '../utils/flutterBridge.js'
 
 const router = useRouter()
 const user = ref(null)
@@ -66,6 +70,8 @@ const uploadedBase64 = ref(null)
 const saving = ref(false)
 const loadingProfile = ref(true)
 const error = ref('')
+const inFlutterApp = isFlutterApp()
+const pickingImage = ref(false)
 const avatarAbortController = ref(null)
 const profileAbortController = ref(null)
 const saveAbortController = ref(null)
@@ -200,23 +206,11 @@ function selectAvatar(a) {
   error.value = ''
 }
 
-function onFileChange(e) {
-  error.value = ''
-  const file = e.target.files[0]
-  if (!file) return
-  if (!file.type.startsWith('image/')) {
-    error.value = 'Format accepté : une image (PNG, JPEG, WebP…).'
-    e.target.value = ''
-    avatarPreviewUrl.value = null
-    uploadedBase64.value = null
-    return
-  }
-  // Compression côté client : les photos de téléphone (plusieurs Mo, WebP…)
-  // sont recadrées en carré et réencodées en JPEG ~512 px avant l'envoi.
-  const url = URL.createObjectURL(file)
+// Compression partagée : recadrage carré + réencodage JPEG 512 px côté client,
+// pour que les photos de téléphone (plusieurs Mo, WebP…) passent toujours.
+function compressDataUrl(dataUrl) {
   const img = new Image()
   img.onload = () => {
-    URL.revokeObjectURL(url)
     const size = 512
     const min = Math.min(img.width, img.height)
     const sx = (img.width - min) / 2
@@ -228,19 +222,49 @@ function onFileChange(e) {
     ctx.fillStyle = '#ffffff'
     ctx.fillRect(0, 0, size, size)
     ctx.drawImage(img, sx, sy, min, min, 0, 0, size, size)
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
-    uploadedBase64.value = dataUrl
-    avatarPreviewUrl.value = dataUrl
+    const out = canvas.toDataURL('image/jpeg', 0.85)
+    uploadedBase64.value = out
+    avatarPreviewUrl.value = out
     selectedAvatar.value = null
   }
   img.onerror = () => {
-    URL.revokeObjectURL(url)
     error.value = 'Impossible de lire cette image (format non supporté, ex. HEIC). Choisissez une photo JPEG ou PNG.'
     avatarPreviewUrl.value = null
     uploadedBase64.value = null
-    e.target.value = ''
   }
-  img.src = url
+  img.src = dataUrl
+}
+
+async function pickFromApp() {
+  error.value = ''
+  pickingImage.value = true
+  try {
+    const res = await pickImage({ source: 'gallery', quality: 85, maxWidth: 1600 })
+    if (res?.base64) {
+      compressDataUrl(`data:${res.mimeType || 'image/jpeg'};base64,${res.base64}`)
+    }
+  } catch (e) {
+    if (e?.code !== 'cancelled') {
+      error.value = 'Impossible de récupérer la photo.'
+    }
+  } finally {
+    pickingImage.value = false
+  }
+}
+
+function onFileChange(e) {
+  error.value = ''
+  const file = e.target.files[0]
+  if (!file) return
+  if (!file.type.startsWith('image/')) {
+    error.value = 'Format accepté : une image (PNG, JPEG, WebP…).'
+    e.target.value = ''
+    avatarPreviewUrl.value = null
+    uploadedBase64.value = null
+    return
+  }
+  const url = URL.createObjectURL(file)
+  compressDataUrl(url)
 }
 
 function handleAuthError() {
@@ -328,6 +352,8 @@ input:focus, select:focus { outline: none; border-color: var(--c-green); box-sha
 .avatar-item span { display: block; font-size: 0.85rem; font-weight: 500; }
 .avatar-item small { display: block; font-size: 0.75rem; color: #64748b; margin-top: 2px; }
 .upload-preview { display: block; width: 120px; height: 120px; object-fit: cover; border-radius: 50%; margin-top: 16px; border: 3px solid var(--c-green); }
+.btn-pick-photo { display: block; width: 100%; padding: 12px; margin-top: 4px; border: 2px dashed var(--c-green); border-radius: 8px; background: transparent; color: var(--c-green); font-weight: 600; font-size: 1rem; cursor: pointer; }
+.btn-pick-photo:disabled { opacity: 0.6; cursor: not-allowed; }
 .btn-save { margin-top: 28px; margin-right: 12px; padding: 12px 24px; background: var(--c-green, #C07A2E); color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
 .btn-save:hover { background: var(--c-green-dark, #B5712B); }
 .btn-save:disabled { opacity: 0.6; cursor: not-allowed; }

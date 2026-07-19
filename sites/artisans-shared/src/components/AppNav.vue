@@ -19,6 +19,22 @@
     <!-- Menu déroulant — toutes tailles d'écran -->
     <Transition name="slide-down">
       <div v-if="menuOpen" class="nav-mobile" @click="menuOpen = false">
+        <RouterLink v-if="user" to="/profil" class="nav-profile-hero">
+          <span class="hero-ring">
+            <svg class="hero-ring-svg" viewBox="0 0 76 76" aria-hidden="true">
+              <circle class="ring-bg" cx="38" cy="38" r="35" />
+              <circle class="ring-fill" cx="38" cy="38" r="35"
+                :stroke-dasharray="heroCircumference" :stroke-dashoffset="heroOffset"
+                transform="rotate(-90 38 38)" />
+            </svg>
+            <img v-if="avatarUrl" :src="avatarUrl" class="hero-avatar" alt="" />
+            <span v-else class="hero-avatar hero-avatar-ph">🙂</span>
+          </span>
+          <span class="hero-info">
+            <strong>{{ user.display_name || 'Mon profil' }}</strong>
+            <small>Nv.{{ user.level }} · {{ user.xp }}/{{ user.xp_needed }} XP</small>
+          </span>
+        </RouterLink>
         <RouterLink v-if="weather" to="/annuaire#meteo" class="nav-weather" :title="`Météo à ${CITY_NAME}`">
           <span class="nav-weather-icon">{{ weatherIcon(weather.weathercode) }}</span>
           <span class="nav-weather-temp">{{ Math.round(weather.temperature) }}°</span>
@@ -44,7 +60,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { CITY_NAME, CITY_LAT, CITY_LNG, getUserToken, getArtisanToken, fetchUserMe, fetchMe, removeUserToken, authEvents } from '../api.js'
+import { CITY_NAME, CITY_LAT, CITY_LNG, getUserToken, getArtisanToken, fetchUserMe, fetchMe, removeUserToken, resolveAvatarUrl, authEvents } from '../api.js'
 import { useWeather } from '../composables/useWeather.js'
 
 const scrolled   = ref(false)
@@ -53,6 +69,13 @@ const user = ref(null)
 const artisan = ref(null)
 
 const isAdmin = computed(() => artisan.value?.is_admin === 1 || artisan.value?.is_admin === true)
+const avatarUrl = computed(() => resolveAvatarUrl(user.value?.avatar_url))
+const heroXpPercent = computed(() => {
+  if (!user.value?.xp_needed) return 0
+  return Math.min(100, (user.value.xp / user.value.xp_needed) * 100)
+})
+const heroCircumference = 2 * Math.PI * 35
+const heroOffset = computed(() => heroCircumference * (1 - heroXpPercent.value / 100))
 
 // Météo affichée en petit en tête du menu (cache partagé 15 min)
 const { weather, load: loadWeather } = useWeather(CITY_LAT, CITY_LNG)
@@ -234,6 +257,35 @@ onUnmounted(() => {
   height: 8px;
   background: var(--c-cream-2);
   border-bottom: 1px solid var(--c-border);
+}
+
+/* Bloc profil en tête de menu (avatar + anneau XP) */
+.nav-profile-hero {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--c-border);
+  transition: background 0.2s;
+}
+.nav-profile-hero:hover { background: var(--c-cream-2); }
+.hero-ring { position: relative; width: 76px; height: 76px; flex-shrink: 0; }
+.hero-ring-svg { position: absolute; inset: 0; width: 76px; height: 76px; }
+.hero-avatar {
+  position: absolute; top: 6px; left: 6px;
+  width: 64px; height: 64px; border-radius: 50%; object-fit: cover;
+}
+.hero-avatar-ph {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.8rem; background: var(--c-cream-2);
+}
+.hero-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.hero-info strong { font-size: 0.95rem; color: var(--c-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hero-info small { font-size: 0.78rem; color: var(--c-text-3); font-weight: 600; }
+.hero-ring .ring-bg { fill: none; stroke: var(--c-border, #e5e2d8); stroke-width: 4; }
+.hero-ring .ring-fill {
+  fill: none; stroke: var(--c-gold, #C07A2E); stroke-width: 4;
+  stroke-linecap: round; transition: stroke-dashoffset 0.6s ease;
 }
 
 .slide-down-enter-active, .slide-down-leave-active { transition: all 0.3s; }

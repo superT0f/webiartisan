@@ -61,6 +61,22 @@ export function clearWatch(callbackId) {
   }
 }
 
+/**
+ * Ouvre le sélecteur de photo natif de l'app (galerie ou caméra).
+ * Résout { base64, mimeType, name } — rejette avec code 'cancelled' si annulé.
+ */
+export function pickImage(options = {}) {
+  return sendMessage('pickImage', {
+    source: options.source || 'gallery',
+    quality: options.quality ?? 85,
+    maxWidth: options.maxWidth ?? 1600,
+  });
+}
+
+export function isFlutterApp() {
+  return typeof FlutterBridge !== 'undefined' && !!FlutterBridge.postMessage;
+}
+
 window.onBiometricResponse = function (callbackId, response) {
   if (!response || typeof response !== 'object') {
     console.error('[flutterBridge] réponse invalide', response);
