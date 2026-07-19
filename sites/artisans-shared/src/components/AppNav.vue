@@ -43,7 +43,6 @@
         <RouterLink to="/carte" class="nav-mobile-link nav-link-featured">🗺️ Carte</RouterLink>
         <RouterLink to="/annuaire" class="nav-mobile-link">🏠 Annuaire des artisans</RouterLink>
         <RouterLink to="/temoignages" class="nav-mobile-link">💬 Avis locaux</RouterLink>
-        <RouterLink to="/recettes" class="nav-mobile-link">🍳 Recettes locales</RouterLink>
         <RouterLink to="/annuaire#services-locaux" class="nav-mobile-link">🏙️ Services locaux</RouterLink>
         <div class="nav-separator" role="separator"></div>
         <RouterLink v-if="!user" to="/profil" class="nav-mobile-link">👤 Se connecter / Mon compte</RouterLink>

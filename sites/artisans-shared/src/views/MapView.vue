@@ -25,7 +25,7 @@ const games = ref([])
 const selected = ref(null)
 const loading = ref(true)
 const { weather, load: loadWeather } = useWeather(CITY_LAT, CITY_LNG)
-const { position, start: startGeolocation, stop: stopGeolocation } = useGeolocation()
+const { position, start: startGeolocation, stop: stopGeolocation, refresh: refreshPosition } = useGeolocation()
 const { showToast } = useGamification()
 
 const userToken = ref(getUserToken())
@@ -77,11 +77,21 @@ const selectedCheckin = computed(() => {
 })
 
 let lastStatusAt = 0
+let statusTimer = null
 watch(effectivePosition, () => {
   const now = Date.now()
-  if (now - lastStatusAt < 5000) return
-  lastStatusAt = now
-  refreshStatus()
+  const elapsed = now - lastStatusAt
+  if (elapsed >= 5000) {
+    lastStatusAt = now
+    refreshStatus()
+  } else if (!statusTimer) {
+    // Trailing : ne pas perdre le dernier déplacement pendant la fenêtre de throttle
+    statusTimer = setTimeout(() => {
+      statusTimer = null
+      lastStatusAt = Date.now()
+      refreshStatus()
+    }, 5000 - elapsed)
+  }
 })
 
 async function refreshStatus() {
@@ -106,6 +116,12 @@ async function doCheckin(targetType, targetId, retried = false) {
     return
   }
   checkinLoading.value = true
+  // Rafraîchir la position avant d'agir : la watch peut être périmée et
+  // fausser la cible et la distance (sauf si position fictive admin active)
+  if (!mockPosition.value) {
+    await refreshPosition()
+    await refreshStatus()
+  }
   const res = await postCheckin({
     target_type: targetType,
     target_id: targetId,

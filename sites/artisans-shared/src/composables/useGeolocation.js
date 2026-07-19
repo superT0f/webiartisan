@@ -64,7 +64,31 @@ export function useGeolocation() {
     }
   }
 
+  /**
+   * Force une lecture fraîche de la position (one-shot, timeout court).
+   * À appeler avant une action sensible (check-in) : la watch peut être
+   * périmée (réseau/GPS lent, reloads) et tromper la cible et le POST.
+   */
+  async function refresh() {
+    try {
+      if (isFlutter()) {
+        position.value = await getPosition({ accuracy: 'best', timeout: 8000, maxAccuracy: 100 })
+      } else if (navigator.geolocation) {
+        position.value = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(
+            p => resolve({ latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: p.coords.accuracy }),
+            reject,
+            { enableHighAccuracy: true, timeout: 8000 }
+          )
+        })
+      }
+    } catch (e) {
+      // Garde l'ancienne position si la lecture échoue
+    }
+    return position.value
+  }
+
   onUnmounted(stop)
 
-  return { position, error, start, stop }
+  return { position, error, start, stop, refresh }
 }
