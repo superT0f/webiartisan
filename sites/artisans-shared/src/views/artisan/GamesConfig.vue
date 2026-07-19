@@ -109,14 +109,14 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { fetchGameTypes, fetchMyGames, createArtisanGame, updateArtisanGame, deleteArtisanGame, getSubscriptionStatus, createSubscriptionCheckout } from '../../api.js'
+import { fetchGameTypes, fetchMyGames, createArtisanGame, updateArtisanGame, deleteArtisanGame, getSubscriptionStatus, createSubscriptionCheckout, getArtisanToken } from '../../api.js'
 import FreemiumLimitBanner from '../../components/FreemiumLimitBanner.vue'
 
 const props = defineProps({
   token: { type: String, default: '' },
 })
 
-const artisanToken = computed(() => props.token || localStorage.getItem('artisan_token') || '')
+const artisanToken = computed(() => props.token || getArtisanToken() || '')
 
 const types = ref([])
 const games = ref([])

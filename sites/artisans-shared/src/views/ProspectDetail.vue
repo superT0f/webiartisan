@@ -81,13 +81,13 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { getProspect, getMyProspects, followProspect, unfollowProspect } from '../api.js'
+import { getProspect, getMyProspects, followProspect, unfollowProspect, getArtisanToken } from '../api.js'
 
 const route = useRoute()
 
 const prospect = ref(null)
 const loading = ref(true)
-const token = ref(localStorage.getItem('artisan_token') || '')
+const token = ref(getArtisanToken())
 const status = ref('tocontact')
 const notes = ref('')
 const saving = ref(false)

@@ -89,13 +89,14 @@ import {
   createArtisanService,
   updateArtisanService,
   deleteArtisanService,
+  getArtisanToken,
 } from '../../api.js'
 
 const props = defineProps({
   token: { type: String, default: '' },
 })
 
-const artisanToken = computed(() => props.token || localStorage.getItem('artisan_token') || '')
+const artisanToken = computed(() => props.token || getArtisanToken() || '')
 
 const services = ref([])
 const catalog = ref([])
