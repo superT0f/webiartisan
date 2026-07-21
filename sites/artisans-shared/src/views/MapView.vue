@@ -4,6 +4,8 @@ import ImmersiveMap from '../components/ImmersiveMap.vue'
 import ArtisanSheet from '../components/ArtisanSheet.vue'
 import MapWeatherBadge from '../components/MapWeatherBadge.vue'
 import ActionButton from '../components/ActionButton.vue'
+import EnergyBar from '../components/EnergyBar.vue'
+import QuestsPanel from '../components/QuestsPanel.vue'
 import GameOverlay from '../components/GameOverlay.vue'
 import AuthForm from '../components/AuthForm.vue'
 import GameRenderer from '../components/GameRenderer.vue'
@@ -15,7 +17,7 @@ import {
   postCheckin, getCheckinStatus, postMessageToFlutter,
   haptic, shareText,
   CITY_LAT, CITY_LNG, CITY_NAME,
-  pickupObject,
+  pickupObject, getQuestsToday, claimQuest,
 } from '../api.js'
 import { useWeather } from '../composables/useWeather.js'
 import { useGeolocation, haversineM } from '../composables/useGeolocation.js'
@@ -46,6 +48,10 @@ const overlay = ref(null) // null | 'coupon' | 'spin' | 'auth'
 const { objects: worldObjects, cityCleanliness, fetchNearby, removeObject } = useWorldObjects()
 const { setEnergy } = useEnergy()
 const pickupLoading = ref(false)
+const quests = ref([])
+const questsOpen = ref(false)
+const questClaiming = ref(false)
+const unclaimedCount = computed(() => quests.value.filter(q => q.completed && !q.claimed).length)
 
 const authenticated = computed(() => !!userToken.value)
 
@@ -154,6 +160,7 @@ async function doCheckin(targetType, targetId, retried = false) {
     if (res.data.energy) setEnergy(res.data.energy)
     for (const q of res.data.quests_completed || []) showToast(`Quête terminée : ${q.label}`)
     await refreshStatus()
+    refreshQuests()
   } else if (res.status === 401) {
     // Session consommateur invalide : tenter le pont artisan → joueur une fois
     const artisanToken = getArtisanToken()
@@ -206,6 +213,7 @@ async function doPickup(object, retried = false) {
     for (const b of res.data.new_badges || []) showToast(`Badge débloqué : ${b.name}`)
     for (const q of res.data.quests_completed || []) showToast(`Quête terminée : ${q.label}`)
     await refreshStatus()
+    refreshQuests()
   } else if (res.status === 401) {
     const artisanToken = getArtisanToken()
     if (!retried && artisanToken) {
@@ -231,6 +239,27 @@ function onFabAct(action) {
     doPickup(action.object)
   } else {
     doCheckin(action.target.target_type, action.target.target_id)
+  }
+}
+
+async function refreshQuests() {
+  if (!authenticated.value) return
+  const res = await getQuestsToday()
+  if (res.success) quests.value = res.data || []
+}
+
+async function onClaimQuest(quest) {
+  questClaiming.value = true
+  const res = await claimQuest(quest.quest_code)
+  questClaiming.value = false
+  if (res.success) {
+    haptic('medium')
+    showToast(`+${res.data.xp_awarded} XP`)
+    if (res.data.level_up) showToast('Niveau supérieur !')
+    for (const b of res.data.new_badges || []) showToast(`Badge débloqué : ${b.name}`)
+    await refreshQuests()
+  } else {
+    showToast(res.error === 'already_claimed' ? 'Récompense déjà récupérée' : 'Quête pas encore terminée')
   }
 }
 
@@ -367,6 +396,7 @@ onMounted(async () => {
   }
   loading.value = false
 
+  refreshQuests()
   startGeolocation()
 })
 
@@ -408,6 +438,17 @@ onUnmounted(() => {
     </div>
 
     <MapWeatherBadge :weather="weather" />
+
+    <EnergyBar v-if="authenticated" />
+
+    <button v-if="authenticated" type="button" class="quests-fab card" @click="questsOpen = !questsOpen">
+      📜 {{ quests.filter(q => q.claimed).length }}/{{ quests.length }}
+      <span v-if="unclaimedCount" class="quests-fab__badge">{{ unclaimedCount }}</span>
+    </button>
+
+    <div v-if="cityCleanliness !== null" class="cleanliness-chip card">🌿 Ville propre : {{ cityCleanliness }} %</div>
+
+    <QuestsPanel :quests="quests" :open="questsOpen" :claiming="questClaiming" @close="questsOpen = false" @claim="onClaimQuest" />
 
     <ActionButton :action="fabAction" :loading="checkinLoading || pickupLoading" @act="onFabAct" />
 
@@ -484,6 +525,35 @@ onUnmounted(() => {
   cursor: pointer;
 }
 .toggle input { width: 18px; height: 18px; cursor: pointer; }
+
+.quests-fab {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 20;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.quests-fab__badge {
+  background: #e11d48;
+  color: #fff;
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 0.7rem;
+  margin-left: 4px;
+}
+.cleanliness-chip {
+  position: absolute;
+  bottom: 24px;
+  left: 12px;
+  z-index: 15;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+}
 
 @media (max-width: 600px) {
   .loading-chip, .admin-controls {
