@@ -24,6 +24,7 @@ import { useGeolocation, haversineM } from '../composables/useGeolocation.js'
 import { useGamification } from '../composables/useGamification.js'
 import { useWorldObjects } from '../composables/useWorldObjects.js'
 import { useEnergy } from '../composables/useEnergy.js'
+import { isMapTilerKey } from '../composables/useMapStyle.js'
 import { pickMapAction } from '../utils/pickMapAction.js'
 
 const artisans = ref([])
@@ -52,6 +53,21 @@ const quests = ref([])
 const questsOpen = ref(false)
 const questClaiming = ref(false)
 const unclaimedCount = computed(() => quests.value.filter(q => q.completed && !q.claimed).length)
+
+// Bascule 2D/3D (spike carte immersive) — préférence persistée
+const immersiveMap = ref(null)
+const can3D = isMapTilerKey(import.meta.env.VITE_MAPTILER_KEY)
+const is3D = ref(localStorage.getItem('map_3d') === '1')
+
+function toggle3D() {
+  is3D.value = !is3D.value
+  localStorage.setItem('map_3d', is3D.value ? '1' : '0')
+  immersiveMap.value?.set3D(is3D.value)
+}
+
+function onMapReady() {
+  if (is3D.value) immersiveMap.value?.set3D(true)
+}
 
 const authenticated = computed(() => !!userToken.value)
 
@@ -412,6 +428,7 @@ onUnmounted(() => {
 <template>
   <div class="map-view">
     <ImmersiveMap
+      ref="immersiveMap"
       :artisans="artisans"
       :pois="pois"
       :objects="worldObjects"
@@ -420,6 +437,7 @@ onUnmounted(() => {
       :halo="isAdmin && adminHalo"
       @select="openSheet"
       @map-click="onMapClick"
+      @ready="onMapReady"
     />
 
     <div v-if="loading" class="loading-chip card">Chargement de la carte…</div>
@@ -444,6 +462,10 @@ onUnmounted(() => {
     <button v-if="authenticated" type="button" class="quests-fab card" @click="questsOpen = !questsOpen">
       📜 {{ quests.filter(q => q.claimed).length }}/{{ quests.length }}
       <span v-if="unclaimedCount" class="quests-fab__badge">{{ unclaimedCount }}</span>
+    </button>
+
+    <button v-if="can3D" type="button" class="map3d-fab card" :class="{ 'map3d-fab--active': is3D }" @click="toggle3D">
+      {{ is3D ? '🗺️ 2D' : '🏙️ 3D' }}
     </button>
 
     <div v-if="cityCleanliness !== null" class="cleanliness-chip card">🌿 Ville propre : {{ cityCleanliness }} %</div>
@@ -544,6 +566,21 @@ onUnmounted(() => {
   padding: 1px 7px;
   font-size: 0.7rem;
   margin-left: 4px;
+}
+.map3d-fab {
+  position: absolute;
+  top: 56px;
+  right: 12px;
+  z-index: 20;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.map3d-fab--active {
+  background: var(--c-text);
+  color: #fff;
 }
 .cleanliness-chip {
   position: absolute;

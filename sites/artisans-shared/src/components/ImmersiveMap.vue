@@ -2,7 +2,7 @@
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { Map, NavigationControl, GeolocateControl, Marker, Popup } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { useMapStyle } from '../composables/useMapStyle.js'
+import { useMapStyle, isMapTilerKey, terrainTilesUrl } from '../composables/useMapStyle.js'
 import { escapeHtml } from '@/utils/escapeHtml.js'
 
 const props = defineProps({
@@ -15,10 +15,12 @@ const props = defineProps({
   halo: { type: Boolean, default: false }
 })
 
-const emit = defineEmits(['select', 'map-click'])
+const emit = defineEmits(['select', 'map-click', 'ready'])
 const mapEl = ref(null)
 const map = ref(null)
 const markers = []
+const has3D = ref(false)
+const is3D = ref(false)
 
 onMounted(async () => {
   const key = import.meta.env.VITE_MAPTILER_KEY
@@ -27,10 +29,11 @@ onMounted(async () => {
     style: useMapStyle(key),
     center: props.center,
     zoom: props.zoom,
+    maxPitch: 70,
     attributionControl: false
   })
 
-  map.value.addControl(new NavigationControl(), 'bottom-right')
+  map.value.addControl(new NavigationControl({ visualizePitch: true }), 'bottom-right')
   map.value.addControl(
     new GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true }),
     'bottom-right'
@@ -41,10 +44,51 @@ onMounted(async () => {
   })
 
   map.value.on('load', () => {
+    setup3D(key)
     renderMarkers()
     upsertUserPosition()
+    emit('ready')
   })
 })
+
+/**
+ * Prépare la 3D (bâtiments + terrain) si le style est vectoriel (clé MapTiler).
+ * Les couches sont ajoutées masquées : c'est set3D(true) qui les active.
+ */
+function setup3D(key) {
+  if (!isMapTilerKey(key) || !map.value) return
+  const style = map.value.getStyle()
+  const vectorSourceId = Object.keys(style.sources).find(id => style.sources[id].type === 'vector')
+  if (!vectorSourceId) return
+
+  map.value.addLayer({
+    id: 'buildings-3d',
+    type: 'fill-extrusion',
+    source: vectorSourceId,
+    'source-layer': 'building',
+    minzoom: 14,
+    layout: { visibility: 'none' },
+    paint: {
+      'fill-extrusion-color': '#d6cfc4',
+      'fill-extrusion-height': ['coalesce', ['get', 'render_height'], ['get', 'height'], 8],
+      'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0],
+      'fill-extrusion-opacity': 0.85
+    }
+  })
+  map.value.addSource('terrain-dem', { type: 'raster-dem', url: terrainTilesUrl(key) })
+  has3D.value = true
+}
+
+/** Bascule 2D/3D : bâtiments extrudés, terrain, caméra inclinée à 55°. */
+function set3D(enabled) {
+  if (!map.value || !has3D.value || !map.value.getLayer('buildings-3d')) return
+  is3D.value = enabled
+  map.value.setLayoutProperty('buildings-3d', 'visibility', enabled ? 'visible' : 'none')
+  map.value.setTerrain(enabled ? { source: 'terrain-dem', exaggeration: 1.3 } : null)
+  map.value.easeTo({ pitch: enabled ? 55 : 0, duration: 800 })
+}
+
+defineExpose({ set3D, has3D, is3D })
 
 let userMarker = null
 const USER_POS_SOURCE = 'user-pos'

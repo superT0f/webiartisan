@@ -1,5 +1,13 @@
+export function isMapTilerKey(apiKey) {
+  return !!(apiKey && apiKey !== 'your_maptiler_key_here')
+}
+
+export function terrainTilesUrl(apiKey) {
+  return `https://api.maptiler.com/tiles/terrain-rgb-v2/tiles.json?key=${apiKey}`
+}
+
 export function useMapStyle(apiKey) {
-  if (apiKey && apiKey !== 'your_maptiler_key_here') {
+  if (isMapTilerKey(apiKey)) {
     return `https://api.maptiler.com/maps/bright/style.json?key=${apiKey}`
   }
   return {
