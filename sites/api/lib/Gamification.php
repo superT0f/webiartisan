@@ -16,6 +16,8 @@ const XP_ACTIONS = [
     'streak_3days'         => ['xp' => 30, 'cooldown' => 'daily',  'limit' => 1, 'internal' => true],
     'poi_checkin'          => ['xp' => 100, 'cooldown' => 'none', 'limit' => null, 'internal' => true],
     'poi_checkin_recharge' => ['xp' => 10,  'cooldown' => 'none', 'limit' => null, 'internal' => true],
+    'object_pickup'        => ['xp' => 0, 'cooldown' => 'none', 'limit' => null, 'internal' => true],
+    'quest_complete'       => ['xp' => 0, 'cooldown' => 'none', 'limit' => null, 'internal' => true],
 ];
 
 const LEVEL_TITLES = [
@@ -35,6 +37,9 @@ const BADGES = [
     'chanceux'       => ['name' => 'Chanceux',         'condition' => 'Gagner 3 fois à la suite.',         'target' => 3,   'action' => 'game_win'],
     'generous'       => ['name' => 'Généreux',         'condition' => 'Partager 5 pages.',                 'target' => 5,   'action' => 'share'],
     'faithful'       => ['name' => 'Fidèle',           'condition' => '7 jours de connexion.',             'target' => 7,   'action' => 'daily_visit'],
+    'premier_ramassage' => ['name' => 'Premier ramassage', 'condition' => 'Ramasser un objet sur la carte.', 'target' => 1,  'action' => 'object_pickup'],
+    'eco_warrior'       => ['name' => 'Éco-guerrier',      'condition' => 'Ramasser 50 déchets.',            'target' => 50, 'action' => 'object_pickup', 'meta_filter' => ['object_category' => 'dechet']],
+    'chasseur_tresor'   => ['name' => 'Chasseur de trésors','condition' => 'Trouver 10 trésors.',            'target' => 10, 'action' => 'object_pickup', 'meta_filter' => ['object_type' => 'tresor']],
 ];
 
 const STREAK_MILESTONE_DAYS = 3;
@@ -84,7 +89,7 @@ function gamificationUserProfile(PDO $pdo, int $userId): ?array
     ];
 }
 
-function gamificationRecordAction(PDO $pdo, int $userId, string $actionKey, ?string $resourceKey = null, ?array $metadata = null, bool $inTransaction = false, bool $allowInternal = false): ?array
+function gamificationRecordAction(PDO $pdo, int $userId, string $actionKey, ?string $resourceKey = null, ?array $metadata = null, bool $inTransaction = false, bool $allowInternal = false, ?int $xpOverride = null): ?array
 {
     if (!isset(XP_ACTIONS[$actionKey])) {
         return null;
@@ -96,12 +101,16 @@ function gamificationRecordAction(PDO $pdo, int $userId, string $actionKey, ?str
 
     $config = XP_ACTIONS[$actionKey];
     $resourceKey = $resourceKey ?? '';
+    $xp = $xpOverride ?? $config['xp'];
+    if ($xp <= 0) {
+        return null;
+    }
 
     if (!empty($config['internal']) && !$allowInternal) {
         return null;
     }
 
-    $doRecord = function () use ($pdo, $userId, $actionKey, $config, $resourceKey, $metadata): array {
+    $doRecord = function () use ($pdo, $userId, $actionKey, $config, $resourceKey, $metadata, $xp): array {
         $pdo->prepare("
             INSERT INTO local_user_cooldowns (user_id, action_key, period, resource_key, last_at)
             VALUES (?, ?, ?, ?, NOW())
@@ -111,17 +120,17 @@ function gamificationRecordAction(PDO $pdo, int $userId, string $actionKey, ?str
         $pdo->prepare("
             INSERT INTO local_user_actions (user_id, action_key, xp_amount, metadata, created_at)
             VALUES (?, ?, ?, ?, NOW())
-        ")->execute([$userId, $actionKey, $config['xp'], $metadata !== null ? json_encode($metadata, JSON_THROW_ON_ERROR) : null]);
+        ")->execute([$userId, $actionKey, $xp, $metadata !== null ? json_encode($metadata, JSON_THROW_ON_ERROR) : null]);
 
         $pdo->prepare("
             UPDATE local_users SET xp = xp + ? WHERE id = ?
-        ")->execute([$config['xp'], $userId]);
+        ")->execute([$xp, $userId]);
 
         $leveledUp = gamificationCheckLevelUp($pdo, $userId);
         $newBadges = gamificationCheckBadges($pdo, $userId, $actionKey);
 
         return [
-            'xp_gained' => $config['xp'],
+            'xp_gained' => $xp,
             'level_up' => $leveledUp,
             'new_badges' => $newBadges,
         ];
@@ -238,11 +247,15 @@ function gamificationCheckBadges(PDO $pdo, int $userId, string $actionKey): arra
         $stmt->execute([$userId, $key]);
         if ($stmt->fetch()) continue;
 
-        $countStmt = $pdo->prepare("
-            SELECT COUNT(*) FROM local_user_actions
-            WHERE user_id = ? AND action_key = ?
-        ");
-        $countStmt->execute([$userId, $badge['action']]);
+        $sql = "SELECT COUNT(*) FROM local_user_actions WHERE user_id = ? AND action_key = ?";
+        $params = [$userId, $badge['action']];
+        foreach (($badge['meta_filter'] ?? []) as $metaKey => $metaValue) {
+            // $metaKey provient exclusivement de la constante BADGES (jamais d'entrée utilisateur)
+            $sql .= " AND metadata->>'$.{$metaKey}' = ?";
+            $params[] = $metaValue;
+        }
+        $countStmt = $pdo->prepare($sql);
+        $countStmt->execute($params);
         $count = (int)$countStmt->fetchColumn();
 
         if ($count >= $badge['target']) {
@@ -313,4 +326,68 @@ function gamificationUpdateStreak(PDO $pdo, int $userId): void
         }
         error_log('[GAMIFICATION-STREAK] ' . $e->getMessage());
     }
+}
+
+
+// ------------------------------------------------------------------
+// Énergie (points de vie = endurance)
+// ------------------------------------------------------------------
+
+const ENERGY_MAX = 100;
+const ENERGY_REGEN_PER_10MIN = 5;
+const ENERGY_PER_CHECKIN = 20;
+
+/**
+ * Solde d'énergie avec régénération paresseuse (+5 / 10 min).
+ * Avec $forUpdate=true, verrouille la ligne user (à appeler dans une transaction).
+ */
+function energyGet(PDO $pdo, int $userId, bool $forUpdate = false): ?array
+{
+    $sql = "SELECT energy, energy_updated_at FROM local_users WHERE id = ?" . ($forUpdate ? " FOR UPDATE" : "");
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$userId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
+        return null;
+    }
+
+    $energy = (int)$row['energy'];
+    $updatedAt = $row['energy_updated_at'] ? strtotime($row['energy_updated_at']) : time();
+    $elapsed = max(0, time() - $updatedAt);
+
+    if ($elapsed >= 600 && $energy < ENERGY_MAX) {
+        $gained = intdiv($elapsed, 600) * ENERGY_REGEN_PER_10MIN;
+        $energy = min(ENERGY_MAX, $energy + $gained);
+        $pdo->prepare("UPDATE local_users SET energy = ?, energy_updated_at = NOW() WHERE id = ?")
+            ->execute([$energy, $userId]);
+    }
+
+    $nextAt = null;
+    if ($energy < ENERGY_MAX) {
+        $nextAt = date('c', time() + (600 - $elapsed % 600));
+    }
+
+    return ['current' => $energy, 'max' => ENERGY_MAX, 'next_energy_at' => $nextAt];
+}
+
+/** À appeler dans une transaction avec la ligne user verrouillée. */
+function energyAdd(PDO $pdo, int $userId, int $amount): void
+{
+    $e = energyGet($pdo, $userId, true);
+    if ($e === null) return;
+    $new = min(ENERGY_MAX, $e['current'] + $amount);
+    $pdo->prepare("UPDATE local_users SET energy = ?, energy_updated_at = NOW() WHERE id = ?")
+        ->execute([$new, $userId]);
+}
+
+/** À appeler dans une transaction avec la ligne user verrouillée. False si solde insuffisant. */
+function energySpend(PDO $pdo, int $userId, int $cost): bool
+{
+    $e = energyGet($pdo, $userId, true);
+    if ($e === null || $e['current'] < $cost) {
+        return false;
+    }
+    $pdo->prepare("UPDATE local_users SET energy = ?, energy_updated_at = NOW() WHERE id = ?")
+        ->execute([$e['current'] - $cost, $userId]);
+    return true;
 }
