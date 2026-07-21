@@ -110,6 +110,17 @@ curl_setopt_array($ch, [CURLOPT_CUSTOMREQUEST => 'DELETE', CURLOPT_RETURNTRANSFE
 curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
 check('DELETE cadeau → 200', $code === 200, (string)$code);
 
+// 10. Ville propre ++ : compteur global + podium des 3 meilleurs nettoyeurs
+$r = api('GET', '/objects?lat=49.1081&lng=-0.7658&city=livry', null, $token);
+$total = $r['json']['data']['city_collected_total'] ?? null;
+check('compteur ville présent (>=1)', is_int($total) && $total >= 1, json_encode($total));
+$top = $r['json']['data']['top_cleaners'] ?? null;
+check('podium présent (1-3 entrées)', is_array($top) && count($top) >= 1 && count($top) <= 3, json_encode($top));
+check('forme podium', isset($top[0]['display_name'], $top[0]['count']), json_encode($top[0] ?? null));
+// Le joueur de test (display_name null → préfixe email) doit être anonymisé
+$names = array_column($top, 'display_name');
+check('anonymisation email-like', !in_array('objects-test-' . '', $names, true) && !str_contains(implode(',', $names), '@'), json_encode($names));
+
 // Cleanup
 $pdo->prepare("DELETE FROM local_object_pickups WHERE user_id = ?")->execute([$userId]);
 $pdo->prepare("DELETE FROM local_user_quests WHERE user_id = ?")->execute([$userId]);

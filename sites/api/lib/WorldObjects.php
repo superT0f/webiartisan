@@ -49,6 +49,49 @@ function worldobjects_cleanliness(PDO $pdo, string $city): int
     return max(0, 100 - ((int)$stmt->fetchColumn()) * 2);
 }
 
+/** Total d'objets ramassés dans la ville (toutes périodes, tous types). */
+function worldobjects_collected_total(PDO $pdo, string $city): int
+{
+    $stmt = $pdo->prepare("
+        SELECT COUNT(*)
+        FROM local_object_pickups p
+        JOIN local_world_objects o ON o.id = p.object_id
+        WHERE o.city = ?
+    ");
+    $stmt->execute([$city]);
+    return (int)$stmt->fetchColumn();
+}
+
+/**
+ * Podium public des 3 meilleurs nettoyeurs de la ville.
+ * Anonymisation identique à /gamification/:id/xp : un display_name vide ou
+ * égal au préfixe email devient « Utilisateur ».
+ */
+function worldobjects_top_cleaners(PDO $pdo, string $city): array
+{
+    $stmt = $pdo->prepare("
+        SELECT u.display_name, u.email, COUNT(*) AS n
+        FROM local_object_pickups p
+        JOIN local_world_objects o ON o.id = p.object_id
+        JOIN local_users u ON u.id = p.user_id
+        WHERE o.city = ?
+        GROUP BY p.user_id
+        ORDER BY n DESC, p.user_id ASC
+        LIMIT 3
+    ");
+    $stmt->execute([$city]);
+    $top = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $name = $row['display_name'];
+        $emailLocal = strstr((string)$row['email'], '@', true);
+        if (empty($name) || ($emailLocal !== false && $name === $emailLocal)) {
+            $name = 'Utilisateur';
+        }
+        $top[] = ['display_name' => $name, 'count' => (int)$row['n']];
+    }
+    return $top;
+}
+
 function worldobjects_random_type(): string
 {
     $total = 0;

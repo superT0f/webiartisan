@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isMapTilerKey, terrainTilesUrl, useMapStyle } from '../useMapStyle.js'
+import { isMapTilerKey, useMapStyle } from '../useMapStyle.js'
 
 describe('isMapTilerKey', () => {
   it('faux sans clé', () => {
@@ -24,11 +24,5 @@ describe('useMapStyle', () => {
   it('fallback raster OSM sans clé', () => {
     const style = useMapStyle(undefined)
     expect(style.sources.osm.type).toBe('raster')
-  })
-})
-
-describe('terrainTilesUrl', () => {
-  it('URL terrain-rgb avec clé', () => {
-    expect(terrainTilesUrl('abc123')).toBe('https://api.maptiler.com/tiles/terrain-rgb-v2/tiles.json?key=abc123')
   })
 })

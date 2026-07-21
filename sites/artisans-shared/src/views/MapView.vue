@@ -6,6 +6,7 @@ import MapWeatherBadge from '../components/MapWeatherBadge.vue'
 import ActionButton from '../components/ActionButton.vue'
 import EnergyBar from '../components/EnergyBar.vue'
 import QuestsPanel from '../components/QuestsPanel.vue'
+import CleanCityPanel from '../components/CleanCityPanel.vue'
 import GameOverlay from '../components/GameOverlay.vue'
 import AuthForm from '../components/AuthForm.vue'
 import GameRenderer from '../components/GameRenderer.vue'
@@ -46,12 +47,13 @@ const effectivePosition = computed(() => mockPosition.value || position.value)
 const statusTargets = ref([])
 const checkinLoading = ref(false)
 const overlay = ref(null) // null | 'coupon' | 'spin' | 'auth'
-const { objects: worldObjects, cityCleanliness, fetchNearby, removeObject } = useWorldObjects()
+const { objects: worldObjects, cityCleanliness, cityCollectedTotal, topCleaners, fetchNearby, removeObject } = useWorldObjects()
 const { setEnergy } = useEnergy()
 const pickupLoading = ref(false)
 const quests = ref([])
 const questsOpen = ref(false)
 const questClaiming = ref(false)
+const cleanPanelOpen = ref(false)
 const unclaimedCount = computed(() => quests.value.filter(q => q.completed && !q.claimed).length)
 
 // Bascule 2D/3D (spike carte immersive) — préférence persistée
@@ -468,7 +470,17 @@ onUnmounted(() => {
       {{ is3D ? '🗺️ 2D' : '🏙️ 3D' }}
     </button>
 
-    <div v-if="cityCleanliness !== null" class="cleanliness-chip card">🌿 Ville propre : {{ cityCleanliness }} %</div>
+    <button v-if="cityCleanliness !== null" type="button" class="cleanliness-chip card" @click="cleanPanelOpen = !cleanPanelOpen">
+      🌿 {{ cityCleanliness }} % · 🗑️ {{ cityCollectedTotal }}
+    </button>
+
+    <CleanCityPanel
+      :cleanliness="cityCleanliness ?? 100"
+      :total="cityCollectedTotal"
+      :top-cleaners="topCleaners"
+      :open="cleanPanelOpen"
+      @close="cleanPanelOpen = false"
+    />
 
     <QuestsPanel :quests="quests" :open="questsOpen" :claiming="questClaiming" @close="questsOpen = false" @claim="onClaimQuest" />
 
@@ -588,8 +600,10 @@ onUnmounted(() => {
   left: 12px;
   z-index: 15;
   padding: 6px 12px;
+  border: none;
   border-radius: 999px;
   font-size: 0.8rem;
+  cursor: pointer;
 }
 
 @media (max-width: 600px) {

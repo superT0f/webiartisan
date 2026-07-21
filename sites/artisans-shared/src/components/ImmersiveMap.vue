@@ -2,7 +2,7 @@
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { Map, NavigationControl, GeolocateControl, Marker, Popup } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { useMapStyle, isMapTilerKey, terrainTilesUrl } from '../composables/useMapStyle.js'
+import { useMapStyle, isMapTilerKey } from '../composables/useMapStyle.js'
 import { escapeHtml } from '@/utils/escapeHtml.js'
 
 const props = defineProps({
@@ -52,8 +52,8 @@ onMounted(async () => {
 })
 
 /**
- * Prépare la 3D (bâtiments + terrain) si le style est vectoriel (clé MapTiler).
- * Les couches sont ajoutées masquées : c'est set3D(true) qui les active.
+ * Prépare la 3D (bâtiments extrudés) si le style est vectoriel (clé MapTiler).
+ * La couche est ajoutée masquée : c'est set3D(true) qui l'active.
  */
 function setup3D(key) {
   if (!isMapTilerKey(key) || !map.value) return
@@ -66,7 +66,7 @@ function setup3D(key) {
     type: 'fill-extrusion',
     source: vectorSourceId,
     'source-layer': 'building',
-    minzoom: 14,
+    minzoom: 15,
     layout: { visibility: 'none' },
     paint: {
       'fill-extrusion-color': '#d6cfc4',
@@ -75,17 +75,19 @@ function setup3D(key) {
       'fill-extrusion-opacity': 0.85
     }
   })
-  map.value.addSource('terrain-dem', { type: 'raster-dem', url: terrainTilesUrl(key) })
   has3D.value = true
 }
 
-/** Bascule 2D/3D : bâtiments extrudés, terrain, caméra inclinée à 55°. */
+/**
+ * Bascule 2D/3D : bâtiments extrudés + caméra inclinée à 45°.
+ * Pas de terrain : toutes les villes sont en zone plate, le raster-dem
+ * coûte du GPU sans rendu visible (mesuré au test terrain).
+ */
 function set3D(enabled) {
   if (!map.value || !has3D.value || !map.value.getLayer('buildings-3d')) return
   is3D.value = enabled
   map.value.setLayoutProperty('buildings-3d', 'visibility', enabled ? 'visible' : 'none')
-  map.value.setTerrain(enabled ? { source: 'terrain-dem', exaggeration: 1.3 } : null)
-  map.value.easeTo({ pitch: enabled ? 55 : 0, duration: 800 })
+  map.value.easeTo({ pitch: enabled ? 45 : 0, duration: 800 })
 }
 
 defineExpose({ set3D, has3D, is3D })

@@ -110,9 +110,11 @@ function objects_list(PDO $pdo): void
     echo json_encode([
         'success' => true,
         'data'    => [
-            'objects'          => $objects,
-            'energy'           => energyGet($pdo, (int)$user['id']),
-            'city_cleanliness' => worldobjects_cleanliness($pdo, $city),
+            'objects'              => $objects,
+            'energy'               => energyGet($pdo, (int)$user['id']),
+            'city_cleanliness'     => worldobjects_cleanliness($pdo, $city),
+            'city_collected_total' => worldobjects_collected_total($pdo, $city),
+            'top_cleaners'         => worldobjects_top_cleaners($pdo, $city),
         ],
     ]);
 }
