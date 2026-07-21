@@ -271,6 +271,18 @@ if ($module === 'checkin') {
     exit;
 }
 
+if ($module === 'objects') {
+    applyRateLimit($pdo, 'public:' . $module);
+    require_once __DIR__ . '/routes/objects.php';
+    exit;
+}
+
+if ($module === 'quests') {
+    applyRateLimit($pdo, 'public:' . $module);
+    require_once __DIR__ . '/routes/quests.php';
+    exit;
+}
+
 if ($module === 'subscription') {
     applyRateLimit($pdo, 'login');
     require_once __DIR__ . '/routes/subscriptions.php';
