@@ -98,6 +98,16 @@
           </section>
 
           <section class="profile-section card">
+            <h2>🗑️ Collecte</h2>
+            <div class="collection-list">
+              <span v-for="(count, type) in user?.collection || {}" :key="type" class="collection-item">
+                {{ collectionEmoji(type) }} ×{{ count }}
+              </span>
+            </div>
+            <p v-if="!Object.keys(user?.collection || {}).length">Aucun objet ramassé pour l'instant. Pars explorer la carte !</p>
+          </section>
+
+          <section class="profile-section card">
             <h2>🚪 Session</h2>
             <button type="button" class="btn btn-outline btn-danger" @click="logout">
               Se déconnecter
@@ -151,6 +161,14 @@ const badgeIcons = {
   chanceux: '🍀',
   generous: '🔗',
   faithful: '🔥',
+  premier_ramassage: '🧤',
+  eco_warrior: '🌿',
+  chasseur_tresor: '💎',
+}
+
+function collectionEmoji(type) {
+  const icons = { dechet: '🗑️', canette: '🍾', papier: '📰', tresor: '💎', cadeau_artisan: '🎁' }
+  return icons[type] || '❓'
 }
 
 function goToCharacter() {
@@ -348,6 +366,8 @@ onUnmounted(() => {
 .form-message.error { background: #fdecea; color: #c5221f; }
 
 .badges-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.collection-list { display: flex; flex-wrap: wrap; gap: 10px; }
+.collection-item { background: #f1f5f9; border-radius: 999px; padding: 6px 12px; font-size: 0.9rem; }
 .badge { background: var(--c-text); color: #fff; padding: 6px 12px; border-radius: 20px; font-size: 13px; }
 
 .btn-danger { border-color: #b71c1c; color: #b71c1c; }
