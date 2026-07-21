@@ -10,6 +10,7 @@ const props = defineProps({
   zoom: { type: Number, default: 14 },
   artisans: { type: Array, default: () => [] },
   pois: { type: Array, default: () => [] },
+  objects: { type: Array, default: () => [] },
   userPosition: { type: Object, default: null },
   halo: { type: Boolean, default: false }
 })
@@ -114,6 +115,7 @@ onUnmounted(() => {
 
 watch(() => props.artisans, renderMarkers, { deep: true })
 watch(() => props.pois, renderMarkers, { deep: true })
+watch(() => props.objects, renderMarkers, { deep: true })
 
 function renderMarkers() {
   if (!map.value) return
@@ -175,6 +177,27 @@ function renderMarkers() {
       .addTo(map.value)
     markers.push(marker)
   })
+
+  props.objects.forEach(o => {
+    if (!o.lat || !o.lng) return
+    const el = document.createElement('div')
+    el.className = `object-marker object-marker--${o.type}`
+    el.innerHTML = `<span>${objectIcon(o.type)}</span>`
+
+    const popup = new Popup({ offset: 12 }).setHTML(
+      `<div class="map-popup object-popup">
+        <strong>${objectIcon(o.type)} ${escapeHtml(o.label)}</strong>
+        <span class="popup-type">+${o.xp} XP${o.energy_cost > 0 ? ` · ⚡${o.energy_cost}` : ' · gratuit'}</span>
+        <span class="popup-address">${o.distance_m} m${o.distance_m <= 50 ? ' — à portée !' : ''}</span>
+      </div>`
+    )
+
+    const marker = new Marker({ element: el, anchor: 'center' })
+      .setLngLat([parseFloat(o.lng), parseFloat(o.lat)])
+      .setPopup(popup)
+      .addTo(map.value)
+    markers.push(marker)
+  })
 }
 
 function formatSchedules(schedules) {
@@ -205,6 +228,17 @@ function poiIcon(type) {
     parc: '🌳', eglise: '⛪', autre: '📍'
   }
   return icons[type] || '📍'
+}
+
+function objectIcon(type) {
+  const icons = {
+    dechet: '🗑️',
+    canette: '🍾',
+    papier: '📰',
+    tresor: '💎',
+    cadeau_artisan: '🎁'
+  }
+  return icons[type] || '❓'
 }
 </script>
 
@@ -258,6 +292,28 @@ function poiIcon(type) {
 }
 :deep(.poi-marker span) {
   font-size: 1rem;
+}
+:deep(.object-marker) {
+  width: 30px;
+  height: 30px;
+  background: rgba(255,255,255,0.92);
+  border: 2px solid #d4a017;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  cursor: pointer;
+}
+:deep(.object-marker span) { font-size: 1rem; }
+:deep(.object-marker--tresor) {
+  border-color: #7c3aed;
+  animation: treasure-pulse 1.6s ease-in-out infinite;
+}
+:deep(.object-marker--cadeau_artisan) { border-color: #e11d48; }
+@keyframes treasure-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(124,58,237,0.5); }
+  50% { transform: scale(1.15); box-shadow: 0 0 0 8px rgba(124,58,237,0); }
 }
 :deep(.user-location-marker) {
   width: 16px;
