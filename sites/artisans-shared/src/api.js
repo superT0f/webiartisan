@@ -1048,3 +1048,64 @@ export async function getCheckinStatus(lat, lng, options = {}) {
     signal: options.signal,
   }, 'Impossible de charger les points à proximité.')
 }
+
+
+// ------------------------------------------------------------------
+// Objets du monde (gamification carte)
+// ------------------------------------------------------------------
+
+export async function getWorldObjects(lat, lng, options = {}) {
+  return requestJson(`${API_BASE}/objects?lat=${lat}&lng=${lng}&city=${CITY_SLUG}`, {
+    headers: { ...userHeaders() },
+    signal: options.signal,
+  }, 'Impossible de charger les objets à proximité.')
+}
+
+export async function pickupObject(id, lat, lng) {
+  return requestJson(`${API_BASE}/objects/${id}/pickup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...userHeaders() },
+    body: JSON.stringify({ lat, lng }),
+  }, 'Ramassage impossible.')
+}
+
+export async function getQuestsToday() {
+  return requestJson(`${API_BASE}/quests/today`, {
+    headers: { ...userHeaders() },
+  }, 'Impossible de charger les quêtes du jour.')
+}
+
+export async function claimQuest(code) {
+  return requestJson(`${API_BASE}/quests/${code}/claim`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...userHeaders() },
+    body: JSON.stringify({}),
+  }, 'Récupération impossible.')
+}
+
+// ------------------------------------------------------------------
+// Cadeaux artisans (plan premium)
+// ------------------------------------------------------------------
+
+export async function fetchMyGifts(token) {
+  const res = await fetch(`${API_BASE}/objects/mine`, {
+    headers: { 'X-Artisan-Token': token },
+  })
+  if (!res.ok) throw new Error('Erreur chargement des cadeaux')
+  return res.json()
+}
+
+export async function createGift(token, lat, lng) {
+  return requestJson(`${API_BASE}/objects`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Artisan-Token': token },
+    body: JSON.stringify({ lat, lng }),
+  }, 'Impossible de placer le cadeau.')
+}
+
+export async function deleteGift(token, id) {
+  return requestJson(`${API_BASE}/objects/${id}`, {
+    method: 'DELETE',
+    headers: { 'X-Artisan-Token': token },
+  }, 'Suppression impossible.')
+}
