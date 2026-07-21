@@ -3,7 +3,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import ImmersiveMap from '../components/ImmersiveMap.vue'
 import ArtisanSheet from '../components/ArtisanSheet.vue'
 import MapWeatherBadge from '../components/MapWeatherBadge.vue'
-import CheckinButton from '../components/CheckinButton.vue'
+import ActionButton from '../components/ActionButton.vue'
 import GameOverlay from '../components/GameOverlay.vue'
 import AuthForm from '../components/AuthForm.vue'
 import GameRenderer from '../components/GameRenderer.vue'
@@ -15,10 +15,14 @@ import {
   postCheckin, getCheckinStatus, postMessageToFlutter,
   haptic, shareText,
   CITY_LAT, CITY_LNG, CITY_NAME,
+  pickupObject,
 } from '../api.js'
 import { useWeather } from '../composables/useWeather.js'
 import { useGeolocation, haversineM } from '../composables/useGeolocation.js'
 import { useGamification } from '../composables/useGamification.js'
+import { useWorldObjects } from '../composables/useWorldObjects.js'
+import { useEnergy } from '../composables/useEnergy.js'
+import { pickMapAction } from '../utils/pickMapAction.js'
 
 const artisans = ref([])
 const pois = ref([])
@@ -39,6 +43,9 @@ const effectivePosition = computed(() => mockPosition.value || position.value)
 const statusTargets = ref([])
 const checkinLoading = ref(false)
 const overlay = ref(null) // null | 'coupon' | 'spin' | 'auth'
+const { objects: worldObjects, cityCleanliness, fetchNearby, removeObject } = useWorldObjects()
+const { setEnergy } = useEnergy()
+const pickupLoading = ref(false)
 
 const authenticated = computed(() => !!userToken.value)
 
@@ -58,6 +65,7 @@ const selectedGame = computed(() => {
 
 // Nearest in-range point (server sorts by distance) — drives the floating button
 const nearestTarget = computed(() => statusTargets.value[0] || null)
+const fabAction = computed(() => pickMapAction(worldObjects.value, nearestTarget.value))
 
 // Check-in state for the artisan shown in the sheet
 const selectedCheckin = computed(() => {
@@ -99,6 +107,9 @@ async function refreshStatus() {
   if (!effectivePosition.value) return
   const res = await getCheckinStatus(effectivePosition.value.latitude, effectivePosition.value.longitude)
   if (res.success) statusTargets.value = res.data || []
+  if (authenticated.value) {
+    await fetchNearby(effectivePosition.value.latitude, effectivePosition.value.longitude)
+  }
 }
 
 async function doCheckin(targetType, targetId, retried = false) {
@@ -139,6 +150,9 @@ async function doCheckin(targetType, targetId, retried = false) {
       showToast('Niveau supérieur !')
     }
     for (const b of res.data.new_badges || []) showToast(`Badge débloqué : ${b.name}`)
+    if (res.data.energy_bonus) showToast(`+${res.data.energy_bonus} ⚡ énergie`)
+    if (res.data.energy) setEnergy(res.data.energy)
+    for (const q of res.data.quests_completed || []) showToast(`Quête terminée : ${q.label}`)
     await refreshStatus()
   } else if (res.status === 401) {
     // Session consommateur invalide : tenter le pont artisan → joueur une fois
@@ -159,8 +173,65 @@ async function doCheckin(targetType, targetId, retried = false) {
   }
 }
 
-function onFabCheckin(target) {
-  doCheckin(target.target_type, target.target_id)
+async function doPickup(object, retried = false) {
+  if (!authenticated.value) {
+    const artisanToken = getArtisanToken()
+    if (!retried && artisanToken) {
+      await bridgeConsumerIfNeeded(artisanToken)
+      if (authenticated.value) return doPickup(object, true)
+    }
+    overlay.value = 'auth'
+    return
+  }
+  if (!effectivePosition.value) {
+    showToast('Position indisponible')
+    return
+  }
+  pickupLoading.value = true
+  if (!mockPosition.value) {
+    await refreshPosition()
+  }
+  const res = await pickupObject(object.id, effectivePosition.value.latitude, effectivePosition.value.longitude)
+  pickupLoading.value = false
+
+  if (res.success) {
+    haptic('medium')
+    showToast(`+${res.data.xp_awarded} XP`)
+    removeObject(object.id)
+    setEnergy(res.data.energy)
+    if (res.data.level_up) {
+      haptic('heavy')
+      showToast('Niveau supérieur !')
+    }
+    for (const b of res.data.new_badges || []) showToast(`Badge débloqué : ${b.name}`)
+    for (const q of res.data.quests_completed || []) showToast(`Quête terminée : ${q.label}`)
+    await refreshStatus()
+  } else if (res.status === 401) {
+    const artisanToken = getArtisanToken()
+    if (!retried && artisanToken) {
+      await bridgeConsumerIfNeeded(artisanToken, true)
+      if (getUserToken()) return doPickup(object, true)
+    }
+    overlay.value = 'auth'
+  } else if (res.status === 410) {
+    showToast('Trop tard, un voisin l\'a eu !')
+    removeObject(object.id)
+  } else if (res.status === 422 && res.error === 'energy') {
+    setEnergy(res.data?.energy)
+    showToast('Plus d\'énergie — fais un check-in chez un artisan pour en récupérer')
+  } else if (res.status === 422) {
+    showToast(`Trop loin de l'objet (${res.data?.distance_m ?? '?'} m, 50 m max)`)
+  } else {
+    showToast(res.error || 'Ramassage impossible')
+  }
+}
+
+function onFabAct(action) {
+  if (action.kind === 'pickup') {
+    doPickup(action.object)
+  } else {
+    doCheckin(action.target.target_type, action.target.target_id)
+  }
 }
 
 function onSheetCheckin() {
@@ -313,6 +384,7 @@ onUnmounted(() => {
     <ImmersiveMap
       :artisans="artisans"
       :pois="pois"
+      :objects="worldObjects"
       :center="[CITY_LNG, CITY_LAT]"
       :user-position="effectivePosition"
       :halo="isAdmin && adminHalo"
@@ -337,7 +409,7 @@ onUnmounted(() => {
 
     <MapWeatherBadge :weather="weather" />
 
-    <CheckinButton :target="nearestTarget" :loading="checkinLoading" @checkin="onFabCheckin" />
+    <ActionButton :action="fabAction" :loading="checkinLoading || pickupLoading" @act="onFabAct" />
 
     <ArtisanSheet
       :artisan="selected"
