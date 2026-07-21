@@ -103,13 +103,35 @@
         </ul>
         <p v-else class="text-muted">Aucun jeu configuré.</p>
       </section>
+
+      <section class="dashboard-section card">
+        <div class="section-title">
+          <h2>Cadeaux sur la carte 🎁</h2>
+          <span v-if="!isPremium" class="premium-note">Réservé au plan premium</span>
+        </div>
+        <p>Place jusqu'à 3 cadeaux autour de ta boutique : les joueurs les ramassent (+15 XP, sans dépenser d'énergie) et découvrent ton enseigne.</p>
+        <ul v-if="gifts.length" class="gifts-list">
+          <li v-for="g in gifts" :key="g.id">
+            🎁 #{{ g.id }} — {{ g.status === 'active' ? 'actif' : g.status }}
+            <button type="button" class="btn btn-outline btn-sm" @click="removeGift(g.id)">Retirer</button>
+          </li>
+        </ul>
+        <p v-else>Aucun cadeau placé pour l'instant.</p>
+        <button
+          v-if="isPremium"
+          type="button"
+          class="btn btn-primary"
+          :disabled="giftSaving || gifts.filter(g => g.status === 'active').length >= 3"
+          @click="placeGift"
+        >{{ giftSaving ? 'Placement…' : '🎁 Placer un cadeau à ma boutique' }}</button>
+      </section>
     </template>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { fetchGameTypes, fetchMyGames, createArtisanGame, updateArtisanGame, deleteArtisanGame, getSubscriptionStatus, createSubscriptionCheckout, getArtisanToken } from '../../api.js'
+import { fetchGameTypes, fetchMyGames, createArtisanGame, updateArtisanGame, deleteArtisanGame, getSubscriptionStatus, createSubscriptionCheckout, getArtisanToken, fetchMyGifts, createGift, deleteGift, fetchMe } from '../../api.js'
 import FreemiumLimitBanner from '../../components/FreemiumLimitBanner.vue'
 
 const props = defineProps({
@@ -138,20 +160,31 @@ const isPremium = computed(() => subscriptionStatus.value?.plan === 'premium')
 const availableTypes = computed(() => types.value.filter(t => t.key === 'coupon'))
 const activeCount = computed(() => games.value.filter(g => g.is_active).length)
 
+const gifts = ref([])
+const giftSaving = ref(false)
+const myPosition = ref(null)
+
 async function load() {
   if (!artisanToken.value) return
   error.value = ''
   loadingSubscription.value = true
   try {
-    const [tRes, gRes, sRes] = await Promise.all([
+    const [tRes, gRes, sRes, giftsRes, meRes] = await Promise.all([
       fetchGameTypes(),
       fetchMyGames(artisanToken.value),
       getSubscriptionStatus(),
+      fetchMyGifts(artisanToken.value),
+      fetchMe(artisanToken.value),
     ])
     types.value = tRes.data || []
     games.value = gRes.data || []
     if (sRes.success && sRes.data) {
       subscriptionStatus.value = sRes.data
+    }
+    if (giftsRes?.success) gifts.value = giftsRes.data || []
+    // fetchMe → enveloppe requestJson : res.data contient l'artisan (latitude/longitude incluses)
+    if (meRes?.data?.latitude && meRes?.data?.longitude) {
+      myPosition.value = { lat: meRes.data.latitude, lng: meRes.data.longitude }
     }
     if (availableTypes.value.length && !availableTypes.value.find(t => t.key === newGame.value.game_type_key)) {
       newGame.value.game_type_key = availableTypes.value[0].key
@@ -161,6 +194,35 @@ async function load() {
     error.value = 'Impossible de charger vos jeux.'
   } finally {
     loadingSubscription.value = false
+  }
+}
+
+async function placeGift() {
+  if (!myPosition.value) {
+    error.value = 'Ta boutique n\'a pas de coordonnées GPS.'
+    return
+  }
+  giftSaving.value = true
+  error.value = ''
+  success.value = ''
+  const res = await createGift(artisanToken.value, myPosition.value.lat, myPosition.value.lng)
+  if (res.success) {
+    success.value = 'Cadeau placé sur la carte ! 🎁'
+    const gRes = await fetchMyGifts(artisanToken.value)
+    if (gRes?.success) gifts.value = gRes.data || []
+  } else {
+    error.value = res.error || 'Impossible de placer le cadeau'
+  }
+  giftSaving.value = false
+}
+
+async function removeGift(id) {
+  error.value = ''
+  const res = await deleteGift(artisanToken.value, id)
+  if (res.success) {
+    gifts.value = gifts.value.filter(g => g.id !== id)
+  } else {
+    error.value = res.error || 'Suppression impossible'
   }
 }
 
@@ -354,6 +416,9 @@ onMounted(load)
   font-size: 0.8rem;
   color: var(--c-text-3);
 }
+
+.gifts-list { list-style: none; padding: 0; margin: 12px 0; }
+.gifts-list li { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-top: 1px solid #e2e8f0; }
 
 .upgrade-cta {
   display: flex;
