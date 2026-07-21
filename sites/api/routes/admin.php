@@ -168,13 +168,9 @@ function admin_reset_artisan_password(PDO $pdo, int $id): void
         return;
     }
 
-    $token = bin2hex(random_bytes(32));
-    $tokenHash = password_hash($token, PASSWORD_DEFAULT);
-    $tokenLookup = hash('sha256', $token);
-    $exp = date('Y-m-d H:i:s', strtotime('+1 hour'));
-
-    $pdo->prepare("UPDATE local_artisans SET auth_token_hash = ?, auth_token_lookup = ?, auth_token_exp = ?, auth_token = NULL WHERE id = ?")
-        ->execute([$tokenHash, $tokenLookup, $exp, $id]);
+    // Session dédiée au lien (1 h) — n'invalide plus les sessions existantes
+    require_once __DIR__ . '/../lib/ArtisanAuth.php';
+    $token = artisan_create_session($pdo, $id, false, 3600);
 
     $config = getAppConfig();
     $fromEmail = $config['mail_from'] ?? 'noreply@webiartisan.prigent.tech';

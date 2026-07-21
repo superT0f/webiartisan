@@ -1,49 +1,12 @@
 <template>
   <div class="container section dashboard">
-    <!-- État non connecté : formulaire de lien magique ou mot de passe -->
+    <!-- État non connecté : connexion par mot de passe
+         (lien magique désactivé temporairement — mails souvent en spam) -->
     <template v-if="!token">
       <div class="auth-card">
         <h1>Espace artisan</h1>
 
-        <div class="auth-tabs" role="tablist" aria-label="Méthode de connexion">
-          <button
-            type="button"
-            role="tab"
-            :class="{ active: authTab === 'magic' }"
-            @click="authTab = 'magic'"
-          >Lien magique</button>
-          <button
-            type="button"
-            role="tab"
-            :class="{ active: authTab === 'password' }"
-            @click="authTab = 'password'"
-          >Mot de passe</button>
-        </div>
-
-        <div v-show="authTab === 'magic'" class="auth-form">
-          <p class="text-muted">Recevez un lien de connexion sécurisé par email.</p>
-          <form @submit.prevent="sendMagicLink">
-            <label for="email">Adresse email</label>
-            <input
-              id="email"
-              v-model="email"
-              type="email"
-              class="form-input"
-              placeholder="votre@email.fr"
-              required
-              :disabled="sending"
-            />
-            <label class="form-checkbox">
-              <input v-model="rememberMe" type="checkbox" :disabled="sending" />
-              Rester connecté sur cet appareil
-            </label>
-            <button type="submit" class="btn btn-primary" :disabled="sending || !email">
-              {{ sending ? 'Envoi…' : 'Recevoir mon lien' }}
-            </button>
-          </form>
-        </div>
-
-        <div v-show="authTab === 'password'" class="auth-form">
+        <div class="auth-form">
           <p class="text-muted">Connectez-vous avec votre email et mot de passe.</p>
           <form @submit.prevent="submitPasswordLogin">
             <label for="login-email">Adresse email</label>
@@ -313,7 +276,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
-import { requestMagicLink, loginArtisan, fetchMe, updateMe, getMyProspects, getArtisanToken, getUserToken, removeUserToken, fetchUserMe, postMessageToFlutter, setArtisanToken, removeArtisanToken, fetchArtisanConsumerToken, setUserToken, logoutArtisan, getSubscriptionStatus, createSubscriptionCheckout, createSubscriptionPortal, changeArtisanPassword } from '../api.js'
+import { loginArtisan, fetchMe, updateMe, getMyProspects, getArtisanToken, getUserToken, removeUserToken, fetchUserMe, postMessageToFlutter, setArtisanToken, removeArtisanToken, fetchArtisanConsumerToken, setUserToken, logoutArtisan, getSubscriptionStatus, createSubscriptionCheckout, createSubscriptionPortal, changeArtisanPassword } from '../api.js'
 
 const router = useRouter()
 
@@ -321,7 +284,6 @@ const token = ref(getArtisanToken())
 const email = ref('')
 const password = ref('')
 const rememberMe = ref(true)
-const authTab = ref('magic')
 const artisan = ref(null)
 const form = reactive({
   company_name: '',
@@ -378,27 +340,6 @@ function abortAllPending() {
 function setMessage(text, type = 'info') {
   message.value = text
   messageType.value = type
-}
-
-async function sendMagicLink() {
-  sending.value = true
-  message.value = ''
-  const signal = newAbortSignal()
-  try {
-    const res = await requestMagicLink(email.value, rememberMe.value, { signal })
-    if (!isMounted) return
-    if (res.success) {
-      setMessage(res.data?.message || 'Si votre email est valide, vous recevrez un lien de connexion.', 'success')
-    } else {
-      setMessage(res.error || 'Erreur lors de l\'envoi. Veuillez réessayer.', 'error')
-    }
-  } catch (e) {
-    if (!isMounted) return
-    setMessage(e.message || 'Erreur lors de l\'envoi. Veuillez réessayer.', 'error')
-  } finally {
-    cleanupSignal(signal)
-    if (isMounted) sending.value = false
-  }
 }
 
 async function submitPasswordLogin() {

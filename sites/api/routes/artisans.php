@@ -661,14 +661,8 @@ function artisan_login(PDO $pdo, array $body): void
 
     $rememberMe = !empty($body['rememberMe']);
 
-    // Générer un token simple (JWT serait mieux — à améliorer)
-    $token = bin2hex(random_bytes(32));
-    $tokenHash = password_hash($token, PASSWORD_DEFAULT);
-    $tokenLookup = hash('sha256', $token);
-    $exp   = date('Y-m-d H:i:s', $rememberMe ? strtotime('+365 days') : strtotime('+30 days'));
-
-    $pdo->prepare("UPDATE local_artisans SET auth_token_hash = ?, auth_token_lookup = ?, auth_token_exp = ?, auth_token = NULL WHERE id = ?")
-        ->execute([$tokenHash, $tokenLookup, $exp, $artisan['id']]);
+    // Session multi-appareils (migration 042) : ne tue plus les autres sessions
+    $token = artisan_create_session($pdo, (int)$artisan['id'], $rememberMe);
 
     // Garantir un compte consommateur lié et créer sa session
     $userId = artisan_ensure_user($pdo, (int)$artisan['id'], $email, $artisan['company_name']);
@@ -717,13 +711,9 @@ function artisan_magic_link(PDO $pdo, array $body): void
         return;
     }
 
-    $token = bin2hex(random_bytes(32));
-    $tokenHash = password_hash($token, PASSWORD_DEFAULT);
-    $tokenLookup = hash('sha256', $token);
-    $exp   = date('Y-m-d H:i:s', $rememberMe ? strtotime('+365 days') : strtotime('+1 hour'));
-
-    $pdo->prepare("UPDATE local_artisans SET auth_token_hash = ?, auth_token_lookup = ?, auth_token_exp = ?, auth_token = NULL WHERE id = ?")
-        ->execute([$tokenHash, $tokenLookup, $exp, $artisan['id']]);
+    // Session dédiée au lien (1 h sans remember, 365 j avec) — n'invalide
+    // plus les sessions existantes (migration 042)
+    $token = artisan_create_session($pdo, (int)$artisan['id'], $rememberMe, $rememberMe ? null : 3600);
 
     $portalUrl = artisan_portal_url();
     $link      = rtrim($portalUrl, '/') . '/espace?token=' . urlencode($token) . ($rememberMe ? '&rememberMe=1' : '');
@@ -826,9 +816,12 @@ function artisan_consumer_token(PDO $pdo): void
 
 function artisan_logout(PDO $pdo): void
 {
-    $artisan = artisan_require_auth($pdo);
-    $pdo->prepare("UPDATE local_artisans SET auth_token_hash = NULL, auth_token_lookup = NULL, auth_token = NULL, auth_token_exp = NULL WHERE id = ?")
-        ->execute([$artisan['id']]);
+    artisan_require_auth($pdo);
+    $token = artisan_get_token();
+    if ($token) {
+        // Détruit uniquement la session courante, pas les autres appareils
+        artisan_destroy_session($pdo, $token);
+    }
     echo json_encode(['success' => true, 'data' => ['message' => 'Déconnecté']]);
 }
 
@@ -1050,7 +1043,13 @@ function artisan_me(PDO $pdo): void
         return;
     }
 
-    $tokenLookup = hash('sha256', $token);
+    $resolved = artisan_resolve_token($pdo, $token);
+    if (!$resolved) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Token invalide ou expiré']);
+        return;
+    }
+
     $stmt = $pdo->prepare("
         SELECT
             a.id, a.company_name, a.description,
@@ -1058,7 +1057,6 @@ function artisan_me(PDO $pdo): void
             a.latitude, a.longitude,
             a.logo_url, a.cover_url,
             a.is_verified, a.is_featured, a.is_admin, a.status,
-            a.auth_token_hash,
             c.slug AS city_slug, c.name AS city_name, c.postal_code,
             cat.slug AS category_slug, cat.name AS category_name,
             cat.icon AS category_icon, cat.color AS category_color,
@@ -1068,18 +1066,12 @@ function artisan_me(PDO $pdo): void
         JOIN local_cities c            ON a.city_id = c.id
         LEFT JOIN local_categories cat ON a.category_id = cat.id
         LEFT JOIN local_reviews r      ON r.artisan_id = a.id AND r.is_approved = 1
-        WHERE a.auth_token_lookup = ?
-          AND a.auth_token_hash IS NOT NULL
-          AND a.auth_token_exp > NOW()
+        WHERE a.id = ?
         GROUP BY a.id
         LIMIT 1
     ");
-    $stmt->execute([$tokenLookup]);
+    $stmt->execute([$resolved['artisan_id']]);
     $artisan = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if ($artisan && !password_verify($token, $artisan['auth_token_hash'])) {
-        $artisan = null;
-    }
 
     if (!$artisan) {
         http_response_code(403);
@@ -1118,26 +1110,13 @@ function artisan_update_me(PDO $pdo, array $body): void
         return;
     }
 
-    $tokenLookup = hash('sha256', $token);
-    $stmt = $pdo->prepare("
-        SELECT id, auth_token_hash FROM local_artisans
-        WHERE auth_token_lookup = ?
-          AND auth_token_hash IS NOT NULL
-          AND auth_token_exp > NOW() AND status = 'active'
-        LIMIT 1
-    ");
-    $stmt->execute([$tokenLookup]);
-    $artisan = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if ($artisan && !password_verify($token, $artisan['auth_token_hash'])) {
-        $artisan = null;
-    }
-
-    if (!$artisan) {
+    $resolved = artisan_resolve_token($pdo, $token);
+    if (!$resolved || $resolved['status'] !== 'active') {
         http_response_code(403);
         echo json_encode(['success' => false, 'error' => 'Token invalide ou expiré']);
         return;
     }
+    $artisan = ['id' => $resolved['artisan_id']];
 
     $allowed = ['company_name', 'description', 'phone', 'website', 'address', 'logo_url', 'cover_url'];
     $updates = [];
@@ -1177,22 +1156,8 @@ function artisan_update(PDO $pdo, int $id, array $body): void
         return;
     }
 
-    $tokenLookup = hash('sha256', $token);
-    $stmt = $pdo->prepare("
-        SELECT id, auth_token_hash FROM local_artisans
-        WHERE id = ? AND auth_token_lookup = ?
-          AND auth_token_hash IS NOT NULL
-          AND auth_token_exp > NOW() AND status = 'active'
-        LIMIT 1
-    ");
-    $stmt->execute([$id, $tokenLookup]);
-    $artisan = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if ($artisan && !password_verify($token, $artisan['auth_token_hash'])) {
-        $artisan = null;
-    }
-
-    if (!$artisan) {
+    $resolved = artisan_resolve_token($pdo, $token);
+    if (!$resolved || $resolved['artisan_id'] !== $id || $resolved['status'] !== 'active') {
         http_response_code(403);
         echo json_encode(['success' => false, 'error' => 'Token invalide ou expiré']);
         return;
