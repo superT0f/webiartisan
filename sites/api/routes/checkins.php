@@ -9,6 +9,7 @@
 
 require_once __DIR__ . '/../lib/UserAuth.php';
 require_once __DIR__ . '/../lib/Gamification.php';
+require_once __DIR__ . '/../lib/Quests.php';
 require_once __DIR__ . '/../lib/AppLogger.php';
 
 const CHECKIN_RANGE_M = 200.0;
@@ -151,6 +152,8 @@ function checkin_create(PDO $pdo, array $body): void
     }
 
     $resourceKey = "{$targetType}:{$targetId}";
+    $questsCompleted = [];
+    $energy = null;
 
     $pdo->beginTransaction();
     try {
@@ -199,6 +202,16 @@ function checkin_create(PDO $pdo, array $body): void
             true
         );
 
+        // Bonus énergie : le check-in restaure +20 ⚡
+        energyAdd($pdo, $userId, ENERGY_PER_CHECKIN);
+
+        // Quête du jour : visite d'artisans
+        if ($targetType === 'artisan') {
+            $q = questsProgress($pdo, $userId, 'visit_2_artisans', 1);
+            if ($q) $questsCompleted[] = $q;
+        }
+        $energy = energyGet($pdo, $userId, true);
+
         $pdo->commit();
         if (function_exists('app_log')) {
             app_log('info', '[CHECKIN] success', ['user_id' => $userId, 'target' => $resourceKey, 'xp' => $xp, 'distance_m' => (int)round($distance)]);
@@ -216,10 +229,13 @@ function checkin_create(PDO $pdo, array $body): void
     echo json_encode([
         'success' => true,
         'data'    => [
-            'xp_awarded'   => $xp,
-            'next_spin_at' => date('c', time() + CHECKIN_RECHARGE_SECONDS),
-            'level_up'     => (bool)($result['level_up'] ?? false),
-            'new_badges'   => $result['new_badges'] ?? [],
+            'xp_awarded'       => $xp,
+            'next_spin_at'     => date('c', time() + CHECKIN_RECHARGE_SECONDS),
+            'level_up'         => (bool)($result['level_up'] ?? false),
+            'new_badges'       => $result['new_badges'] ?? [],
+            'energy_bonus'     => ENERGY_PER_CHECKIN,
+            'energy'           => $energy,
+            'quests_completed' => $questsCompleted,
         ],
     ]);
 }

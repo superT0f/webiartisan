@@ -72,6 +72,18 @@ function gamificationUserProfile(PDO $pdo, int $userId): ?array
 
     $xpNeeded = ((int)$user['level']) * 100;
 
+    $collectionStmt = $pdo->prepare("
+        SELECT object_type, COUNT(*) AS n
+        FROM local_object_pickups
+        WHERE user_id = ?
+        GROUP BY object_type
+    ");
+    $collectionStmt->execute([$userId]);
+    $collection = [];
+    foreach ($collectionStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $collection[$row['object_type']] = (int)$row['n'];
+    }
+
     return [
         'id' => (int)$user['id'],
         'email' => $user['email'],
@@ -86,6 +98,8 @@ function gamificationUserProfile(PDO $pdo, int $userId): ?array
         'badges' => array_map(fn($b) => ['key' => $b['badge_key'], 'name' => BADGES[$b['badge_key']]['name'] ?? $b['badge_key'], 'unlocked_at' => $b['unlocked_at']], $badges),
         'current_streak' => $streak ? (int)$streak['current_streak'] : 0,
         'last_visit_date' => $streak ? $streak['last_visit_date'] : null,
+        'energy' => energyGet($pdo, $userId),
+        'collection' => $collection,
     ];
 }
 
