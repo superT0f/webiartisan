@@ -1,4 +1,4 @@
-.PHONY: help up down migrate seed build dev test-api push-api push-app push-livry build-combs push-combs build-vsd push-vsd deploy-all console console-exec e2e-test e2e-dashboard-dev push-e2e
+.PHONY: help up down migrate seed build dev test-api push-api push-app push-livry build-combs push-combs build-vsd push-vsd deploy-all console console-exec e2e-test e2e-dashboard-dev push-e2e mysql db-apply test-php test-php-all e2e e2e-all
 
 APP_VERSION := $(shell cat .version 2>/dev/null || echo 2.0.1)
 
@@ -21,6 +21,17 @@ help:
 	@echo "  make deploy-all      Build & push Livry, Combs and VSD"
 	@echo "  make console         Open Gandi gPaas emergency console (SSH)"
 	@echo "  make console-exec CMD='...'  Run one command on the emergency console"
+	@echo ""
+	@echo "  — Local dev (docker compose exec, marche sous podman) —"
+	@echo "  make mysql           Shell MySQL interactif (conteneur)"
+	@echo "  make db-apply FILE=sites/api/migrations/042_artisan_sessions.sql"
+	@echo "                       Applique un fichier SQL via le conteneur mysql"
+	@echo "  make test-php FILE=test_objects.php"
+	@echo "                       Lance un test PHP de sites/api/tests"
+	@echo "  make test-php-all    Lance tous les tests sites/api/tests/test_*.php"
+	@echo "  make e2e FILE=game-objects-test.cjs"
+	@echo "                       Lance un test e2e puppeteer (stack + vite dev requis)"
+	@echo "  make e2e-all         Lance les 3 e2e jeu (map, objets, cadeaux)"
 
 up:
 	@docker compose up -d --build
@@ -68,6 +79,33 @@ push-vsd:
 	@VITE_APP_VERSION=$(APP_VERSION) $(MAKE) -C sites/webiartisan-vert-saint-denis push
 
 deploy-all: build push-livry build-combs push-combs build-vsd push-vsd
+
+# --- Local dev (docker compose exec — fonctionne sous podman, pas de client
+# --- mysql/php requis sur l'hôte) -------------------------------------------
+
+mysql: ## Shell MySQL interactif dans le conteneur
+	@docker compose exec mysql mysql -h 127.0.0.1 -uwebiartisan -pwebiartisan_dev webiartisan
+
+db-apply: ## Applique un fichier SQL : make db-apply FILE=sites/api/migrations/XXX.sql
+	@test -n "$(FILE)" || (echo "usage: make db-apply FILE=sites/api/migrations/XXX.sql" && exit 1)
+	@docker compose exec -T mysql mysql -h 127.0.0.1 -uwebiartisan -pwebiartisan_dev webiartisan < $(FILE) && echo "✅ $(FILE) appliqué"
+
+test-php: ## Lance un test PHP : make test-php FILE=test_objects.php
+	@test -n "$(FILE)" || (echo "usage: make test-php FILE=test_objects.php" && exit 1)
+	@docker compose exec -T php php /var/www/api/tests/$(FILE)
+
+test-php-all: ## Lance tous les tests PHP de sites/api/tests
+	@for f in sites/api/tests/test_*.php; do \
+		echo "== $$(basename $$f)"; \
+		docker compose exec -T php php /var/www/api/tests/$$(basename $$f) || exit 1; \
+	done && echo "✅ Tous les tests PHP passent"
+
+e2e: ## Lance un e2e puppeteer (stack + vite dev requis) : make e2e FILE=game-objects-test.cjs
+	@test -n "$(FILE)" || (echo "usage: make e2e FILE=game-objects-test.cjs" && exit 1)
+	@cd e2e && node $(FILE)
+
+e2e-all: ## Lance les 3 e2e jeu (map, objets, cadeaux artisans)
+	@cd e2e && node game-map-test.cjs && node game-objects-test.cjs && node artisan-gifts-test.cjs && echo "✅ Tous les e2e passent"
 
 console:
 	@echo "Admin web (Gandi Simple Hosting):"

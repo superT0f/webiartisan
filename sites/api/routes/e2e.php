@@ -65,7 +65,37 @@ switch ($method) {
         break;
 
     case 'POST':
-        if ($action === 'activate-artisan' && $param !== null && is_numeric($param)) {
+        if ($action === 'prepare-artisan' && $param !== null && is_numeric($param)) {
+            requireE2EAuth();
+            $id = (int) $param;
+            $body = json_decode(file_get_contents('php://input'), true) ?? [];
+
+            try {
+                $stmt = $pdo->prepare('SELECT email FROM local_artisans WHERE id = ?');
+                $stmt->execute([$id]);
+                $email = $stmt->fetchColumn();
+
+                if (!$email || !isTestEmail($email)) {
+                    http_response_code(404);
+                    echo json_encode(['error' => 'Test artisan not found']);
+                    exit;
+                }
+
+                $plan = ($body['plan'] ?? '') === 'premium' ? 'premium' : 'free';
+                $lat = is_numeric($body['lat'] ?? null) ? (float)$body['lat'] : null;
+                $lng = is_numeric($body['lng'] ?? null) ? (float)$body['lng'] : null;
+
+                $pdo->prepare("UPDATE local_artisans SET status = 'active', email_verified = 1, plan = ?, latitude = COALESCE(?, latitude), longitude = COALESCE(?, longitude) WHERE id = ?")
+                    ->execute([$plan, $lat, $lng, $id]);
+
+                app_log('info', '[E2E-PREPARE-ARTISAN] test artisan prepared', ['id' => $id, 'plan' => $plan]);
+                echo json_encode(['ok' => true]);
+            } catch (Throwable $e) {
+                app_log('error', '[E2E-PREPARE-ARTISAN] database error', ['id' => $id, 'error' => $e->getMessage()]);
+                http_response_code(500);
+                echo json_encode(['error' => 'Server error']);
+            }
+        } elseif ($action === 'activate-artisan' && $param !== null && is_numeric($param)) {
             requireE2EAuth();
             $id = (int) $param;
 
