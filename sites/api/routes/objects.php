@@ -80,6 +80,22 @@ function objects_list(PDO $pdo): void
     worldobjects_expire_stale($pdo);
     worldobjects_ensure_density($pdo, $city, $lat, $lng);
 
+    // Garantie admin : toujours un Big Brother à proximité (debug/démo)
+    $adminStmt = $pdo->prepare("SELECT 1 FROM local_artisans WHERE user_id = ? AND is_admin = 1 AND status = 'active' LIMIT 1");
+    $adminStmt->execute([(int)$user['id']]);
+    if ($adminStmt->fetchColumn()) {
+        $bossStmt = $pdo->prepare("
+            SELECT 1 FROM local_world_objects
+            WHERE city = ? AND status = 'active' AND object_type = 'big_brother'
+              AND lat BETWEEN ? AND ? AND lng BETWEEN ? AND ?
+            LIMIT 1
+        ");
+        $bossStmt->execute([$city, $lat - 0.01, $lat + 0.01, $lng - 0.014, $lng + 0.014]);
+        if (!$bossStmt->fetchColumn()) {
+            worldobjects_spawn_boss($pdo, $city, $lat, $lng);
+        }
+    }
+
     // Bounding-box ~1 km (0.01° lat, 0.014° lng à ~49°)
     // Les boss déjà combattus par le joueur sont exclus.
     $stmt = $pdo->prepare("

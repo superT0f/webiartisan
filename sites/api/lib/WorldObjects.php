@@ -22,8 +22,22 @@ const OBJECT_TYPES = [
     'papier'         => ['xp' => 10, 'energy' => 5,  'weight' => 14, 'category' => 'dechet', 'label' => 'Papier'],
     'tresor'         => ['xp' => 50, 'energy' => 10, 'weight' => 6,  'category' => 'tresor', 'label' => 'Trésor'],
     'cadeau_artisan' => ['xp' => 15, 'energy' => 0,  'weight' => 0,  'category' => 'cadeau', 'label' => 'Cadeau'],
-    'big_brother'    => ['xp' => 150, 'energy' => 0, 'weight' => 2,  'category' => 'boss',   'label' => 'Big Brother'],
+    'big_brother'    => ['xp' => 150, 'energy' => 0, 'weight' => 5,  'category' => 'boss',   'label' => 'Big Brother'],
 ];
+
+/** Fait apparaître un Big Brother dans l'anneau 100–500 m (TTL 2 h). */
+function worldobjects_spawn_boss(PDO $pdo, string $city, float $lat, float $lng): int
+{
+    $dist = mt_rand(SPAWN_MIN_RADIUS_M, SPAWN_RADIUS_M);
+    $bearing = deg2rad(mt_rand(0, 359));
+    $dLat = ($dist * cos($bearing)) / 111320.0;
+    $dLng = ($dist * sin($bearing)) / (111320.0 * cos(deg2rad($lat)));
+    $pdo->prepare("
+        INSERT INTO local_world_objects (city, object_type, lat, lng, xp_value, energy_cost, expires_at)
+        VALUES (?, 'big_brother', ?, ?, 150, 0, DATE_ADD(NOW(), INTERVAL 2 HOUR))
+    ")->execute([$city, round($lat + $dLat, 7), round($lng + $dLng, 7)]);
+    return (int)$pdo->lastInsertId();
+}
 
 function worldobjects_distance_m(float $lat1, float $lng1, float $lat2, float $lng2): float
 {

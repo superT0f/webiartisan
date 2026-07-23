@@ -41,6 +41,7 @@ $pdo->prepare("INSERT INTO local_world_objects (city, object_type, lat, lng, xp_
 $bossId = (int)$pdo->lastInsertId();
 
 // 1. Engager le combat
+$xpBaseline = $pdo->query("SELECT level, xp FROM local_users WHERE id = $userId")->fetch(PDO::FETCH_ASSOC);
 $r = api('POST', "/boss/$bossId/fight", ['lat' => 49.1081, 'lng' => -0.7658], $token);
 check('fight 200', $r['status'] === 200, json_encode($r['json']));
 $fightId = (int)($r['json']['data']['fight_id'] ?? 0);
@@ -88,8 +89,6 @@ $r = api('POST', "/boss/fights/$fightId/answer", ['move' => $payload['solution_u
 check('mat solution → round_won', ($r['json']['data']['round_won'] ?? null) === true, json_encode($r['json']));
 
 // 8. Forcer la victoire (boss à 0) : rejouer des quiz jusqu'à la fin
-$xpBeforeWin = (int)$pdo->query("SELECT xp FROM local_users WHERE id = $userId")->fetchColumn();
-$levelBeforeWin = (int)$pdo->query("SELECT level FROM local_users WHERE id = $userId")->fetchColumn();
 for ($i = 0; $i < 4; $i++) {
     $state = api('GET', "/boss/fights/$fightId", null, $token)['json']['data'];
     if (($state['status'] ?? '') !== 'ongoing') break;
@@ -100,10 +99,11 @@ for ($i = 0; $i < 4; $i++) {
 $state = api('GET', "/boss/fights/$fightId", null, $token)['json']['data'];
 check('victoire', ($state['status'] ?? '') === 'won', json_encode($state));
 // XP cumulatif (les niveaux consomment de l'XP : level-up = level*100)
+// Victoire = 3 manches gagnées (75 XP) + bonus (150 XP) quelle que soit l'issue des cartes
 $userFinal = $pdo->query("SELECT level, xp FROM local_users WHERE id = $userId")->fetch(PDO::FETCH_ASSOC);
 $cumul = fn(int $level, int $xp): int => (int)(($level - 1) * $level / 2 * 100) + $xp;
-$gained = $cumul((int)$userFinal['level'], (int)$userFinal['xp']) - $cumul($levelBeforeWin, $xpBeforeWin);
-check('+175 XP (manche + victoire) cumulés', $gained >= 175, "gained=$gained");
+$gained = $cumul((int)$userFinal['level'], (int)$userFinal['xp']) - $cumul((int)$xpBaseline['level'], (int)$xpBaseline['xp']);
+check('XP combat cumulés (>= 225)', $gained >= 225, "gained=$gained");
 
 // 9. Badge brother_slayer débloqué
 $badge = $pdo->query("SELECT 1 FROM local_user_badges WHERE user_id = $userId AND badge_key = 'brother_slayer'")->fetchColumn();
@@ -129,7 +129,28 @@ check('pickup boss → 422 not_pickable', $r['status'] === 422 && ($r['json']['e
 $r = api('POST', "/boss/$boss2Id/fight", ['lat' => 49.15, 'lng' => -0.76], $token);
 check('fight trop loin → 422', $r['status'] === 422 && ($r['json']['error'] ?? '') === 'distance', json_encode($r['json']));
 
+// 14. Garantie admin : un admin voit toujours un boss à proximité
+$adminEmail = 'boss-admin-' . time() . '@example.com';
+api('POST', '/users/register', ['email' => $adminEmail, 'password' => 'Password123!']);
+$r = api('POST', '/users/login', ['email' => $adminEmail, 'password' => 'Password123!']);
+$adminToken = $r['json']['token'] ?? null;
+$adminUserId = (int)$pdo->query("SELECT id FROM local_users WHERE email = '$adminEmail'")->fetchColumn();
+// Lie un compte artisan admin à ce joueur
+$pdo->prepare("INSERT INTO local_artisans (company_name, city_id, category_id, email, phone, status, plan, is_admin, user_id) VALUES ('Admin Boss', 1, 1, ?, '0100000000', 'active', 'free', 1, ?)")
+    ->execute([$adminEmail, $adminUserId]);
+$adminArtisanId = (int)$pdo->lastInsertId();
+// Zone vierge de boss
+$pdo->exec("UPDATE local_world_objects SET status = 'expired' WHERE object_type = 'big_brother'");
+$r = api('GET', '/objects?lat=49.1081&lng=-0.7658&city=livry', null, $adminToken);
+$adminBoss = false;
+foreach ($r['json']['data']['objects'] ?? [] as $o) { if ($o['type'] === 'big_brother') $adminBoss = true; }
+check('admin : un boss apparaît à proximité', $adminBoss === true, json_encode(array_column($r['json']['data']['objects'] ?? [], 'type')));
+
 // Cleanup
+$pdo->prepare("DELETE FROM local_artisans WHERE id = ?")->execute([$adminArtisanId]);
+$pdo->prepare("DELETE FROM local_user_actions WHERE user_id = ?")->execute([$adminUserId]);
+$pdo->prepare("DELETE FROM local_user_cooldowns WHERE user_id = ?")->execute([$adminUserId]);
+$pdo->prepare("DELETE FROM local_users WHERE id = ?")->execute([$adminUserId]);
 $pdo->prepare("DELETE FROM local_boss_fights WHERE user_id = ?")->execute([$userId]);
 $pdo->prepare("DELETE FROM local_boss_fights_live WHERE user_id = ?")->execute([$userId]);
 $pdo->prepare("DELETE FROM local_object_pickups WHERE user_id = ?")->execute([$userId]);
