@@ -13,10 +13,12 @@
       <template v-if="state.status === 'ongoing'">
         <template v-if="!round">
           <h2>Choisis ton arme !</h2>
+          <p v-if="!fightId" class="arena__loading">Connexion au combat…</p>
+          <p v-else-if="errorMessage" class="arena__error">{{ errorMessage }}</p>
           <div class="arena__games">
-            <button type="button" class="btn btn-primary" :disabled="busy" @click="startRound('quiz')">📚 Quiz savoir-faire</button>
-            <button type="button" class="btn btn-primary" :disabled="busy" @click="startRound('mate')">♟️ Mat en 1 coup</button>
-            <button type="button" class="btn btn-primary" :disabled="busy" @click="startRound('cards')">🃏 Duel de cartes</button>
+            <button type="button" class="btn btn-primary" :disabled="busy || !fightId" @click="startRound('quiz')">📚 Quiz savoir-faire</button>
+            <button type="button" class="btn btn-primary" :disabled="busy || !fightId" @click="startRound('mate')">♟️ Mat en 1 coup</button>
+            <button type="button" class="btn btn-primary" :disabled="busy || !fightId" @click="startRound('cards')">🃏 Duel de cartes</button>
           </div>
         </template>
 
@@ -67,6 +69,7 @@ const state = reactive({ boss_hp: 3, player_hp: 3, rounds_won: 0, rounds_lost: 0
 const round = ref(null)
 const reveal = ref(null)
 const busy = ref(false)
+const errorMessage = ref('')
 let scene = null
 
 const { position, start: startGeolocation } = useGeolocation()
@@ -80,15 +83,20 @@ function applyState(data) {
 }
 
 async function startRound(game) {
+  if (!fightId.value) return // combat pas encore initialisé (fix GPS en cours)
   busy.value = true
+  errorMessage.value = ''
   reveal.value = null
   const res = await startBossRound(fightId.value, game)
   busy.value = false
   if (res.success) {
     round.value = { game: res.data.game, content: res.data.content }
     applyState(res.data)
-  } else {
+  } else if (res.status === 410) {
     leave()
+  } else {
+    // Erreur transitoire : rester dans l'arène avec un message
+    errorMessage.value = 'Manche indisponible — réessaie dans un instant.'
   }
 }
 
@@ -190,6 +198,8 @@ onUnmounted(() => {
   max-height: 62vh; overflow-y: auto;
 }
 .arena__panel h2 { margin: 0 0 12px; font-size: 1.1rem; text-align: center; }
+.arena__loading { text-align: center; color: #7a6f63; font-size: 0.85rem; margin: 0 0 10px; }
+.arena__error { text-align: center; color: #dc2626; font-size: 0.85rem; font-weight: 600; margin: 0 0 10px; }
 .arena__games { display: flex; flex-direction: column; gap: 10px; }
 .arena__end { text-align: center; display: flex; flex-direction: column; gap: 10px; align-items: center; }
 .arena__end-emoji { font-size: 3rem; }
