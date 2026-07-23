@@ -12,7 +12,7 @@ require_once __DIR__ . '/../lib/Gamification.php';
 require_once __DIR__ . '/../lib/Quests.php';
 require_once __DIR__ . '/../lib/AppLogger.php';
 
-const CHECKIN_RANGE_M = 200.0;
+const CHECKIN_RANGE_M = 500.0;
 const CHECKIN_DAILY_SECONDS = 86400;   // 24 h
 const CHECKIN_RECHARGE_SECONDS = 600;  // 10 min
 const CHECKIN_DAILY_XP = 100;
@@ -145,7 +145,7 @@ function checkin_create(PDO $pdo, array $body): void
         http_response_code(422);
         echo json_encode([
             'success' => false,
-            'error'   => 'Trop loin du point (200 m maximum)',
+            'error'   => 'Trop loin du point (500 m maximum)',
             'data'    => ['distance_m' => (int)round($distance)],
         ]);
         return;
@@ -255,7 +255,7 @@ function checkin_status(PDO $pdo): void
     // Optional auth: cooldown state is only computed for a connected user
     $userId = user_optional_auth($pdo);
 
-    // Bounding-box prefilter (~250 m: 0.0025° lat, 0.0035° lng at ~49° latitude)
+    // Bounding-box prefilter (~600 m: 0.0055° lat, 0.008° lng at ~49° latitude)
     $candidates = [];
 
     $artisanStmt = $pdo->prepare("
@@ -267,7 +267,7 @@ function checkin_status(PDO $pdo): void
           AND a.latitude BETWEEN ? AND ?
           AND a.longitude BETWEEN ? AND ?
     ");
-    $artisanStmt->execute([$lat - 0.0025, $lat + 0.0025, $lng - 0.0035, $lng + 0.0035]);
+    $artisanStmt->execute([$lat - 0.0055, $lat + 0.0055, $lng - 0.008, $lng + 0.008]);
     foreach ($artisanStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         $row['target_type'] = 'artisan';
         $candidates[] = $row;
@@ -282,7 +282,7 @@ function checkin_status(PDO $pdo): void
           AND p.latitude BETWEEN ? AND ?
           AND p.longitude BETWEEN ? AND ?
     ");
-    $poiStmt->execute([$lat - 0.0025, $lat + 0.0025, $lng - 0.0035, $lng + 0.0035]);
+    $poiStmt->execute([$lat - 0.0055, $lat + 0.0055, $lng - 0.008, $lng + 0.008]);
     foreach ($poiStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         $row['target_type'] = 'poi';
         $candidates[] = $row;

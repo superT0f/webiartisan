@@ -1,5 +1,5 @@
 // Miroir du PICKUP_RANGE_M serveur (lib/WorldObjects.php)
-export const PICKUP_RANGE_M = 50
+export const PICKUP_RANGE_M = 150
 
 /**
  * Choisit l'action du FAB : ramassage si un objet est à portée,

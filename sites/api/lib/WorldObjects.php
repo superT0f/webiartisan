@@ -6,7 +6,7 @@
 
 require_once __DIR__ . '/Gamification.php';
 
-const PICKUP_RANGE_M = 50.0;
+const PICKUP_RANGE_M = 150.0;
 const SPAWN_DENSITY = 10;
 const SPAWN_RADIUS_M = 500;
 const SPAWN_MIN_RADIUS_M = 100;

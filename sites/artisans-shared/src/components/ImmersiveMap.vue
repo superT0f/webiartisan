@@ -136,7 +136,7 @@ function upsertUserPosition() {
       source: USER_POS_SOURCE,
       layout: { visibility: props.halo ? 'visible' : 'none' },
       paint: {
-        'circle-radius': { stops: [[10, 200 / 30], [16, 200 / 5], [20, 200 / 2]], base: 2 },
+        'circle-radius': { stops: [[10, 500 / 30], [16, 500 / 5], [20, 500 / 2]], base: 2 },
         'circle-color': '#C07A2E',
         'circle-opacity': 0.12,
         'circle-stroke-width': 2,

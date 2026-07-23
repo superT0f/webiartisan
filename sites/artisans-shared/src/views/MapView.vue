@@ -192,7 +192,7 @@ async function doCheckin(targetType, targetId, retried = false) {
       ? 'Trop de requêtes, réessayez dans une minute'
       : 'Point en recharge, réessayez dans quelques minutes')
   } else if (res.status === 422) {
-    showToast(`Trop loin du point (${res.data?.distance_m ?? '?'} m, 200 m max)`)
+    showToast(`Trop loin du point (${res.data?.distance_m ?? '?'} m, 500 m max)`)
   } else {
     showToast(res.error || 'Check-in impossible')
   }
@@ -448,7 +448,7 @@ onUnmounted(() => {
       <div class="control-row">
         <label class="toggle">
           <input v-model="adminHalo" type="checkbox" />
-          <span>🛡️ Halo 200 m</span>
+          <span>🛡️ Halo 500 m</span>
         </label>
         <button v-if="!mockPosition" type="button" class="btn btn-outline btn-sm" :disabled="teleportArmed" @click="armTeleport">
           {{ teleportArmed ? 'Cliquez sur la carte…' : '📍 Déplacer ma position' }}
