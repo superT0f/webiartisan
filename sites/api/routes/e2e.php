@@ -88,6 +88,13 @@ switch ($method) {
                 $pdo->prepare("UPDATE local_artisans SET status = 'active', email_verified = 1, plan = ?, latitude = COALESCE(?, latitude), longitude = COALESCE(?, longitude) WHERE id = ?")
                     ->execute([$plan, $lat, $lng, $id]);
 
+                // Crée un POI de test appartenant à l'artisan (parcours images e2e)
+                if (!empty($body['make_poi_owner'])) {
+                    $cityId = (int)$pdo->query("SELECT city_id FROM local_artisans WHERE id = $id")->fetchColumn();
+                    $pdo->prepare("INSERT INTO local_pois (city_id, type, name, latitude, longitude, is_active, owner_artisan_id) VALUES (?, 'parc', 'Parc E2E', ?, ?, 1, ?)")
+                        ->execute([$cityId, $lat ?? 49.1081, $lng ?? -0.7658, $id]);
+                }
+
                 app_log('info', '[E2E-PREPARE-ARTISAN] test artisan prepared', ['id' => $id, 'plan' => $plan]);
                 echo json_encode(['ok' => true]);
             } catch (Throwable $e) {
