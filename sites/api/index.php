@@ -295,6 +295,12 @@ if ($module === 'boss') {
     exit;
 }
 
+if ($module === 'beta') {
+    applyRateLimit($pdo, 'login');
+    require_once __DIR__ . '/routes/beta.php';
+    exit;
+}
+
 if ($module === 'subscription') {
     applyRateLimit($pdo, 'login');
     require_once __DIR__ . '/routes/subscriptions.php';
