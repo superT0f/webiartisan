@@ -44,7 +44,7 @@
           <ul>
             <li><a href="https://webiartisan.prigent.tech" target="_blank" rel="noopener">WebiArtisan ↗</a></li>
             <li><a href="mailto:webiartisan@prigent.tech">Nous contacter</a></li>
-            <li><a href="https://github.com/prigent" target="_blank" rel="noopener">GitHub ↗</a></li>
+            <li><a href="https://github.com/superT0f/webiartisan" target="_blank" rel="noopener">GitHub ↗</a></li>
           </ul>
         </div>
       </div>
