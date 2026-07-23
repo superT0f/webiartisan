@@ -4,14 +4,14 @@
       <template v-if="action.kind === 'pickup'">
         <span class="checkin-fab__icon">{{ objectEmoji(action.object.type) }}</span>
         <span class="checkin-fab__text">
-          <strong>{{ loading ? 'Ramassage…' : 'Ramasser' }}</strong>
+          <strong>{{ loading ? 'Ramassage…' : 'Balayer pour ramasser' }}</strong>
           <small>{{ action.object.label }} · +{{ action.object.xp }} XP · {{ action.object.distance_m }} m</small>
         </span>
       </template>
       <template v-else>
         <span class="checkin-fab__icon">📍</span>
         <span class="checkin-fab__text">
-          <strong>{{ loading ? 'Check-in…' : 'Check-in' }}</strong>
+          <strong>{{ loading ? 'Check-in…' : 'Balayer pour check-in' }}</strong>
           <small>{{ action.target.name }} · {{ action.target.distance_m }} m</small>
         </span>
       </template>

@@ -7,6 +7,7 @@ import ActionButton from '../components/ActionButton.vue'
 import EnergyBar from '../components/EnergyBar.vue'
 import QuestsPanel from '../components/QuestsPanel.vue'
 import CleanCityPanel from '../components/CleanCityPanel.vue'
+import SwipeRingOverlay from '../components/SwipeRingOverlay.vue'
 import GameOverlay from '../components/GameOverlay.vue'
 import AuthForm from '../components/AuthForm.vue'
 import GameRenderer from '../components/GameRenderer.vue'
@@ -26,7 +27,8 @@ import { useGamification } from '../composables/useGamification.js'
 import { useWorldObjects } from '../composables/useWorldObjects.js'
 import { useEnergy } from '../composables/useEnergy.js'
 import { isMapTilerKey } from '../composables/useMapStyle.js'
-import { pickMapAction } from '../utils/pickMapAction.js'
+import { pickMapAction, PICKUP_RANGE_M } from '../utils/pickMapAction.js'
+import { playSound } from '../utils/sounds.js'
 
 const artisans = ref([])
 const pois = ref([])
@@ -54,6 +56,17 @@ const quests = ref([])
 const questsOpen = ref(false)
 const questClaiming = ref(false)
 const cleanPanelOpen = ref(false)
+
+// Anneau de swipe (check-in / ramassage)
+const ringTarget = ref(null) // { kind, name, emoji, rewardLabel, object?|target? }
+const ringOverlay = ref(null)
+
+const activeObjectIds = computed(() =>
+  worldObjects.value.filter(o => o.distance_m <= PICKUP_RANGE_M).map(o => o.id)
+)
+const activeTargetIds = computed(() =>
+  statusTargets.value.map(t => `${t.target_type}:${t.target_id}`)
+)
 const unclaimedCount = computed(() => quests.value.filter(q => q.completed && !q.claimed).length)
 
 // Bascule 2D/3D (spike carte immersive) — préférence persistée
@@ -149,7 +162,7 @@ async function doCheckin(targetType, targetId, retried = false) {
   }
   if (!effectivePosition.value) {
     showToast('Position indisponible')
-    return
+    return false
   }
   checkinLoading.value = true
   // Rafraîchir la position avant d'agir : la watch peut être périmée et
@@ -171,14 +184,19 @@ async function doCheckin(targetType, targetId, retried = false) {
     showToast(`+${res.data.xp_awarded} XP`)
     if (res.data.level_up) {
       haptic('heavy')
+      playSound('level-up')
       showToast('Niveau supérieur !')
     }
-    for (const b of res.data.new_badges || []) showToast(`Badge débloqué : ${b.name}`)
+    for (const b of res.data.new_badges || []) {
+      playSound('badge')
+      showToast(`Badge débloqué : ${b.name}`)
+    }
     if (res.data.energy_bonus) showToast(`+${res.data.energy_bonus} ⚡ énergie`)
     if (res.data.energy) setEnergy(res.data.energy)
     for (const q of res.data.quests_completed || []) showToast(`Quête terminée : ${q.label}`)
     await refreshStatus()
     refreshQuests()
+    return true
   } else if (res.status === 401) {
     // Session consommateur invalide : tenter le pont artisan → joueur une fois
     const artisanToken = getArtisanToken()
@@ -196,6 +214,7 @@ async function doCheckin(targetType, targetId, retried = false) {
   } else {
     showToast(res.error || 'Check-in impossible')
   }
+  return false
 }
 
 async function doPickup(object, retried = false) {
@@ -210,7 +229,7 @@ async function doPickup(object, retried = false) {
   }
   if (!effectivePosition.value) {
     showToast('Position indisponible')
-    return
+    return false
   }
   pickupLoading.value = true
   if (!mockPosition.value) {
@@ -226,12 +245,17 @@ async function doPickup(object, retried = false) {
     setEnergy(res.data.energy)
     if (res.data.level_up) {
       haptic('heavy')
+      playSound('level-up')
       showToast('Niveau supérieur !')
     }
-    for (const b of res.data.new_badges || []) showToast(`Badge débloqué : ${b.name}`)
+    for (const b of res.data.new_badges || []) {
+      playSound('badge')
+      showToast(`Badge débloqué : ${b.name}`)
+    }
     for (const q of res.data.quests_completed || []) showToast(`Quête terminée : ${q.label}`)
     await refreshStatus()
     refreshQuests()
+    return true
   } else if (res.status === 401) {
     const artisanToken = getArtisanToken()
     if (!retried && artisanToken) {
@@ -246,17 +270,62 @@ async function doPickup(object, retried = false) {
     setEnergy(res.data?.energy)
     showToast('Plus d\'énergie — fais un check-in chez un artisan pour en récupérer')
   } else if (res.status === 422) {
-    showToast(`Trop loin de l'objet (${res.data?.distance_m ?? '?'} m, 50 m max)`)
+    showToast(`Trop loin de l'objet (${res.data?.distance_m ?? '?'} m, 150 m max)`)
   } else {
     showToast(res.error || 'Ramassage impossible')
   }
+  return false
+}
+
+function objectEmoji(type) {
+  const icons = { dechet: '🗑️', canette: '🍾', papier: '📰', tresor: '💎', cadeau_artisan: '🎁' }
+  return icons[type] || '❓'
+}
+
+function openRingForObject(object) {
+  ringTarget.value = {
+    kind: 'pickup',
+    name: object.label,
+    emoji: objectEmoji(object.type),
+    rewardLabel: `+${object.xp} XP${object.energy_cost > 0 ? ` · ⚡${object.energy_cost}` : ''}`,
+    object,
+  }
+}
+
+function openRingForTarget(target) {
+  ringTarget.value = {
+    kind: 'checkin',
+    name: target.name,
+    emoji: '📍',
+    rewardLabel: '+100 XP · +20 ⚡',
+    target,
+  }
+}
+
+async function onRingComplete() {
+  const t = ringTarget.value
+  if (!t) return
+  const ok = t.kind === 'pickup'
+    ? await doPickup(t.object)
+    : await doCheckin(t.target.target_type, t.target.target_id)
+  if (ok) {
+    ringOverlay.value?.succeed()
+    setTimeout(() => { ringTarget.value = null }, 1300)
+  } else {
+    ringOverlay.value?.fail(null)
+    setTimeout(() => { ringTarget.value = null }, 1500)
+  }
+}
+
+function onRingCancel() {
+  ringTarget.value = null
 }
 
 function onFabAct(action) {
   if (action.kind === 'pickup') {
-    doPickup(action.object)
+    openRingForObject(action.object)
   } else {
-    doCheckin(action.target.target_type, action.target.target_id)
+    openRingForTarget(action.target)
   }
 }
 
@@ -272,9 +341,16 @@ async function onClaimQuest(quest) {
   questClaiming.value = false
   if (res.success) {
     haptic('medium')
+    playSound('quest-complete')
     showToast(`+${res.data.xp_awarded} XP`)
-    if (res.data.level_up) showToast('Niveau supérieur !')
-    for (const b of res.data.new_badges || []) showToast(`Badge débloqué : ${b.name}`)
+    if (res.data.level_up) {
+      playSound('level-up')
+      showToast('Niveau supérieur !')
+    }
+    for (const b of res.data.new_badges || []) {
+      playSound('badge')
+      showToast(`Badge débloqué : ${b.name}`)
+    }
     await refreshQuests()
   } else {
     showToast(res.error === 'already_claimed' ? 'Récompense déjà récupérée' : 'Quête pas encore terminée')
@@ -283,7 +359,7 @@ async function onClaimQuest(quest) {
 
 function onSheetCheckin() {
   if (!selected.value) return
-  doCheckin('artisan', Number(selected.value.id))
+  openRingForTarget({ target_type: 'artisan', target_id: Number(selected.value.id), name: selected.value.company_name })
 }
 
 function openSheet(artisan) { selected.value = artisan }
@@ -434,12 +510,15 @@ onUnmounted(() => {
       :artisans="artisans"
       :pois="pois"
       :objects="worldObjects"
+      :active-object-ids="activeObjectIds"
+      :active-target-ids="activeTargetIds"
       :center="[CITY_LNG, CITY_LAT]"
       :user-position="effectivePosition"
       :halo="isAdmin && adminHalo"
       @select="openSheet"
       @map-click="onMapClick"
       @ready="onMapReady"
+      @select-object="openRingForObject"
     />
 
     <div v-if="loading" class="loading-chip card">Chargement de la carte…</div>
@@ -483,6 +562,14 @@ onUnmounted(() => {
     />
 
     <QuestsPanel :quests="quests" :open="questsOpen" :claiming="questClaiming" @close="questsOpen = false" @claim="onClaimQuest" />
+
+    <SwipeRingOverlay
+      ref="ringOverlay"
+      :target="ringTarget"
+      :open="!!ringTarget"
+      @complete="onRingComplete"
+      @cancel="onRingCancel"
+    />
 
     <ActionButton :action="fabAction" :loading="checkinLoading || pickupLoading" @act="onFabAct" />
 
