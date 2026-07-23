@@ -1160,3 +1160,38 @@ export async function revokePoiOwner(token, poiId) {
     method: 'POST', headers: { 'Content-Type': 'application/json', ...artisanHeaders(token) }, body: JSON.stringify({}),
   }, 'Révocation impossible')
 }
+
+
+// ------------------------------------------------------------------
+// Arène Big Brother
+// ------------------------------------------------------------------
+
+export async function startBossFight(bossId, lat, lng) {
+  return requestJson(`${API_BASE}/boss/${bossId}/fight`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...userHeaders() },
+    body: JSON.stringify({ lat, lng }),
+  }, 'Impossible d\'engager le combat')
+}
+
+export async function getBossFight(fightId) {
+  return requestJson(`${API_BASE}/boss/fights/${fightId}`, {
+    headers: { ...userHeaders() },
+  }, 'Erreur chargement du combat')
+}
+
+export async function startBossRound(fightId, game) {
+  return requestJson(`${API_BASE}/boss/fights/${fightId}/round`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...userHeaders() },
+    body: JSON.stringify({ game }),
+  }, 'Impossible de lancer la manche')
+}
+
+export async function answerBossRound(fightId, answer) {
+  return requestJson(`${API_BASE}/boss/fights/${fightId}/answer`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...userHeaders() },
+    body: JSON.stringify(answer),
+  }, 'Réponse impossible')
+}

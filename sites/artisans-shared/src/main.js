@@ -17,6 +17,7 @@ const routes = [
   { path: '/artisan/services', component: () => import('./views/artisan/ServicesConfig.vue'), props: true, meta: { title: 'Mes services' } },
   { path: '/artisan/jeux', component: () => import('./views/artisan/GamesConfig.vue'), props: true, meta: { title: 'Mes mini-jeux' } },
   { path: '/espace/quartier', component: () => import('./views/artisan/MyPois.vue'), props: true, meta: { title: 'Mon quartier' } },
+  { path: '/arene', component: () => import('./views/ArenaView.vue'), meta: { title: 'Arène' } },
   { path: '/prospection', component: () => import('./views/Prospects.vue'), meta: { title: 'Prospection locale' } },
   { path: '/prospect/:id', component: () => import('./views/ProspectDetail.vue'), meta: { title: 'Fiche prospect' } },
   { path: '/recettes', component: () => import('./views/Recipes.vue'), meta: { title: 'Recettes locales' } },
