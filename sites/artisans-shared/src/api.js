@@ -417,7 +417,7 @@ export function resolveAvatarUrl(avatarUrl) {
     const url = new URL(avatarUrl, API_BASE)
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
     if (url.host !== base.host) return null
-    const allowedPaths = ['/avatars/', '/uploads/avatars/']
+    const allowedPaths = ['/avatars/', '/uploads/avatars/', '/uploads/pois/']
     if (!allowedPaths.some((p) => url.pathname.startsWith(p))) return null
     return url.href
   } catch {
@@ -1108,4 +1108,55 @@ export async function deleteGift(token, id) {
     method: 'DELETE',
     headers: { 'X-Artisan-Token': token },
   }, 'Suppression impossible.')
+}
+
+
+// ------------------------------------------------------------------
+// POI — claims owner + images
+// ------------------------------------------------------------------
+
+const artisanHeaders = (token) => ({ 'X-Artisan-Token': token })
+
+export async function fetchClaimablePois(token) {
+  return requestJson(`${API_BASE}/pois/claimable`, { headers: artisanHeaders(token) }, 'Erreur chargement des POI')
+}
+
+export async function fetchMyPoiClaims(token) {
+  return requestJson(`${API_BASE}/pois/my-claims`, { headers: artisanHeaders(token) }, 'Erreur chargement de mes POI')
+}
+
+export async function claimPoi(token, poiId) {
+  return requestJson(`${API_BASE}/pois/${poiId}/claim`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...artisanHeaders(token) }, body: JSON.stringify({}),
+  }, 'Revendication impossible')
+}
+
+export async function uploadPoiImage(token, poiId, file) {
+  const form = new FormData()
+  form.append('image', file)
+  return requestJson(`${API_BASE}/pois/${poiId}/image`, {
+    method: 'POST', headers: { ...artisanHeaders(token) }, body: form,
+  }, 'Envoi de l\'image impossible')
+}
+
+export async function deletePoiImage(token, poiId) {
+  return requestJson(`${API_BASE}/pois/${poiId}/image`, {
+    method: 'DELETE', headers: artisanHeaders(token),
+  }, 'Suppression impossible')
+}
+
+export async function fetchAdminPoiClaims(token, status = 'pending') {
+  return requestJson(`${API_BASE}/admin/poi-claims?status=${status}`, { headers: artisanHeaders(token) }, 'Erreur chargement des claims')
+}
+
+export async function reviewPoiClaim(token, claimId, approve) {
+  return requestJson(`${API_BASE}/admin/poi-claims/${claimId}/${approve ? 'approve' : 'reject'}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...artisanHeaders(token) }, body: JSON.stringify({}),
+  }, 'Action impossible')
+}
+
+export async function revokePoiOwner(token, poiId) {
+  return requestJson(`${API_BASE}/admin/pois/${poiId}/revoke-owner`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...artisanHeaders(token) }, body: JSON.stringify({}),
+  }, 'Révocation impossible')
 }

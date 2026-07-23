@@ -187,6 +187,18 @@
 
       <section class="dashboard-section card">
         <div class="section-title">
+          <h2>Mon quartier</h2>
+        </div>
+        <div class="prospect-list">
+          <RouterLink to="/espace/quartier" class="prospect-mini">
+            <div><strong>Mes POI</strong><span class="text-muted small">Photos sur la carte et revendications</span></div>
+            <span class="badge badge-green">Gérer</span>
+          </RouterLink>
+        </div>
+      </section>
+
+      <section class="dashboard-section card">
+        <div class="section-title">
           <h2>🎮 Jouer</h2>
         </div>
         <div class="prospect-list">
