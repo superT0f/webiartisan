@@ -57,6 +57,14 @@ if ($method === 'GET' && $action === 'artisans' && $param === null) {
     admin_set_artisan_subscription_status($pdo, (int)$param);
 } elseif ($method === 'POST' && $action === 'artisans' && is_numeric($param) && $subAction === 'set-admin') {
     admin_set_artisan_admin($pdo, (int)$param);
+} elseif ($method === 'GET' && $action === 'poi-claims' && $param === null) {
+    admin_poi_claims($pdo);
+} elseif ($method === 'POST' && $action === 'poi-claims' && is_numeric($param) && $subAction === 'approve') {
+    admin_poi_claim_review($pdo, (int)$param, true);
+} elseif ($method === 'POST' && $action === 'poi-claims' && is_numeric($param) && $subAction === 'reject') {
+    admin_poi_claim_review($pdo, (int)$param, false);
+} elseif ($method === 'POST' && $action === 'pois' && is_numeric($param) && $subAction === 'revoke-owner') {
+    admin_poi_revoke_owner($pdo, (int)$param);
 } elseif ($action === 'pois') {
     admin_pois_router($pdo, $method, $param);
 } elseif ($action === 'schedules') {
@@ -732,4 +740,92 @@ function admin_moderation_testimonial_reject(PDO $pdo, int $id): void
         return;
     }
     echo json_encode(['success' => true, 'data' => ['message' => 'Témoignage rejeté']]);
+}
+
+
+// ------------------------------------------------------------------
+// Revendications de POI (validation owner) + révocation
+// ------------------------------------------------------------------
+
+function admin_poi_claims(PDO $pdo): void
+{
+    $status = in_array($_GET['status'] ?? '', ['pending', 'approved', 'rejected'], true) ? $_GET['status'] : 'pending';
+    $stmt = $pdo->prepare("
+        SELECT c.id, c.poi_id, c.status, c.created_at,
+               p.name AS poi_name, ci.slug AS city,
+               a.id AS artisan_id, a.company_name AS artisan_name
+        FROM local_poi_claims c
+        JOIN local_pois p ON p.id = c.poi_id
+        JOIN local_cities ci ON ci.id = p.city_id
+        JOIN local_artisans a ON a.id = c.artisan_id
+        WHERE c.status = ?
+        ORDER BY c.created_at ASC
+        LIMIT 100
+    ");
+    $stmt->execute([$status]);
+    echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+}
+
+function admin_poi_claim_review(PDO $pdo, int $claimId, bool $approve): void
+{
+    global $artisan;
+
+    $pdo->beginTransaction();
+    try {
+        $stmt = $pdo->prepare("SELECT id, poi_id, artisan_id, status FROM local_poi_claims WHERE id = ? FOR UPDATE");
+        $stmt->execute([$claimId]);
+        $claim = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$claim) {
+            $pdo->rollBack();
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'Claim introuvable']);
+            return;
+        }
+        if ($claim['status'] !== 'pending') {
+            $pdo->rollBack();
+            http_response_code(409);
+            echo json_encode(['success' => false, 'error' => 'Claim déjà traitée']);
+            return;
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $adminId = (int)$artisan['id'];
+
+        if ($approve) {
+            $pdo->prepare("UPDATE local_poi_claims SET status = 'approved', reviewed_by = ?, reviewed_at = ? WHERE id = ?")
+                ->execute([$adminId, $now, $claimId]);
+            $pdo->prepare("UPDATE local_pois SET owner_artisan_id = ? WHERE id = ?")
+                ->execute([(int)$claim['artisan_id'], (int)$claim['poi_id']]);
+            $pdo->prepare("UPDATE local_poi_claims SET status = 'rejected', reviewed_by = ?, reviewed_at = ? WHERE poi_id = ? AND status = 'pending' AND id != ?")
+                ->execute([$adminId, $now, (int)$claim['poi_id'], $claimId]);
+        } else {
+            $pdo->prepare("UPDATE local_poi_claims SET status = 'rejected', reviewed_by = ?, reviewed_at = ? WHERE id = ?")
+                ->execute([$adminId, $now, $claimId]);
+        }
+
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        error_log('[ADMIN-POI] ' . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
+        return;
+    }
+
+    echo json_encode(['success' => true, 'data' => ['id' => $claimId, 'approved' => $approve]]);
+}
+
+function admin_poi_revoke_owner(PDO $pdo, int $poiId): void
+{
+    $stmt = $pdo->prepare("UPDATE local_pois SET owner_artisan_id = NULL WHERE id = ?");
+    $stmt->execute([$poiId]);
+    if ($stmt->rowCount() === 0) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'POI introuvable']);
+        return;
+    }
+    echo json_encode(['success' => true, 'data' => ['revoked' => $poiId]]);
 }

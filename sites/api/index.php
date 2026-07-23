@@ -283,6 +283,12 @@ if ($module === 'quests') {
     exit;
 }
 
+if ($module === 'pois') {
+    applyRateLimit($pdo, 'public:' . $module);
+    require_once __DIR__ . '/routes/pois.php';
+    exit;
+}
+
 if ($module === 'subscription') {
     applyRateLimit($pdo, 'login');
     require_once __DIR__ . '/routes/subscriptions.php';
