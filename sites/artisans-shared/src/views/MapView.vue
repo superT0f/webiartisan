@@ -2,7 +2,6 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import ImmersiveMap from '../components/ImmersiveMap.vue'
 import ArtisanSheet from '../components/ArtisanSheet.vue'
-import MapWeatherBadge from '../components/MapWeatherBadge.vue'
 import ActionButton from '../components/ActionButton.vue'
 import EnergyBar from '../components/EnergyBar.vue'
 import QuestsPanel from '../components/QuestsPanel.vue'
@@ -36,6 +35,16 @@ const games = ref([])
 const selected = ref(null)
 const loading = ref(true)
 const { weather, load: loadWeather } = useWeather(CITY_LAT, CITY_LNG)
+
+// Thème dynamique de la carte (remplace le badge météo) :
+// nuit 21 h → 7 h, pluie si weathercode > 48, sinon soleil
+const mapTheme = computed(() => {
+  const h = new Date().getHours()
+  if (h < 7 || h >= 21) return 'night'
+  const code = weather.value?.weathercode
+  if (code != null && code > 48) return 'rain'
+  return 'sun'
+})
 const { position, start: startGeolocation, stop: stopGeolocation, refresh: refreshPosition } = useGeolocation()
 const { showToast } = useGamification()
 
@@ -515,6 +524,7 @@ onUnmounted(() => {
       :center="[CITY_LNG, CITY_LAT]"
       :user-position="effectivePosition"
       :halo="isAdmin && adminHalo"
+      :theme="mapTheme"
       @select="openSheet"
       @map-click="onMapClick"
       @ready="onMapReady"
@@ -535,8 +545,6 @@ onUnmounted(() => {
         <button v-else type="button" class="btn btn-outline btn-sm" @click="resetPosition">↩︎ Position réelle</button>
       </div>
     </div>
-
-    <MapWeatherBadge :weather="weather" />
 
     <EnergyBar v-if="authenticated" />
 

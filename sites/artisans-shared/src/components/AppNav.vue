@@ -46,7 +46,6 @@
         <RouterLink to="/annuaire#services-locaux" class="nav-mobile-link">🏙️ Services locaux</RouterLink>
         <div class="nav-separator" role="separator"></div>
         <RouterLink v-if="!user" to="/profil" class="nav-mobile-link">👤 Se connecter / Mon compte</RouterLink>
-        <RouterLink v-if="user" to="/profil" class="nav-mobile-link">👤 Mon profil (Lv.{{ user.level }})</RouterLink>
         <RouterLink to="/espace" class="nav-mobile-link">🔐 Mon espace</RouterLink>
         <RouterLink v-if="isAdmin" to="/espace/admin" class="nav-mobile-link nav-link-featured">🛡️ Administration</RouterLink>
         <RouterLink to="/inscrire" class="btn btn-primary" style="margin: 12px 20px;">

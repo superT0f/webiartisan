@@ -14,7 +14,8 @@ const props = defineProps({
   activeObjectIds: { type: Array, default: () => [] },
   activeTargetIds: { type: Array, default: () => [] },
   userPosition: { type: Object, default: null },
-  halo: { type: Boolean, default: false }
+  halo: { type: Boolean, default: false },
+  theme: { type: String, default: 'sun' } // 'sun' | 'rain' | 'night'
 })
 
 const emit = defineEmits(['select', 'map-click', 'ready', 'select-object'])
@@ -307,7 +308,9 @@ function objectIcon(type) {
 </script>
 
 <template>
-  <div ref="mapEl" class="immersive-map"></div>
+  <div ref="mapEl" class="immersive-map">
+    <div class="map-theme-overlay" :class="`map-theme-overlay--${theme}`"></div>
+  </div>
 </template>
 
 <style scoped>
@@ -316,6 +319,16 @@ function objectIcon(type) {
   height: 100%;
   min-height: 100vh;
 }
+.map-theme-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  transition: background 1.2s ease;
+}
+.map-theme-overlay--sun { background: transparent; }
+.map-theme-overlay--rain { background: rgba(60, 90, 140, 0.20); }
+.map-theme-overlay--night { background: rgba(10, 15, 40, 0.38); }
 :deep(.artisan-marker) {
   width: 40px;
   height: 40px;
