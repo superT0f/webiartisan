@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "tech.prigent.webiartisan",
+      "sha256_cert_fingerprints": [
+        "7D:4E:46:14:0C:98:55:D8:A1:B7:3C:BE:4E:1D:0E:1E:D6:45:88:6C:57:A3:57:8C:49:33:4D:8C:9F:66:BC:E5"
+      ]
+    }
+  }
+]
