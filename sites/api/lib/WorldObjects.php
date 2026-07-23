@@ -22,6 +22,7 @@ const OBJECT_TYPES = [
     'papier'         => ['xp' => 10, 'energy' => 5,  'weight' => 14, 'category' => 'dechet', 'label' => 'Papier'],
     'tresor'         => ['xp' => 50, 'energy' => 10, 'weight' => 6,  'category' => 'tresor', 'label' => 'Trésor'],
     'cadeau_artisan' => ['xp' => 15, 'energy' => 0,  'weight' => 0,  'category' => 'cadeau', 'label' => 'Cadeau'],
+    'big_brother'    => ['xp' => 150, 'energy' => 0, 'weight' => 2,  'category' => 'boss',   'label' => 'Big Brother'],
 ];
 
 function worldobjects_distance_m(float $lat1, float $lng1, float $lat2, float $lng2): float
@@ -148,7 +149,7 @@ function worldobjects_ensure_density(PDO $pdo, string $city, float $lat, float $
         $bearing = deg2rad(mt_rand(0, 359));
         $dLat = ($dist * cos($bearing)) / 111320.0;
         $dLng = ($dist * sin($bearing)) / (111320.0 * cos(deg2rad($lat)));
-        $ttl = $type === 'tresor' ? TRESOR_TTL_HOURS : OBJECT_TTL_HOURS;
+        $ttl = ($type === 'tresor' || $type === 'big_brother') ? TRESOR_TTL_HOURS : OBJECT_TTL_HOURS;
         $insert->execute([
             $city, $type,
             round($lat + $dLat, 7), round($lng + $dLng, 7),

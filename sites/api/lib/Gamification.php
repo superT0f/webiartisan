@@ -18,6 +18,9 @@ const XP_ACTIONS = [
     'poi_checkin_recharge' => ['xp' => 10,  'cooldown' => 'none', 'limit' => null, 'internal' => true],
     'object_pickup'        => ['xp' => 0, 'cooldown' => 'none', 'limit' => null, 'internal' => true],
     'quest_complete'       => ['xp' => 0, 'cooldown' => 'none', 'limit' => null, 'internal' => true],
+    'boss_round_won'       => ['xp' => 25, 'cooldown' => 'none', 'limit' => null, 'internal' => true],
+    'boss_win'             => ['xp' => 0, 'cooldown' => 'none', 'limit' => null, 'internal' => true],
+    'boss_loss'            => ['xp' => 0, 'cooldown' => 'none', 'limit' => null, 'internal' => true],
 ];
 
 const LEVEL_TITLES = [
@@ -40,6 +43,7 @@ const BADGES = [
     'premier_ramassage' => ['name' => 'Premier ramassage', 'condition' => 'Ramasser un objet sur la carte.', 'target' => 1,  'action' => 'object_pickup'],
     'eco_warrior'       => ['name' => 'Éco-guerrier',      'condition' => 'Ramasser 50 déchets.',            'target' => 50, 'action' => 'object_pickup', 'meta_filter' => ['object_category' => 'dechet']],
     'chasseur_tresor'   => ['name' => 'Chasseur de trésors','condition' => 'Trouver 10 trésors.',            'target' => 10, 'action' => 'object_pickup', 'meta_filter' => ['object_type' => 'tresor']],
+    'brother_slayer'    => ['name' => 'Tombeur du Big Brother', 'condition' => 'Vaincre le Big Brother.',     'target' => 1,  'action' => 'boss_win'],
 ];
 
 const STREAK_MILESTONE_DAYS = 3;

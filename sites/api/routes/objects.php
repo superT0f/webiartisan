@@ -81,15 +81,20 @@ function objects_list(PDO $pdo): void
     worldobjects_ensure_density($pdo, $city, $lat, $lng);
 
     // Bounding-box ~1 km (0.01° lat, 0.014° lng à ~49°)
+    // Les boss déjà combattus par le joueur sont exclus.
     $stmt = $pdo->prepare("
-        SELECT id, object_type, lat, lng, xp_value, energy_cost
-        FROM local_world_objects
-        WHERE city = ? AND status = 'active'
-          AND lat BETWEEN ? AND ? AND lng BETWEEN ? AND ?
-        ORDER BY id DESC
+        SELECT o.id, o.object_type, o.lat, o.lng, o.xp_value, o.energy_cost
+        FROM local_world_objects o
+        WHERE o.city = ? AND o.status = 'active'
+          AND o.lat BETWEEN ? AND ? AND o.lng BETWEEN ? AND ?
+          AND (o.object_type != 'big_brother' OR NOT EXISTS (
+              SELECT 1 FROM local_boss_fights f
+              WHERE f.object_id = o.id AND f.user_id = ?
+          ))
+        ORDER BY o.id DESC
         LIMIT 50
     ");
-    $stmt->execute([$city, $lat - 0.01, $lat + 0.01, $lng - 0.014, $lng + 0.014]);
+    $stmt->execute([$city, $lat - 0.01, $lat + 0.01, $lng - 0.014, $lng + 0.014, (int)$user['id']]);
 
     $objects = [];
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
@@ -156,6 +161,13 @@ function objects_pickup(PDO $pdo, int $objectId, array $body): void
             $pdo->rollBack();
             http_response_code(410);
             echo json_encode(['success' => false, 'error' => 'gone', 'message' => 'Trop tard, un voisin l\'a eu !']);
+            return;
+        }
+
+        if ($obj['object_type'] === 'big_brother') {
+            $pdo->rollBack();
+            http_response_code(422);
+            echo json_encode(['success' => false, 'error' => 'not_pickable', 'message' => 'Le Big Brother ne se ramasse pas — affronte-le en duel !']);
             return;
         }
 
