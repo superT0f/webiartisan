@@ -154,25 +154,42 @@ onMounted(async () => {
   }
   if (!bossId) return
 
-  // Attendre un fix GPS valide avant d'engager (422 distance sinon)
+  // Position passée par la carte dans l'URL : le combat démarre immédiatement,
+  // sans attendre un nouveau fix GPS (le bridge peut être long).
+  const queryLat = Number(route.query.lat)
+  const queryLng = Number(route.query.lng)
+  if (queryLat && queryLng) {
+    await engageFight(bossId, queryLat, queryLng)
+    return
+  }
+
+  // Sinon : attendre un fix GPS valide avant d'engager (422 distance sinon)
   let fightRequested = false
   const stopWatch = watch(position, async (pos) => {
     if (!pos || fightRequested) return
     fightRequested = true
     stopWatch()
-    const res = await startBossFight(bossId, pos.latitude, pos.longitude)
-    if (res.success) {
-      fightId.value = res.data.fight_id
-      applyState(res.data)
-    } else if (res.status === 409 && res.data?.fight_id) {
-      fightId.value = res.data.fight_id
-      const st = await getBossFight(fightId.value)
-      if (st.success) applyState(st.data)
-    } else {
-      router.push('/carte')
-    }
+    await engageFight(bossId, pos.latitude, pos.longitude)
   }, { immediate: true })
 })
+
+async function engageFight(id, lat, lng) {
+  const res = await startBossFight(id, lat, lng)
+  if (res.success) {
+    fightId.value = res.data.fight_id
+    applyState(res.data)
+  } else if (res.status === 409 && res.data?.fight_id) {
+    fightId.value = res.data.fight_id
+    const st = await getBossFight(fightId.value)
+    if (st.success) applyState(st.data)
+  } else if (res.status === 410) {
+    leave()
+  } else {
+    errorMessage.value = res.error === 'distance'
+      ? `Trop loin du Big Brother (${res.data?.distance_m ?? '?'} m, 500 m max)`
+      : 'Impossible d\'engager le combat — réessaie.'
+  }
+}
 
 onUnmounted(() => {
   scene?.destroy()
@@ -180,7 +197,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.arena { position: fixed; inset: 0; z-index: 70; background: #1a1330; display: flex; flex-direction: column; }
+.arena { position: fixed; inset: 0; z-index: 120; background: #1a1330; display: flex; flex-direction: column; }
 .arena__scene { position: absolute; inset: 0; }
 .arena__close {
   position: absolute; top: 12px; right: 12px; z-index: 3;

@@ -295,7 +295,9 @@ function objectEmoji(type) {
 
 function openRingForObject(object) {
   if (object.type === 'big_brother') {
-    router.push(`/arene?boss=${object.id}`)
+    const pos = effectivePosition.value
+    const coords = pos ? `&lat=${pos.latitude}&lng=${pos.longitude}` : ''
+    router.push(`/arene?boss=${object.id}${coords}`)
     return
   }
   ringTarget.value = {
