@@ -17,6 +17,19 @@
       </div>
 
       <template v-else>
+        <section class="claims-section card" v-if="poiClaims.length">
+          <h2>Revendications à valider ({{ poiClaims.length }})</h2>
+          <ul class="claims-list">
+            <li v-for="c in poiClaims" :key="c.id" class="claims-item">
+              <span><strong>{{ c.poi_name }}</strong> ({{ c.city }}) — {{ c.artisan_name }}</span>
+              <span class="claims-actions">
+                <button type="button" class="btn btn-primary btn-sm" @click="onReviewClaim(c, true)">Approuver</button>
+                <button type="button" class="btn btn-outline btn-sm" @click="onReviewClaim(c, false)">Rejeter</button>
+              </span>
+            </li>
+          </ul>
+        </section>
+
         <div class="filters">
           <input
             v-model="search"
@@ -176,10 +189,11 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { getArtisanToken, fetchAdminPois, createAdminPoi, updateAdminPoi, deleteAdminPoi, createAdminSchedule, deleteAdminSchedule, DAYS } from '../api.js'
+import { getArtisanToken, fetchAdminPois, createAdminPoi, updateAdminPoi, deleteAdminPoi, createAdminSchedule, deleteAdminSchedule, fetchAdminPoiClaims, reviewPoiClaim, DAYS } from '../api.js'
 
 const token = ref(getArtisanToken())
 const pois = ref([])
+const poiClaims = ref([])
 const loading = ref(true)
 const error = ref('')
 const search = ref('')
@@ -208,6 +222,14 @@ const emptyForm = () => ({
 
 const form = ref(emptyForm())
 
+async function onReviewClaim(c, approve) {
+  const res = await reviewPoiClaim(token.value, c.id, approve)
+  if (res.success) {
+    const claimsRes = await fetchAdminPoiClaims(token.value, 'pending')
+    if (claimsRes.success) poiClaims.value = claimsRes.data || []
+  }
+}
+
 const filteredPois = computed(() => {
   const q = search.value.trim().toLowerCase()
   if (!q) return pois.value
@@ -232,6 +254,8 @@ async function load() {
     } else {
       error.value = res.error || 'Erreur de chargement'
     }
+    const claimsRes = await fetchAdminPoiClaims(token.value, 'pending')
+    if (claimsRes.success) poiClaims.value = claimsRes.data || []
   } catch (e) {
     error.value = 'Erreur réseau'
   } finally {
@@ -465,4 +489,9 @@ onMounted(load)
   .schedule-row { grid-template-columns: 1fr 1fr; }
   .poi-header { flex-direction: column; }
 }
+.claims-section { padding: 16px 20px; margin-bottom: 16px; }
+.claims-section h2 { font-size: 1.05rem; margin-bottom: 8px; }
+.claims-list { list-style: none; padding: 0; margin: 0; }
+.claims-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid #e2e8f0; flex-wrap: wrap; }
+.claims-actions { display: flex; gap: 8px; }
 </style>

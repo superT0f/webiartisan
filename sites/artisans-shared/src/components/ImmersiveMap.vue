@@ -208,14 +208,23 @@ function renderMarkers() {
     const el = document.createElement('div')
     el.className = 'poi-marker'
     if (props.activeTargetIds.includes(`poi:${p.id}`)) el.classList.add('marker--active')
-    el.innerHTML = `<span>${poiIcon(p.type)}</span>`
+    if (p.image_url) {
+      el.classList.add('poi-marker--photo')
+      el.innerHTML = `<img src="${escapeHtml(p.image_url)}" alt="" />`
+    } else {
+      el.innerHTML = `<span>${poiIcon(p.type)}</span>`
+    }
 
     const scheduleInfo = p.schedules?.length
       ? `<br><small>${escapeHtml(formatSchedules(p.schedules))}</small>`
       : ''
+    const imageHtml = p.image_url
+      ? `<img src="${escapeHtml(p.image_url)}" alt="" class="popup-photo" />`
+      : ''
 
     const popup = new Popup({ offset: 16 }).setHTML(
       `<div class="map-popup poi-popup">
+        ${imageHtml}
         <strong>${escapeHtml(p.name)}</strong>
         <span class="popup-type">${escapeHtml(p.type)}</span>
         ${p.address ? `<span class="popup-address">${escapeHtml(p.address)}</span>` : ''}
@@ -369,6 +378,24 @@ function objectIcon(type) {
 }
 :deep(.poi-marker span) {
   font-size: 1rem;
+}
+:deep(.poi-marker--photo) {
+  padding: 0;
+  overflow: hidden;
+}
+:deep(.poi-marker--photo img) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+:deep(.popup-photo) {
+  width: 100%;
+  max-height: 120px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  display: block;
 }
 :deep(.object-marker) {
   width: 30px;

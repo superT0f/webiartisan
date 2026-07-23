@@ -209,7 +209,8 @@
             class="service-card"
           >
             <div class="service-header">
-              <span class="service-icon">{{ poiIcon(poi.type) }}</span>
+              <img v-if="poi.image_url" :src="resolveAvatarUrl(poi.image_url)" class="service-photo" alt="" />
+              <span v-else class="service-icon">{{ poiIcon(poi.type) }}</span>
               <div>
                 <h3>{{ poi.name }}</h3>
                 <span class="badge" :class="poi.is_open_now ? 'badge-open' : 'badge-closed'">
@@ -326,7 +327,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { fetchArtisans, fetchCategories, fetchCityPois, fetchWeather,
   weatherInfo, formatTime, todayIndex,
-  CITY_NAME, CITY_CP, CITY_LAT, CITY_LNG
+  CITY_NAME, CITY_CP, CITY_LAT, CITY_LNG, resolveAvatarUrl
 } from '../api.js'
 import { escapeHtml } from '@/utils/escapeHtml.js'
 import L from 'leaflet'
@@ -755,6 +756,7 @@ const demoArtisans = [
   margin-bottom: 16px;
 }
 .service-icon { font-size: 2rem; flex-shrink: 0; }
+.service-photo { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
 .service-header h3 { font-size: 1rem; margin-bottom: 4px; }
 
 /* Météo */

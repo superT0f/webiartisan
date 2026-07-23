@@ -16,7 +16,7 @@ import {
   getUserToken, setUserToken, removeUserToken, authEvents,
   getArtisanToken, fetchMe, fetchUserMe, fetchArtisanConsumerToken,
   postCheckin, getCheckinStatus, postMessageToFlutter,
-  haptic, shareText,
+  haptic, shareText, resolveAvatarUrl,
   CITY_LAT, CITY_LNG, CITY_NAME,
   pickupObject, getQuestsToday, claimQuest,
 } from '../api.js'
@@ -302,12 +302,18 @@ function openRingForObject(object) {
 }
 
 function openRingForTarget(target) {
+  let imageUrl = null
+  if (target.target_type === 'poi') {
+    const poi = pois.value.find(p => Number(p.id) === Number(target.target_id))
+    imageUrl = poi?.image_url ? resolveAvatarUrl(poi.image_url) : null
+  }
   ringTarget.value = {
     kind: 'checkin',
     name: target.name,
     emoji: '📍',
     rewardLabel: '+100 XP · +20 ⚡',
     target,
+    imageUrl,
   }
 }
 

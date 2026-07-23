@@ -19,7 +19,11 @@
             :stroke-dashoffset="dashOffset"
           />
         </svg>
-        <div class="ring-disc">
+        <div
+          class="ring-disc"
+          :style="target.imageUrl ? { backgroundImage: `url(${target.imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}"
+        >
+          <div v-if="target.imageUrl" class="ring-disc-veil"></div>
           <span class="ring-emoji">{{ target.emoji }}</span>
           <strong class="ring-name">{{ target.name }}</strong>
           <span class="ring-reward">{{ target.rewardLabel }}</span>
@@ -170,6 +174,13 @@ defineExpose({ succeed, fail })
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
 }
 .ring-emoji { font-size: 2.6rem; }
+.ring-disc-veil {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.72);
+}
+.ring-disc > *:not(.ring-disc-veil) { position: relative; z-index: 1; }
 .ring-name { font-size: 1rem; }
 .ring-reward { color: #b45309; font-weight: 700; }
 .ring-hint { font-size: 0.75rem; color: #64748b; }
