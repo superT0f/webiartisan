@@ -289,6 +289,12 @@ if ($module === 'pois') {
     exit;
 }
 
+if ($module === 'boss') {
+    applyRateLimit($pdo, 'public:' . $module);
+    require_once __DIR__ . '/routes/boss.php';
+    exit;
+}
+
 if ($module === 'subscription') {
     applyRateLimit($pdo, 'login');
     require_once __DIR__ . '/routes/subscriptions.php';
