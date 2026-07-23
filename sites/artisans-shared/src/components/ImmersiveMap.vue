@@ -11,11 +11,13 @@ const props = defineProps({
   artisans: { type: Array, default: () => [] },
   pois: { type: Array, default: () => [] },
   objects: { type: Array, default: () => [] },
+  activeObjectIds: { type: Array, default: () => [] },
+  activeTargetIds: { type: Array, default: () => [] },
   userPosition: { type: Object, default: null },
   halo: { type: Boolean, default: false }
 })
 
-const emit = defineEmits(['select', 'map-click', 'ready'])
+const emit = defineEmits(['select', 'map-click', 'ready', 'select-object'])
 const mapEl = ref(null)
 const map = ref(null)
 const markers = []
@@ -162,6 +164,8 @@ onUnmounted(() => {
 watch(() => props.artisans, renderMarkers, { deep: true })
 watch(() => props.pois, renderMarkers, { deep: true })
 watch(() => props.objects, renderMarkers, { deep: true })
+watch(() => props.activeObjectIds, renderMarkers, { deep: true })
+watch(() => props.activeTargetIds, renderMarkers, { deep: true })
 
 function renderMarkers() {
   if (!map.value) return
@@ -172,6 +176,7 @@ function renderMarkers() {
     if (!a.latitude || !a.longitude) return
     const el = document.createElement('div')
     el.className = 'artisan-marker'
+    if (props.activeTargetIds.includes(`artisan:${a.id}`)) el.classList.add('marker--active')
     el.innerHTML = `<span>${categoryIcon(a.category_slug)}</span>${a.has_active_game ? '<i class="marker-gift">🎁</i>' : ''}`
 
     const popupHtml = `
@@ -201,6 +206,7 @@ function renderMarkers() {
     if (!p.latitude || !p.longitude) return
     const el = document.createElement('div')
     el.className = 'poi-marker'
+    if (props.activeTargetIds.includes(`poi:${p.id}`)) el.classList.add('marker--active')
     el.innerHTML = `<span>${poiIcon(p.type)}</span>`
 
     const scheduleInfo = p.schedules?.length
@@ -226,15 +232,27 @@ function renderMarkers() {
 
   props.objects.forEach(o => {
     if (!o.lat || !o.lng) return
+    const isActive = props.activeObjectIds.includes(o.id)
     const el = document.createElement('div')
     el.className = `object-marker object-marker--${o.type}`
+    if (isActive) el.classList.add('marker--active')
     el.innerHTML = `<span>${objectIcon(o.type)}</span>`
+
+    if (isActive) {
+      // Objet à portée : tap direct = anneau de swipe (pas de popup)
+      el.addEventListener('click', () => emit('select-object', o))
+      const marker = new Marker({ element: el, anchor: 'center' })
+        .setLngLat([parseFloat(o.lng), parseFloat(o.lat)])
+        .addTo(map.value)
+      markers.push(marker)
+      return
+    }
 
     const popup = new Popup({ offset: 12 }).setHTML(
       `<div class="map-popup object-popup">
         <strong>${objectIcon(o.type)} ${escapeHtml(o.label)}</strong>
         <span class="popup-type">+${o.xp} XP${o.energy_cost > 0 ? ` · ⚡${o.energy_cost}` : ' · gratuit'}</span>
-        <span class="popup-address">${o.distance_m} m${o.distance_m <= 50 ? ' — à portée !' : ''}</span>
+        <span class="popup-address">${o.distance_m} m — approche-toi !</span>
       </div>`
     )
 
@@ -357,6 +375,14 @@ function objectIcon(type) {
   animation: treasure-pulse 1.6s ease-in-out infinite;
 }
 :deep(.object-marker--cadeau_artisan) { border-color: #e11d48; }
+:deep(.marker--active) {
+  animation: active-glow 1.8s ease-in-out infinite;
+  z-index: 3;
+}
+@keyframes active-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.55), 0 4px 12px rgba(0,0,0,0.2); }
+  50% { box-shadow: 0 0 0 12px rgba(245, 158, 11, 0), 0 4px 12px rgba(0,0,0,0.2); }
+}
 @keyframes treasure-pulse {
   0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(124,58,237,0.5); }
   50% { transform: scale(1.15); box-shadow: 0 0 0 8px rgba(124,58,237,0); }
