@@ -65,7 +65,15 @@ switch ($method) {
         break;
 
     case 'POST':
-        if ($action === 'prepare-artisan' && $param !== null && is_numeric($param)) {
+        if ($action === 'spawn-boss') {
+            requireE2EAuth();
+            $body = json_decode(file_get_contents('php://input'), true) ?? [];
+            $lat = is_numeric($body['lat'] ?? null) ? (float)$body['lat'] : 49.1081;
+            $lng = is_numeric($body['lng'] ?? null) ? (float)$body['lng'] : -0.7658;
+            $pdo->prepare("INSERT INTO local_world_objects (city, object_type, lat, lng, xp_value, energy_cost, expires_at) VALUES ('livry', 'big_brother', ?, ?, 150, 0, DATE_ADD(NOW(), INTERVAL 2 HOUR))")
+                ->execute([$lat, $lng]);
+            echo json_encode(['ok' => true, 'id' => (int)$pdo->lastInsertId()]);
+        } elseif ($action === 'prepare-artisan' && $param !== null && is_numeric($param)) {
             requireE2EAuth();
             $id = (int) $param;
             $body = json_decode(file_get_contents('php://input'), true) ?? [];
@@ -105,7 +113,6 @@ switch ($method) {
         } elseif ($action === 'activate-artisan' && $param !== null && is_numeric($param)) {
             requireE2EAuth();
             $id = (int) $param;
-
             try {
                 $stmt = $pdo->prepare('SELECT email FROM local_artisans WHERE id = ?');
                 $stmt->execute([$id]);

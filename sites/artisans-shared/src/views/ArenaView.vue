@@ -43,7 +43,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   startBossFight, getBossFight, startBossRound, answerBossRound,
@@ -144,9 +144,15 @@ onMounted(async () => {
       return
     }
   }
-  if (bossId) {
-    const pos = position.value
-    const res = await startBossFight(bossId, pos?.latitude ?? 0, pos?.longitude ?? 0)
+  if (!bossId) return
+
+  // Attendre un fix GPS valide avant d'engager (422 distance sinon)
+  let fightRequested = false
+  const stopWatch = watch(position, async (pos) => {
+    if (!pos || fightRequested) return
+    fightRequested = true
+    stopWatch()
+    const res = await startBossFight(bossId, pos.latitude, pos.longitude)
     if (res.success) {
       fightId.value = res.data.fight_id
       applyState(res.data)
@@ -157,7 +163,7 @@ onMounted(async () => {
     } else {
       router.push('/carte')
     }
-  }
+  }, { immediate: true })
 })
 
 onUnmounted(() => {

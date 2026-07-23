@@ -310,7 +310,8 @@ function objectIcon(type) {
     canette: '🍾',
     papier: '📰',
     tresor: '💎',
-    cadeau_artisan: '🎁'
+    cadeau_artisan: '🎁',
+    big_brother: '🎩'
   }
   return icons[type] || '❓'
 }
@@ -415,6 +416,15 @@ function objectIcon(type) {
   animation: treasure-pulse 1.6s ease-in-out infinite;
 }
 :deep(.object-marker--cadeau_artisan) { border-color: #e11d48; }
+:deep(.object-marker--big_brother) {
+  border-color: #7c3aed;
+  background: #2e1065;
+  animation: boss-pulse 1.4s ease-in-out infinite;
+}
+@keyframes boss-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(124,58,237,0.6); }
+  50% { box-shadow: 0 0 0 14px rgba(124,58,237,0); }
+}
 :deep(.marker--active) {
   animation: active-glow 1.8s ease-in-out infinite;
   z-index: 3;

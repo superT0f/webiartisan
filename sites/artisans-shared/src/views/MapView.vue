@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import ImmersiveMap from '../components/ImmersiveMap.vue'
 import ArtisanSheet from '../components/ArtisanSheet.vue'
 import ActionButton from '../components/ActionButton.vue'
@@ -29,6 +30,7 @@ import { isMapTilerKey } from '../composables/useMapStyle.js'
 import { pickMapAction, PICKUP_RANGE_M } from '../utils/pickMapAction.js'
 import { playSound } from '../utils/sounds.js'
 
+const router = useRouter()
 const artisans = ref([])
 const pois = ref([])
 const games = ref([])
@@ -292,6 +294,10 @@ function objectEmoji(type) {
 }
 
 function openRingForObject(object) {
+  if (object.type === 'big_brother') {
+    router.push(`/arene?boss=${object.id}`)
+    return
+  }
   ringTarget.value = {
     kind: 'pickup',
     name: object.label,

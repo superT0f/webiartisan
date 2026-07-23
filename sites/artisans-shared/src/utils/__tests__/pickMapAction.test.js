@@ -27,4 +27,10 @@ describe('pickMapAction', () => {
     const b = { id: 4, distance_m: 30 }
     expect(pickMapAction([b, a], null)).toEqual({ kind: 'pickup', object: a })
   })
+
+  it('le Big Brother est exclu du ramassage', () => {
+    const boss = { id: 9, type: 'big_brother', distance_m: 10 }
+    expect(pickMapAction([boss], target)).toEqual({ kind: 'checkin', target })
+    expect(pickMapAction([boss], null)).toBeNull()
+  })
 })
