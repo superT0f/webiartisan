@@ -448,7 +448,7 @@ export function resolveAvatarUrl(avatarUrl) {
  * @param {string} url
  * @param {RequestInit} [options]
  * @param {string|null} [networkError] - Custom user-facing message for network failures.
- * @returns {Promise<{success: boolean, data: any, status: number, error: string|undefined}>}
+ * @returns {Promise<{success: boolean, data: any, status: number, error: string|undefined, message: string|undefined}>}
  */
 export async function requestJson(url, options = {}, networkError = null) {
   let res
@@ -474,6 +474,7 @@ export async function requestJson(url, options = {}, networkError = null) {
     data: json.data,
     status: res.status,
     error: json.error,
+    message: json.message,
     code: json.code,
   }
 }
@@ -1161,6 +1162,42 @@ export async function deletePoiImage(token, poiId) {
   return requestJson(`${API_BASE}/pois/${poiId}/image`, {
     method: 'DELETE', headers: artisanHeaders(token),
   }, 'Suppression impossible')
+}
+
+// --- POI — galerie photo communautaire -----------------------------
+
+export async function getPoiPhotos(poiId) {
+  return requestJson(`${API_BASE}/pois/${poiId}/photos`, { headers: { ...userHeaders() } }, 'Impossible de charger les photos.')
+}
+
+export async function uploadPoiPhoto(poiId, file) {
+  const form = new FormData()
+  form.append('image', file)
+  return requestJson(`${API_BASE}/pois/${poiId}/photos`, {
+    method: 'POST', headers: { ...userHeaders() }, body: form,
+  }, 'Envoi de la photo impossible')
+}
+
+export async function deletePoiPhoto(photoId) {
+  return requestJson(`${API_BASE}/pois/photos/${photoId}`, {
+    method: 'DELETE', headers: { ...userHeaders() },
+  }, 'Suppression impossible')
+}
+
+export async function reportPoiPhoto(photoId) {
+  return requestJson(`${API_BASE}/pois/photos/${photoId}/report`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...userHeaders() }, body: JSON.stringify({}),
+  }, 'Signalement impossible')
+}
+
+export async function fetchAdminPhotoReports(token) {
+  return requestJson(`${API_BASE}/admin/moderation/photos`, { headers: artisanHeaders(token) }, 'Erreur chargement des signalements')
+}
+
+export async function reviewPhotoReport(token, photoId, action) {
+  return requestJson(`${API_BASE}/admin/moderation/photos/${photoId}/${action}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...artisanHeaders(token) }, body: JSON.stringify({}),
+  }, 'Action impossible')
 }
 
 export async function fetchAdminPoiClaims(token, status = 'pending') {

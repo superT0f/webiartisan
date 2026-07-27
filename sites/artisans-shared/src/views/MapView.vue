@@ -663,9 +663,11 @@ onUnmounted(() => {
       :poi="selectedPoi"
       :checkin-state="selectedPoiCheckin"
       :authenticated="authenticated"
+      :is-admin="isAdmin"
       @close="closePoiSheet"
       @navigate="navigate"
       @checkin="onPoiSheetCheckin"
+      @toast="showToast"
     />
 
     <GameOverlay v-if="overlay === 'coupon'" :title="selectedGame?.title || 'Coupon'" @close="overlay = null">
