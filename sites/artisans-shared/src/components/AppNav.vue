@@ -2,7 +2,7 @@
   <nav class="nav" :class="{ scrolled }">
     <div class="container nav-inner">
       <RouterLink to="/" class="nav-logo">
-        <span class="logo-icon">🏠</span>
+        <img src="/logo-baguette.svg" class="logo-icon-img" alt="WebiArtisan" />
         <span class="logo-text">
           <span class="logo-title">Artisans</span>
           <span class="logo-city">{{ CITY_NAME }}</span>
@@ -183,6 +183,7 @@ onUnmounted(() => {
   gap: 10px;
 }
 .logo-icon { font-size: 1.6rem; }
+.logo-icon-img { width: 34px; height: 34px; display: block; }
 .logo-text { display: flex; flex-direction: column; line-height: 1.1; }
 .logo-title { font-family: var(--font-title); font-weight: 800; font-size: 1.05rem; color: var(--c-green); }
 .logo-city  { font-size: 0.72rem; color: var(--c-text-3); font-weight: 500; }

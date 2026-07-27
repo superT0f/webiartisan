@@ -347,6 +347,8 @@ function flutter_villes(PDO $pdo): void
                 c.name,
                 c.postal_code AS cp,
                 c.subdomain,
+                c.latitude,
+                c.longitude,
                 COUNT(DISTINCT a.id) AS artisan_count
             FROM local_cities c
             LEFT JOIN local_artisans a ON a.city_id = c.id AND a.status = 'active'
@@ -372,6 +374,8 @@ function flutter_villes(PDO $pdo): void
             'cp'            => $city['cp'] ?? '',
             'subdomain'     => $subdomain,
             'url'           => $subdomain ? 'https://' . rtrim($subdomain, '/') . '/' : '',
+            'latitude'      => $city['latitude'] !== null ? (float) $city['latitude'] : null,
+            'longitude'     => $city['longitude'] !== null ? (float) $city['longitude'] : null,
             'artisan_count' => (int) $city['artisan_count'],
         ];
     }, $cities);
