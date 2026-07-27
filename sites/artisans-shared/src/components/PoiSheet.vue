@@ -53,7 +53,9 @@ const checkinDisabled = computed(() => {
 
 const tab = ref('photos')
 const photos = ref([])
+const coverUrl = ref(null)
 const uploading = ref(false)
+const deletingIds = ref(new Set())
 const reportedIds = ref(new Set())
 const fileInput = ref(null)
 const coverInput = ref(null)
@@ -62,8 +64,7 @@ const coverInput = ref(null)
 // servies par l'API : même résolution que poi.image_url dans MapView.
 const galleryItems = computed(() => {
   const items = []
-  const cover = resolveAvatarUrl(props.poi?.image_url)
-  if (cover) items.push({ key: 'cover', url: cover, cover: true })
+  if (coverUrl.value) items.push({ key: 'cover', url: coverUrl.value, cover: true })
   for (const p of photos.value) {
     const url = resolveAvatarUrl(p.url)
     if (url) items.push({ key: `photo-${p.id}`, url, photo: p })
@@ -75,8 +76,10 @@ watch(() => props.poi?.id, async (id) => {
   tab.value = 'photos'
   photos.value = []
   reportedIds.value = new Set()
+  coverUrl.value = resolveAvatarUrl(props.poi?.image_url)
   if (!id) return
   const res = await getPoiPhotos(id)
+  if (id !== props.poi?.id) return
   if (res.success) photos.value = res.data || []
 }, { immediate: true })
 
@@ -109,10 +112,13 @@ async function onFilePicked(e) {
 async function doUpload(file) {
   if (uploading.value) return
   uploading.value = true
-  const res = await uploadPoiPhoto(props.poi.id, file)
+  const poiId = props.poi?.id
+  const res = await uploadPoiPhoto(poiId, file)
   uploading.value = false
   if (res.success) {
-    photos.value.unshift({ id: res.data.id, url: res.data.url, mine: true, created_at: new Date().toISOString() })
+    if (props.poi?.id === poiId) {
+      photos.value.unshift({ id: res.data.id, url: res.data.url, mine: true, created_at: new Date().toISOString() })
+    }
     emit('toast', '📷 Photo publiée, merci !')
   } else {
     emit('toast', res.message || res.error || 'Envoi impossible')
@@ -120,9 +126,12 @@ async function doUpload(file) {
 }
 
 async function onDeletePhoto(photo) {
+  if (deletingIds.value.has(photo.id)) return
+  deletingIds.value = new Set([...deletingIds.value, photo.id])
   const res = await deletePoiPhoto(photo.id)
   if (res.success) photos.value = photos.value.filter(p => p.id !== photo.id)
   else emit('toast', res.error || 'Suppression impossible')
+  deletingIds.value = new Set([...deletingIds.value].filter(id => id !== photo.id))
 }
 
 async function onReportPhoto(photo) {
@@ -141,7 +150,12 @@ async function onCoverUpload(e) {
   if (!file) return
   const token = getArtisanToken()
   const res = await uploadPoiImage(token, props.poi.id, file)
-  emit('toast', res.success ? '✅ Couverture mise à jour' : (res.message || res.error || 'Envoi impossible'))
+  if (res.success) {
+    coverUrl.value = resolveAvatarUrl(res.data.image_url) + '?v=' + Date.now()
+    emit('toast', '✅ Couverture mise à jour')
+  } else {
+    emit('toast', res.message || res.error || 'Envoi impossible')
+  }
 }
 </script>
 
