@@ -100,6 +100,15 @@ if ($appEnv === 'production' && (strlen($jwtSecret) < 64)) {
 // Database connection used by rate limiting and route files
 $pdo = getDatabase();
 
+// Migrations additives idempotentes (déploiement sans phpMyAdmin).
+// Une défaillance DDL ne doit jamais casser l'API : on logge et on continue.
+try {
+    require_once __DIR__ . '/lib/Migrations.php';
+    migrations_apply($pdo);
+} catch (Throwable $e) {
+    $logger->error('Migrations apply failed', ['error' => $e->getMessage()]);
+}
+
 // Global exception handler — return JSON for API requests
 set_exception_handler(function (Throwable $e) use ($logger): void {
     $logger->error('Unhandled exception', ['error' => $e->getMessage(), 'file' => $e->getFile(), 'line' => $e->getLine()]);
@@ -274,6 +283,12 @@ if ($module === 'checkin') {
 if ($module === 'objects') {
     applyRateLimit($pdo, 'public:' . $module);
     require_once __DIR__ . '/routes/objects.php';
+    exit;
+}
+
+if ($module === 'inventory') {
+    applyRateLimit($pdo, 'public:' . $module);
+    require_once __DIR__ . '/routes/inventory.php';
     exit;
 }
 

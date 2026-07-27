@@ -174,6 +174,7 @@ function objects_pickup(PDO $pdo, int $objectId, array $body): void
     $energy = null;
     $xp = 0;
     $result = null;
+    $inventoryItem = null;
 
     $pdo->beginTransaction();
     try {
@@ -242,6 +243,15 @@ function objects_pickup(PDO $pdo, int $objectId, array $body): void
             VALUES (?, ?, ?, ?)
         ")->execute([$userId, $objectId, $type, $xp]);
 
+        // Objets utilisables (leurre à boss, réserve d'énergie) → inventaire
+        if (in_array($type, INVENTORY_TYPES, true)) {
+            $pdo->prepare("
+                INSERT INTO local_user_inventory (user_id, object_type, source_object_id)
+                VALUES (?, ?, ?)
+            ")->execute([$userId, $type, $objectId]);
+            $inventoryItem = $type;
+        }
+
         $result = gamificationRecordAction(
             $pdo, $userId, 'object_pickup', "object:$objectId",
             ['city' => $obj['city'], 'object_type' => $type, 'object_category' => $category, 'object_id' => $objectId],
@@ -284,6 +294,7 @@ function objects_pickup(PDO $pdo, int $objectId, array $body): void
         'data'    => [
             'xp_awarded'       => $xp,
             'energy'           => $energy,
+            'inventory_item'   => $inventoryItem,
             'level_up'         => (bool)($result['level_up'] ?? false),
             'new_badges'       => $result['new_badges'] ?? [],
             'quests_completed' => $questsCompleted,

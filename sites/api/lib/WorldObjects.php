@@ -15,6 +15,7 @@ const OBJECT_TTL_HOURS = 48;
 const TRESOR_TTL_HOURS = 24;
 const ARTISAN_GIFT_MAX = 3;
 const ARTISAN_GIFT_RANGE_M = 100.0;
+const ENERGY_STORE_AMOUNT = 30;
 
 const OBJECT_TYPES = [
     'dechet'         => ['xp' => 10, 'energy' => 5,  'weight' => 60, 'category' => 'dechet', 'label' => 'Déchet'],
@@ -23,7 +24,12 @@ const OBJECT_TYPES = [
     'tresor'         => ['xp' => 50, 'energy' => 10, 'weight' => 6,  'category' => 'tresor', 'label' => 'Trésor'],
     'cadeau_artisan' => ['xp' => 15, 'energy' => 0,  'weight' => 0,  'category' => 'cadeau', 'label' => 'Cadeau'],
     'big_brother'    => ['xp' => 150, 'energy' => 0, 'weight' => 5,  'category' => 'boss',   'label' => 'Affamer de Gaffe'],
+    'boss_spawner'   => ['xp' => 25, 'energy' => 5,  'weight' => 3,  'category' => 'special', 'label' => 'Leurre à Big Brother'],
+    'energy_store'   => ['xp' => 10, 'energy' => 5,  'weight' => 4,  'category' => 'special', 'label' => 'Réserve d\'énergie'],
 ];
+
+/** Types ramassés puis stockés dans l'inventaire (activation différée). */
+const INVENTORY_TYPES = ['boss_spawner', 'energy_store'];
 
 /** Fait apparaître un Big Brother dans l'anneau 100–500 m (TTL 2 h). */
 function worldobjects_spawn_boss(PDO $pdo, string $city, float $lat, float $lng): int

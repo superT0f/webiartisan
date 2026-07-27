@@ -18,7 +18,7 @@ const props = defineProps({
   theme: { type: String, default: 'sun' } // 'sun' | 'rain' | 'night'
 })
 
-const emit = defineEmits(['select', 'map-click', 'ready', 'select-object'])
+const emit = defineEmits(['select', 'map-click', 'ready', 'select-object', 'select-poi'])
 const mapEl = ref(null)
 const map = ref(null)
 const markers = []
@@ -93,7 +93,33 @@ function set3D(enabled) {
   map.value.easeTo({ pitch: enabled ? 45 : 0, duration: 800 })
 }
 
-defineExpose({ set3D, has3D, is3D })
+/**
+ * Vue première personne (expérimental) : caméra basse (pitch max), zoom
+ * rapproché, recentrage sur le joueur à chaque mise à jour de position.
+ * Bâtiments 3D forcés si disponibles.
+ */
+const isFirstPerson = ref(false)
+function setFirstPerson(enabled) {
+  if (!map.value) return
+  isFirstPerson.value = enabled
+  if (enabled) {
+    if (has3D.value && map.value.getLayer('buildings-3d')) {
+      map.value.setLayoutProperty('buildings-3d', 'visibility', 'visible')
+    }
+    const pos = props.userPosition
+    map.value.easeTo({
+      pitch: 70,
+      zoom: 17.5,
+      ...(pos ? { center: [pos.longitude, pos.latitude] } : {}),
+      duration: 900,
+    })
+  } else {
+    // Retour à l'inclinaison du mode courant (3D ou 2D)
+    map.value.easeTo({ pitch: is3D.value ? 45 : 0, duration: 800 })
+  }
+}
+
+defineExpose({ set3D, has3D, is3D, setFirstPerson, isFirstPerson })
 
 let userMarker = null
 const USER_POS_SOURCE = 'user-pos'
@@ -115,6 +141,10 @@ function upsertUserPosition() {
     userMarker = new Marker({ element: el, anchor: 'center' }).setLngLat(lngLat).addTo(map.value)
   } else {
     userMarker.setLngLat(lngLat)
+  }
+  // Première personne : la caméra suit le joueur
+  if (isFirstPerson.value) {
+    map.value.easeTo({ center: lngLat, duration: 400 })
   }
   const data = { type: 'Feature', geometry: { type: 'Point', coordinates: lngLat } }
   if (map.value.getSource(USER_POS_SOURCE)) {
@@ -215,27 +245,11 @@ function renderMarkers() {
       el.innerHTML = `<span>${poiIcon(p.type)}</span>`
     }
 
-    const scheduleInfo = p.schedules?.length
-      ? `<br><small>${escapeHtml(formatSchedules(p.schedules))}</small>`
-      : ''
-    const imageHtml = p.image_url
-      ? `<img src="${escapeHtml(p.image_url)}" alt="" class="popup-photo" />`
-      : ''
-
-    const popup = new Popup({ offset: 16 }).setHTML(
-      `<div class="map-popup poi-popup">
-        ${imageHtml}
-        <strong>${escapeHtml(p.name)}</strong>
-        <span class="popup-type">${escapeHtml(p.type)}</span>
-        ${p.address ? `<span class="popup-address">${escapeHtml(p.address)}</span>` : ''}
-        ${p.phone ? `<span class="popup-phone">📞 ${escapeHtml(p.phone)}</span>` : ''}
-        ${scheduleInfo}
-      </div>`
-    )
+    // Tap = fiche résumé + action check-in dans la partie basse (pas de popup)
+    el.addEventListener('click', () => emit('select-poi', p))
 
     const marker = new Marker({ element: el, anchor: 'bottom' })
       .setLngLat([parseFloat(p.longitude), parseFloat(p.latitude)])
-      .setPopup(popup)
       .addTo(map.value)
     markers.push(marker)
   })
@@ -302,16 +316,7 @@ function renderMarkers() {
   })
 }
 
-function formatSchedules(schedules) {
-  const days = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
-  return schedules
-    .filter(s => !s.is_closed)
-    .map(s => `${days[s.day_of_week] || '?'} ${s.open_time?.slice(0, 5)}–${s.close_time?.slice(0, 5)}`)
-    .join(' · ')
-}
-
-function categoryIcon(slug) {
-  const map = {
+function categoryIcon(slug) {  const map = {
     boulangerie: '🥖',
     coiffure: '✂️',
     plombier: '🚿',
@@ -339,7 +344,9 @@ function objectIcon(type) {
     papier: '📰',
     tresor: '💎',
     cadeau_artisan: '🎁',
-    big_brother: '🎩'
+    big_brother: '🎩',
+    boss_spawner: '🎯',
+    energy_store: '🔋'
   }
   return icons[type] || '❓'
 }
@@ -444,6 +451,8 @@ function objectIcon(type) {
   animation: treasure-pulse 1.6s ease-in-out infinite;
 }
 :deep(.object-marker--cadeau_artisan) { border-color: #e11d48; }
+:deep(.object-marker--boss_spawner) { border-color: #b91c1c; }
+:deep(.object-marker--energy_store) { border-color: #16a34a; }
 :deep(.boss-marker) {
   width: 46px;
   height: 55px;
@@ -451,20 +460,25 @@ function objectIcon(type) {
   filter: drop-shadow(0 3px 6px rgba(0,0,0,0.45));
 }
 :deep(.boss-marker img) { width: 100%; height: 100%; }
-:deep(.boss-marker.marker--active) {
-  animation: boss-pulse 1.4s ease-in-out infinite;
+/*
+ * Halo d'action (cible à portée) : balayage horaire dans l'anneau,
+ * remplace l'ancien clignotement. Le centre est masqué pour ne garder
+ * que l'anneau extérieur (pas de voile sur l'icône).
+ */
+:deep(.marker--active) { z-index: 3; }
+:deep(.marker--active)::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, rgba(245,158,11,0.95) 0deg, rgba(245,158,11,0.35) 110deg, transparent 200deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px));
+  animation: halo-sweep 1.5s linear infinite;
+  pointer-events: none;
 }
-@keyframes boss-pulse {
-  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(124,58,237,0.7)); }
-  50% { transform: scale(1.12); filter: drop-shadow(0 0 14px rgba(124,58,237,0.9)); }
-}
-:deep(.marker--active) {
-  animation: active-glow 1.8s ease-in-out infinite;
-  z-index: 3;
-}
-@keyframes active-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.55), 0 4px 12px rgba(0,0,0,0.2); }
-  50% { box-shadow: 0 0 0 12px rgba(245, 158, 11, 0), 0 4px 12px rgba(0,0,0,0.2); }
+@keyframes halo-sweep {
+  to { transform: rotate(360deg); }
 }
 @keyframes treasure-pulse {
   0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(124,58,237,0.5); }

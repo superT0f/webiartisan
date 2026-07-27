@@ -41,6 +41,7 @@
           <span class="nav-weather-city">à {{ CITY_NAME }}</span>
         </RouterLink>
         <RouterLink to="/carte" class="nav-mobile-link nav-link-featured">🗺️ Carte</RouterLink>
+        <RouterLink v-if="user" to="/inventaire" class="nav-mobile-link">🎒 Inventaire</RouterLink>
         <RouterLink to="/annuaire" class="nav-mobile-link">🏠 Annuaire des artisans</RouterLink>
         <RouterLink to="/temoignages" class="nav-mobile-link">💬 Avis locaux</RouterLink>
         <RouterLink to="/annuaire#services-locaux" class="nav-mobile-link">🏙️ Services locaux</RouterLink>

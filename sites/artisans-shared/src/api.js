@@ -1069,6 +1069,24 @@ export async function pickupObject(id, lat, lng) {
   }, 'Ramassage impossible.')
 }
 
+// ------------------------------------------------------------------
+// Inventaire joueur (leurres à boss, réserves d'énergie)
+// ------------------------------------------------------------------
+
+export async function getInventory() {
+  return requestJson(`${API_BASE}/inventory`, {
+    headers: { ...userHeaders() },
+  }, 'Impossible de charger l\'inventaire.')
+}
+
+export async function activateInventoryItem(id, { lat, lng, city }) {
+  return requestJson(`${API_BASE}/inventory/${id}/activate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...userHeaders() },
+    body: JSON.stringify({ lat, lng, city }),
+  }, 'Activation impossible.')
+}
+
 export async function getQuestsToday() {
   return requestJson(`${API_BASE}/quests/today`, {
     headers: { ...userHeaders() },

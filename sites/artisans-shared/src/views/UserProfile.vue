@@ -105,6 +105,7 @@
               </span>
             </div>
             <p v-if="!Object.keys(user?.collection || {}).length">Aucun objet ramassé pour l'instant. Pars explorer la carte !</p>
+            <RouterLink to="/inventaire" class="inventory-link">🎒 Ouvrir mon inventaire →</RouterLink>
           </section>
 
           <section class="profile-section card">
@@ -368,6 +369,7 @@ onUnmounted(() => {
 .badges-list { display: flex; flex-wrap: wrap; gap: 8px; }
 .collection-list { display: flex; flex-wrap: wrap; gap: 10px; }
 .collection-item { background: #f1f5f9; border-radius: 999px; padding: 6px 12px; font-size: 0.9rem; }
+.inventory-link { display: inline-block; margin-top: 10px; font-size: 0.9rem; font-weight: 600; color: var(--c-green); text-decoration: none; }
 .badge { background: var(--c-text); color: #fff; padding: 6px 12px; border-radius: 20px; font-size: 13px; }
 
 .btn-danger { border-color: #b71c1c; color: #b71c1c; }

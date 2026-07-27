@@ -3,7 +3,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import ImmersiveMap from '../components/ImmersiveMap.vue'
 import ArtisanSheet from '../components/ArtisanSheet.vue'
-import ActionButton from '../components/ActionButton.vue'
+import PoiSheet from '../components/PoiSheet.vue'
 import EnergyBar from '../components/EnergyBar.vue'
 import QuestsPanel from '../components/QuestsPanel.vue'
 import CleanCityPanel from '../components/CleanCityPanel.vue'
@@ -27,7 +27,7 @@ import { useGamification } from '../composables/useGamification.js'
 import { useWorldObjects } from '../composables/useWorldObjects.js'
 import { useEnergy } from '../composables/useEnergy.js'
 import { isMapTilerKey } from '../composables/useMapStyle.js'
-import { pickMapAction, PICKUP_RANGE_M } from '../utils/pickMapAction.js'
+import { PICKUP_RANGE_M } from '../utils/pickMapAction.js'
 import { playSound } from '../utils/sounds.js'
 
 const router = useRouter()
@@ -80,19 +80,35 @@ const activeTargetIds = computed(() =>
 )
 const unclaimedCount = computed(() => quests.value.filter(q => q.completed && !q.claimed).length)
 
-// Bascule 2D/3D (spike carte immersive) — préférence persistée
+// Modes de caméra : 2D → 3D → première personne (spike carte immersive).
+// Préférence persistée (migration douce depuis l'ancien booléen map_3d).
 const immersiveMap = ref(null)
 const can3D = isMapTilerKey(import.meta.env.VITE_MAPTILER_KEY)
-const is3D = ref(localStorage.getItem('map_3d') === '1')
+const mapMode = ref(
+  localStorage.getItem('map_mode')
+  || (localStorage.getItem('map_3d') === '1' ? '3d' : '2d')
+)
+const MAP_MODES = ['2d', '3d', 'fp']
+const MAP_MODE_LABELS = { '2d': '🗺️ 2D', '3d': '🏙️ 3D', 'fp': '🚶 1ère pers.' }
 
-function toggle3D() {
-  is3D.value = !is3D.value
-  localStorage.setItem('map_3d', is3D.value ? '1' : '0')
-  immersiveMap.value?.set3D(is3D.value)
+function applyMapMode() {
+  if (mapMode.value === 'fp') {
+    immersiveMap.value?.setFirstPerson(true)
+  } else {
+    immersiveMap.value?.setFirstPerson(false)
+    immersiveMap.value?.set3D(mapMode.value === '3d')
+  }
+}
+
+function cycleMapMode() {
+  const next = MAP_MODES[(MAP_MODES.indexOf(mapMode.value) + 1) % MAP_MODES.length]
+  mapMode.value = next
+  localStorage.setItem('map_mode', next)
+  applyMapMode()
 }
 
 function onMapReady() {
-  if (is3D.value) immersiveMap.value?.set3D(true)
+  applyMapMode()
 }
 
 const authenticated = computed(() => !!userToken.value)
@@ -111,10 +127,6 @@ const selectedGame = computed(() => {
   return gameByArtisan.value[Number(selected.value.id)] || null
 })
 
-// Nearest in-range point (server sorts by distance) — drives the floating button
-const nearestTarget = computed(() => statusTargets.value[0] || null)
-const fabAction = computed(() => pickMapAction(worldObjects.value, nearestTarget.value))
-
 // Check-in state for the artisan shown in the sheet
 const selectedCheckin = computed(() => {
   if (!selected.value || !effectivePosition.value) return null
@@ -124,6 +136,25 @@ const selectedCheckin = computed(() => {
   ))
   const st = statusTargets.value.find(
     t => t.target_type === 'artisan' && t.target_id === Number(selected.value.id)
+  )
+  return {
+    inRange: distanceM <= 200,
+    distanceM,
+    dailyAvailable: st ? st.daily_available : null,
+    nextSpinAt: st ? st.next_spin_at : null,
+  }
+})
+
+// Check-in state for the POI shown in the sheet (même règle que les artisans)
+const selectedPoi = ref(null)
+const selectedPoiCheckin = computed(() => {
+  if (!selectedPoi.value || !effectivePosition.value) return null
+  const distanceM = Math.round(haversineM(
+    effectivePosition.value.latitude, effectivePosition.value.longitude,
+    Number(selectedPoi.value.latitude), Number(selectedPoi.value.longitude)
+  ))
+  const st = statusTargets.value.find(
+    t => t.target_type === 'poi' && t.target_id === Number(selectedPoi.value.id)
   )
   return {
     inRange: distanceM <= 200,
@@ -255,6 +286,8 @@ async function doPickup(object, retried = false) {
   if (res.success) {
     haptic('medium')
     showToast(`+${res.data.xp_awarded} XP`)
+    if (res.data.inventory_item === 'boss_spawner') showToast('🎯 Leurre à boss rangé dans ton inventaire 🎒')
+    if (res.data.inventory_item === 'energy_store') showToast('🔋 Réserve d\'énergie rangée dans ton inventaire 🎒')
     removeObject(object.id)
     setEnergy(res.data.energy)
     if (res.data.level_up) {
@@ -292,7 +325,7 @@ async function doPickup(object, retried = false) {
 }
 
 function objectEmoji(type) {
-  const icons = { dechet: '🗑️', canette: '🍾', papier: '📰', tresor: '💎', cadeau_artisan: '🎁' }
+  const icons = { dechet: '🗑️', canette: '🍾', papier: '📰', tresor: '💎', cadeau_artisan: '🎁', boss_spawner: '🎯', energy_store: '🔋' }
   return icons[type] || '❓'
 }
 
@@ -347,14 +380,6 @@ function onRingCancel() {
   ringTarget.value = null
 }
 
-function onFabAct(action) {
-  if (action.kind === 'pickup') {
-    openRingForObject(action.object)
-  } else {
-    openRingForTarget(action.target)
-  }
-}
-
 async function refreshQuests() {
   if (!authenticated.value) return
   const res = await getQuestsToday()
@@ -390,6 +415,14 @@ function onSheetCheckin() {
 
 function openSheet(artisan) { selected.value = artisan }
 function closeSheet() { selected.value = null }
+
+function openPoiSheet(poi) { selectedPoi.value = poi }
+function closePoiSheet() { selectedPoi.value = null }
+
+function onPoiSheetCheckin() {
+  if (!selectedPoi.value) return
+  openRingForTarget({ target_type: 'poi', target_id: Number(selectedPoi.value.id), name: selectedPoi.value.name })
+}
 
 function navigate(artisan) {
   const url = `https://www.google.com/maps/dir/?api=1&destination=${artisan.latitude},${artisan.longitude}`
@@ -551,6 +584,7 @@ onUnmounted(() => {
       @map-click="onMapClick"
       @ready="onMapReady"
       @select-object="openRingForObject"
+      @select-poi="openPoiSheet"
     />
 
     <div v-if="loading" class="loading-chip card">Chargement de la carte…</div>
@@ -575,8 +609,8 @@ onUnmounted(() => {
       <span v-if="unclaimedCount" class="quests-fab__badge">{{ unclaimedCount }}</span>
     </button>
 
-    <button v-if="can3D" type="button" class="map3d-fab card" :class="{ 'map3d-fab--active': is3D }" @click="toggle3D">
-      {{ is3D ? '🗺️ 2D' : '🏙️ 3D' }}
+    <button v-if="can3D" type="button" class="map3d-fab card" :class="{ 'map3d-fab--active': mapMode !== '2d' }" @click="cycleMapMode">
+      {{ MAP_MODE_LABELS[mapMode] }}
     </button>
 
     <button v-if="cityCleanliness !== null" type="button" class="cleanliness-chip card" @click="cleanPanelOpen = !cleanPanelOpen">
@@ -601,8 +635,6 @@ onUnmounted(() => {
       @cancel="onRingCancel"
     />
 
-    <ActionButton :action="fabAction" :loading="checkinLoading || pickupLoading" @act="onFabAct" />
-
     <ArtisanSheet
       :artisan="selected"
       :game="selectedGame"
@@ -614,6 +646,15 @@ onUnmounted(() => {
       @play-coupon="overlay = 'coupon'"
       @play-spin="overlay = 'spin'"
       @share="onShareArtisan"
+    />
+
+    <PoiSheet
+      :poi="selectedPoi"
+      :checkin-state="selectedPoiCheckin"
+      :authenticated="authenticated"
+      @close="closePoiSheet"
+      @navigate="navigate"
+      @checkin="onPoiSheetCheckin"
     />
 
     <GameOverlay v-if="overlay === 'coupon'" :title="selectedGame?.title || 'Coupon'" @close="overlay = null">
