@@ -513,6 +513,11 @@ onMounted(async () => {
   }
   loading.value = false
 
+  // Premier fetch au centre-ville en attendant le fix GPS (carte vivante dès l'ouverture)
+  if (!effectivePosition.value && authenticated.value) {
+    fetchNearby(CITY_LAT, CITY_LNG)
+  }
+
   refreshQuests()
   startGeolocation()
 })
