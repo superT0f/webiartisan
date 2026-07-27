@@ -31,10 +31,14 @@ const OBJECT_TYPES = [
 /** Types ramassés puis stockés dans l'inventaire (activation différée). */
 const INVENTORY_TYPES = ['boss_spawner', 'energy_store'];
 
-/** Fait apparaître un Big Brother dans l'anneau 100–500 m (TTL 2 h). */
-function worldobjects_spawn_boss(PDO $pdo, string $city, float $lat, float $lng): int
+/**
+ * Fait apparaître un Big Brother (TTL 2 h).
+ * Par défaut dans l'anneau 100–500 m ; $atExactPosition=true le pose
+ * exactement sur le point (garantie admin : engagement immédiat).
+ */
+function worldobjects_spawn_boss(PDO $pdo, string $city, float $lat, float $lng, bool $atExactPosition = false): int
 {
-    $dist = mt_rand(SPAWN_MIN_RADIUS_M, SPAWN_RADIUS_M);
+    $dist = $atExactPosition ? 0 : mt_rand(SPAWN_MIN_RADIUS_M, SPAWN_RADIUS_M);
     $bearing = deg2rad(mt_rand(0, 359));
     $dLat = ($dist * cos($bearing)) / 111320.0;
     $dLng = ($dist * sin($bearing)) / (111320.0 * cos(deg2rad($lat)));

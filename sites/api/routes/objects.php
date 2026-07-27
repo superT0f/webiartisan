@@ -105,7 +105,8 @@ function objects_list(PDO $pdo): void
         // Bbox ~500 m (0.005° lat, 0.007° lng à ~49°)
         $bossStmt->execute([$city, $lat - 0.005, $lat + 0.005, $lng - 0.007, $lng + 0.007, (int)$user['id']]);
         if (!$bossStmt->fetchColumn()) {
-            worldobjects_spawn_boss($pdo, $city, $lat, $lng);
+            // Admin : boss posé exactement sur le joueur (engagement immédiat)
+            worldobjects_spawn_boss($pdo, $city, $lat, $lng, true);
         }
     }
 

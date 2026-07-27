@@ -143,8 +143,12 @@ $adminArtisanId = (int)$pdo->lastInsertId();
 $pdo->exec("UPDATE local_world_objects SET status = 'expired' WHERE object_type = 'big_brother'");
 $r = api('GET', '/objects?lat=49.1081&lng=-0.7658&city=livry', null, $adminToken);
 $adminBoss = false;
-foreach ($r['json']['data']['objects'] ?? [] as $o) { if ($o['type'] === 'big_brother') $adminBoss = true; }
+$adminBossDist = null;
+foreach ($r['json']['data']['objects'] ?? [] as $o) {
+    if ($o['type'] === 'big_brother') { $adminBoss = true; $adminBossDist = $o['distance_m']; }
+}
 check('admin : un boss apparaît à proximité', $adminBoss === true, json_encode(array_column($r['json']['data']['objects'] ?? [], 'type')));
+check('admin : boss posé sur le joueur (< 50 m)', $adminBossDist !== null && $adminBossDist < 50, "dist={$adminBossDist}m");
 
 // 15. Garantie admin : un boss COMBATTU dans la zone ne bloque pas le respawn
 $pdo->exec("UPDATE local_world_objects SET status = 'expired' WHERE object_type = 'big_brother'");
