@@ -90,6 +90,17 @@ foreach (['NOW()', 'DATE_SUB(NOW(), INTERVAL 1 DAY)', 'DATE_SUB(NOW(), INTERVAL 
 }
 check('streak ramassage = 3', questsPickupStreak($pdo, $userId) === 3);
 
+// 9. Drop de check-in : chance 0 → jamais, chance 100 → toujours, dans l'inventaire
+check('drop chance 0 → null', worldobjects_checkin_drop($pdo, $userId, 0) === null);
+$before = (int)$pdo->query("SELECT COUNT(*) FROM local_user_inventory WHERE user_id = $userId")->fetchColumn();
+$type = worldobjects_checkin_drop($pdo, $userId, 100);
+check('drop chance 100 → type valide', in_array($type, ['energy_store', 'boss_spawner'], true), (string)$type);
+$after = (int)$pdo->query("SELECT COUNT(*) FROM local_user_inventory WHERE user_id = $userId")->fetchColumn();
+check('drop inséré dans l inventaire', $after === $before + 1);
+$row = $pdo->query("SELECT object_type, source_object_id, status FROM local_user_inventory WHERE user_id = $userId ORDER BY id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+check('ligne inventaire correcte', $row && $row['object_type'] === $type && $row['source_object_id'] === null && $row['status'] === 'active', json_encode($row));
+$pdo->prepare("DELETE FROM local_user_inventory WHERE user_id = ?")->execute([$userId]);
+
 // Cleanup
 $pdo->prepare("DELETE FROM local_object_pickups WHERE user_id = ?")->execute([$userId]);
 $pdo->prepare("DELETE FROM local_user_quests WHERE user_id = ?")->execute([$userId]);

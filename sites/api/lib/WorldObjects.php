@@ -31,6 +31,34 @@ const OBJECT_TYPES = [
 /** Types ramassés puis stockés dans l'inventaire (activation différée). */
 const INVENTORY_TYPES = ['boss_spawner', 'energy_store'];
 
+const CHECKIN_DROP_CHANCE = 20; // % de chance d'un drop après un check-in réussi
+const CHECKIN_DROP_WEIGHTS = ['energy_store' => 60, 'boss_spawner' => 40];
+
+/**
+ * Drop aléatoire après un check-in réussi : l'objet part directement dans
+ * l'inventaire du joueur (source_object_id NULL — pas d'objet monde d'origine).
+ * Retourne le type droppé ou null.
+ */
+function worldobjects_checkin_drop(PDO $pdo, int $userId, int $chancePercent = CHECKIN_DROP_CHANCE): ?string
+{
+    if ($chancePercent <= 0 || mt_rand(1, 100) > $chancePercent) {
+        return null;
+    }
+    $roll = mt_rand(1, 100);
+    $acc = 0;
+    foreach (CHECKIN_DROP_WEIGHTS as $type => $weight) {
+        $acc += $weight;
+        if ($roll <= $acc) {
+            $pdo->prepare("
+                INSERT INTO local_user_inventory (user_id, object_type, source_object_id)
+                VALUES (?, ?, NULL)
+            ")->execute([$userId, $type]);
+            return $type;
+        }
+    }
+    return null;
+}
+
 /**
  * Fait apparaître un Big Brother (TTL 2 h).
  * Par défaut dans l'anneau 100–500 m ; $atExactPosition=true le pose

@@ -237,6 +237,7 @@ async function doCheckin(targetType, targetId, retried = false) {
       showToast(`Badge débloqué : ${b.name}`)
     }
     if (res.data.energy_bonus) showToast(`+${res.data.energy_bonus} ⚡ énergie`)
+    if (res.data.drop) showToast(`🎁 Drop : ${res.data.drop.label} → dans ton inventaire 🎒`)
     if (res.data.energy) setEnergy(res.data.energy)
     for (const q of res.data.quests_completed || []) showToast(`Quête terminée : ${q.label}`)
     await refreshStatus()

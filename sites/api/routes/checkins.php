@@ -10,6 +10,7 @@
 require_once __DIR__ . '/../lib/UserAuth.php';
 require_once __DIR__ . '/../lib/Gamification.php';
 require_once __DIR__ . '/../lib/Quests.php';
+require_once __DIR__ . '/../lib/WorldObjects.php';
 require_once __DIR__ . '/../lib/AppLogger.php';
 
 const CHECKIN_RANGE_M = 500.0;
@@ -153,6 +154,7 @@ function checkin_create(PDO $pdo, array $body): void
 
     $resourceKey = "{$targetType}:{$targetId}";
     $questsCompleted = [];
+    $dropType = null;
     $energy = null;
 
     $pdo->beginTransaction();
@@ -205,6 +207,9 @@ function checkin_create(PDO $pdo, array $body): void
         // Bonus énergie : le check-in restaure +20 ⚡
         energyAdd($pdo, $userId, ENERGY_PER_CHECKIN);
 
+        // Drop aléatoire → inventaire (leurre à boss, réserve d'énergie)
+        $dropType = worldobjects_checkin_drop($pdo, $userId);
+
         // Quête du jour : visite d'artisans
         if ($targetType === 'artisan') {
             $q = questsProgress($pdo, $userId, 'visit_2_artisans', 1);
@@ -235,6 +240,7 @@ function checkin_create(PDO $pdo, array $body): void
             'new_badges'       => $result['new_badges'] ?? [],
             'energy_bonus'     => ENERGY_PER_CHECKIN,
             'energy'           => $energy,
+            'drop'             => $dropType ? ['type' => $dropType, 'label' => OBJECT_TYPES[$dropType]['label']] : null,
             'quests_completed' => $questsCompleted,
         ],
     ]);
