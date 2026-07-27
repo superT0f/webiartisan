@@ -28,15 +28,20 @@
       </template>
 
       <div v-else-if="state.status === 'won'" class="arena__end arena__end--won">
-        <span class="arena__end-emoji">🏆</span>
-        <h2>Big Brother terrassé !</h2>
-        <p>+150 XP — la ville respire (3 déchets nettoyés) 🌿</p>
+        <div class="arena__end-row">
+          <img src="/boss/artisan-kid-2.jpg" class="arena__kid" alt="Les artisans gagnent !" />
+          <div>
+            <span class="arena__end-emoji">🏆</span>
+            <h2>Affamer de Gaffe terrassé !</h2>
+            <p>+150 XP — la ville respire (3 déchets nettoyés) 🌿</p>
+          </div>
+        </div>
         <button type="button" class="btn btn-primary" @click="leave">Retour à la carte</button>
       </div>
 
       <div v-else class="arena__end arena__end--lost">
         <span class="arena__end-emoji">💸</span>
-        <h2>Le Big Brother t'a écrasé…</h2>
+        <h2>Affamer de Gaffe t'a écrasé…</h2>
         <p>+5 XP de consolation. Recharge ton énergie et reviens !</p>
         <button type="button" class="btn btn-primary" @click="leave">Retour à la carte</button>
       </div>
@@ -221,4 +226,6 @@ onUnmounted(() => {
 .arena__games { display: flex; flex-direction: column; gap: 10px; }
 .arena__end { text-align: center; display: flex; flex-direction: column; gap: 10px; align-items: center; }
 .arena__end-emoji { font-size: 3rem; }
+.arena__end-row { display: flex; align-items: center; gap: 14px; text-align: left; }
+.arena__kid { width: 76px; height: auto; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
 </style>
