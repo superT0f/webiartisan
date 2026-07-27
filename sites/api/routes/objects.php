@@ -90,8 +90,8 @@ function objects_list(PDO $pdo): void
     ");
     $adminStmt->execute([(int)$user['id'], (int)$user['id']]);
     if ($adminStmt->fetchColumn()) {
-        // La présence compte uniquement les boss NON combattus par le joueur
-        // (un boss vaincu est masqué pour lui : il ne doit pas bloquer le respawn)
+        // Garantie admin : un boss NON combattu à ≤500 m du joueur.
+        // (Un boss plus loin ne suffit pas : l'admin doit pouvoir l'engager.)
         $bossStmt = $pdo->prepare("
             SELECT 1 FROM local_world_objects o
             WHERE o.city = ? AND o.status = 'active' AND o.object_type = 'big_brother'
@@ -102,7 +102,8 @@ function objects_list(PDO $pdo): void
               )
             LIMIT 1
         ");
-        $bossStmt->execute([$city, $lat - 0.01, $lat + 0.01, $lng - 0.014, $lng + 0.014, (int)$user['id']]);
+        // Bbox ~500 m (0.005° lat, 0.007° lng à ~49°)
+        $bossStmt->execute([$city, $lat - 0.005, $lat + 0.005, $lng - 0.007, $lng + 0.007, (int)$user['id']]);
         if (!$bossStmt->fetchColumn()) {
             worldobjects_spawn_boss($pdo, $city, $lat, $lng);
         }

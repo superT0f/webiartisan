@@ -159,6 +159,18 @@ foreach ($r['json']['data']['objects'] ?? [] as $o) {
 }
 check('admin : respawn malgré un boss vaincu dans la zone', $freshBoss === true);
 
+// 16. Garantie admin : un boss NON combattu mais à >500 m → respawn quand même
+$pdo->exec("UPDATE local_world_objects SET status = 'expired' WHERE object_type = 'big_brother'");
+// Boss actif non combattu à ~750 m (hors des 500 m de la garantie)
+$pdo->prepare("INSERT INTO local_world_objects (city, object_type, lat, lng, xp_value, energy_cost, expires_at) VALUES ('livry', 'big_brother', 49.1145, -0.7658, 150, 0, DATE_ADD(NOW(), INTERVAL 2 HOUR))")->execute();
+$farBossId = (int)$pdo->lastInsertId();
+$r = api('GET', '/objects?lat=49.1081&lng=-0.7658&city=livry', null, $adminToken);
+$nearBoss = false;
+foreach ($r['json']['data']['objects'] ?? [] as $o) {
+    if ($o['type'] === 'big_brother' && (int)$o['id'] !== $farBossId && (int)$o['distance_m'] <= 500) $nearBoss = true;
+}
+check('admin : respawn si le seul boss est à >500 m', $nearBoss === true, json_encode(array_column($r['json']['data']['objects'] ?? [], 'type')));
+
 // Cleanup
 $pdo->prepare("DELETE FROM local_boss_fights WHERE object_id = ?")->execute([$foughtBossId]);
 $pdo->prepare("DELETE FROM local_artisans WHERE id = ?")->execute([$adminArtisanId]);
