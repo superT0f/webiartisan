@@ -25,9 +25,14 @@
  * GET  /admin/moderation/testimonials            — Témoignages en attente
  * POST /admin/moderation/testimonials/{id}/approve — Approuver un témoignage
  * POST /admin/moderation/testimonials/{id}/reject  — Rejeter un témoignage
+ * GET  /admin/moderation/photos                  — Photos POI signalées
+ * POST /admin/moderation/photos/{id}/keep        — Valider une photo (+ cadeau inventaire)
+ * POST /admin/moderation/photos/{id}/hide        — Masquer une photo
+ * POST /admin/moderation/photos/{id}/delete      — Supprimer une photo (+ fichier)
  */
 
 require_once __DIR__ . '/../lib/ArtisanAuth.php';
+require_once __DIR__ . '/../lib/AppLogger.php';
 
 $artisan = artisan_require_auth($pdo);
 
@@ -81,6 +86,10 @@ if ($method === 'GET' && $action === 'artisans' && $param === null) {
     admin_moderation_testimonial_approve($pdo, (int)$subAction);
 } elseif ($action === 'moderation' && $param === 'testimonials' && $method === 'POST' && is_numeric($subAction) && ($segments[4] ?? '') === 'reject') {
     admin_moderation_testimonial_reject($pdo, (int)$subAction);
+} elseif ($action === 'moderation' && $param === 'photos' && $method === 'GET' && $subAction === '') {
+    admin_moderation_photos($pdo);
+} elseif ($action === 'moderation' && $param === 'photos' && $method === 'POST' && is_numeric($subAction) && in_array($segments[4] ?? '', ['keep','hide','delete'], true)) {
+    admin_moderation_photo_review($pdo, (int)$subAction, $segments[4]);
 } else {
     http_response_code(404);
     echo json_encode(['success' => false, 'error' => 'Endpoint inconnu']);
@@ -828,4 +837,75 @@ function admin_poi_revoke_owner(PDO $pdo, int $poiId): void
         return;
     }
     echo json_encode(['success' => true, 'data' => ['revoked' => $poiId]]);
+}
+
+/* =============================================================
+ * Modération galerie photo POI (signalements joueurs)
+ * ============================================================= */
+
+/**
+ * GET /admin/moderation/photos — Photos signalées (actives ou validées)
+ */
+function admin_moderation_photos(PDO $pdo): void
+{
+    $stmt = $pdo->query("
+        SELECT ph.id, ph.file_path, ph.status, ph.created_at, ph.poi_id,
+               p.name AS poi_name,
+               (SELECT COUNT(*) FROM local_poi_photo_reports r WHERE r.photo_id = ph.id) AS reports
+        FROM local_poi_photos ph
+        JOIN local_pois p ON p.id = ph.poi_id
+        WHERE ph.status IN ('active','validated')
+          AND EXISTS (SELECT 1 FROM local_poi_photo_reports r WHERE r.photo_id = ph.id)
+        ORDER BY reports DESC, ph.created_at ASC
+        LIMIT 100
+    ");
+    echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+}
+
+/**
+ * POST /admin/moderation/photos/{id}/{keep|hide|delete} — Décision de modération
+ * keep : valide la photo + offre une réserve d'énergie à l'uploadeur (une seule fois par photo)
+ * hide : masque la photo de la galerie publique
+ * delete : marque deleted + supprime le fichier
+ */
+function admin_moderation_photo_review(PDO $pdo, int $id, string $action): void
+{
+    $stmt = $pdo->prepare("SELECT * FROM local_poi_photos WHERE id = ? AND status IN ('active','validated')");
+    $stmt->execute([$id]);
+    $photo = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$photo) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Photo introuvable']);
+        return;
+    }
+
+    if ($action === 'keep') {
+        $pdo->prepare("UPDATE local_poi_photos SET status = 'validated' WHERE id = ?")->execute([$id]);
+        // Cadeau pour l'uploadeur, une seule fois par photo
+        $gifted = false;
+        if ($photo['gifted_at'] === null) {
+            $pdo->prepare("
+                INSERT INTO local_user_inventory (user_id, object_type, source_object_id, source_label)
+                VALUES (?, 'energy_store', NULL, 'Merci pour la photo, ami artisan')
+            ")->execute([(int)$photo['user_id']]);
+            $pdo->prepare("UPDATE local_poi_photos SET gifted_at = NOW() WHERE id = ?")->execute([$id]);
+            $gifted = true;
+        }
+        app_log('info', '[POI-PHOTOS] keep', ['photo_id' => $id, 'gifted' => $gifted]);
+        echo json_encode(['success' => true, 'data' => ['validated' => $id, 'gifted' => $gifted]]);
+        return;
+    }
+
+    if ($action === 'hide') {
+        $pdo->prepare("UPDATE local_poi_photos SET status = 'hidden' WHERE id = ?")->execute([$id]);
+        echo json_encode(['success' => true, 'data' => ['hidden' => $id]]);
+        return;
+    }
+
+    // delete
+    $pdo->prepare("UPDATE local_poi_photos SET status = 'deleted' WHERE id = ?")->execute([$id]);
+    $file = __DIR__ . '/../uploads/pois/gallery/' . basename($photo['file_path']);
+    if (is_file($file)) @unlink($file);
+    app_log('info', '[POI-PHOTOS] delete', ['photo_id' => $id]);
+    echo json_encode(['success' => true, 'data' => ['deleted' => $id]]);
 }
