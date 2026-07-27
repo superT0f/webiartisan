@@ -80,9 +80,15 @@ function objects_list(PDO $pdo): void
     worldobjects_expire_stale($pdo);
     worldobjects_ensure_density($pdo, $city, $lat, $lng);
 
-    // Garantie admin : toujours un Big Brother à proximité (debug/démo)
-    $adminStmt = $pdo->prepare("SELECT 1 FROM local_artisans WHERE user_id = ? AND is_admin = 1 AND status = 'active' LIMIT 1");
-    $adminStmt->execute([(int)$user['id']]);
+    // Garantie admin : toujours un Big Brother à proximité (debug/démo).
+    // Match par user_id lié OU par email (certaines lignes n'ont pas le lien).
+    $adminStmt = $pdo->prepare("
+        SELECT 1 FROM local_artisans a
+        WHERE a.is_admin = 1 AND a.status = 'active'
+          AND (a.user_id = ? OR a.email = (SELECT email FROM local_users WHERE id = ?))
+        LIMIT 1
+    ");
+    $adminStmt->execute([(int)$user['id'], (int)$user['id']]);
     if ($adminStmt->fetchColumn()) {
         $bossStmt = $pdo->prepare("
             SELECT 1 FROM local_world_objects
