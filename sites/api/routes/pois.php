@@ -347,3 +347,64 @@ function pois_upload_photo(PDO $pdo, int $poiId): void
     http_response_code(201);
     echo json_encode(['success' => true, 'data' => ['id' => $id, 'url' => $path]]);
 }
+
+function pois_is_admin(PDO $pdo, int $userId): bool
+{
+    $stmt = $pdo->prepare("
+        SELECT 1 FROM local_artisans a
+        WHERE a.is_admin = 1 AND a.status = 'active'
+          AND (a.user_id = ? OR a.email = (SELECT email FROM local_users WHERE id = ?))
+        LIMIT 1
+    ");
+    $stmt->execute([$userId, $userId]);
+    return (bool)$stmt->fetchColumn();
+}
+
+function pois_delete_photo(PDO $pdo, int $photoId): void
+{
+    $user = user_require_auth($pdo);
+    $userId = (int)$user['id'];
+    $stmt = $pdo->prepare("SELECT * FROM local_poi_photos WHERE id = ? AND status != 'deleted'");
+    $stmt->execute([$photoId]);
+    $photo = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$photo) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Photo introuvable']);
+        return;
+    }
+    if ((int)$photo['user_id'] !== $userId && !pois_is_admin($pdo, $userId)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Seul l\'auteur (ou un admin) peut supprimer cette photo']);
+        return;
+    }
+    $pdo->prepare("UPDATE local_poi_photos SET status = 'deleted' WHERE id = ?")->execute([$photoId]);
+    $file = __DIR__ . '/../uploads/pois/gallery/' . basename($photo['file_path']);
+    if (is_file($file)) @unlink($file);
+    echo json_encode(['success' => true, 'data' => ['deleted' => $photoId]]);
+}
+
+function pois_report_photo(PDO $pdo, int $photoId): void
+{
+    $user = user_require_auth($pdo);
+    $userId = (int)$user['id'];
+    $exists = $pdo->prepare("SELECT 1 FROM local_poi_photos WHERE id = ? AND status IN ('active','validated')");
+    $exists->execute([$photoId]);
+    if (!$exists->fetchColumn()) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Photo introuvable']);
+        return;
+    }
+    try {
+        $pdo->prepare("INSERT INTO local_poi_photo_reports (photo_id, user_id) VALUES (?, ?)")
+            ->execute([$photoId, $userId]);
+    } catch (PDOException $e) {
+        if ((int)($e->errorInfo[1] ?? 0) === 1062) {
+            http_response_code(409);
+            echo json_encode(['success' => false, 'error' => 'already_reported', 'message' => 'Déjà signalée, merci !']);
+            return;
+        }
+        throw $e;
+    }
+    app_log('info', '[POI-PHOTOS] report', ['photo_id' => $photoId, 'user_id' => $userId]);
+    echo json_encode(['success' => true, 'data' => ['reported' => $photoId]]);
+}
