@@ -90,13 +90,19 @@ function objects_list(PDO $pdo): void
     ");
     $adminStmt->execute([(int)$user['id'], (int)$user['id']]);
     if ($adminStmt->fetchColumn()) {
+        // La présence compte uniquement les boss NON combattus par le joueur
+        // (un boss vaincu est masqué pour lui : il ne doit pas bloquer le respawn)
         $bossStmt = $pdo->prepare("
-            SELECT 1 FROM local_world_objects
-            WHERE city = ? AND status = 'active' AND object_type = 'big_brother'
-              AND lat BETWEEN ? AND ? AND lng BETWEEN ? AND ?
+            SELECT 1 FROM local_world_objects o
+            WHERE o.city = ? AND o.status = 'active' AND o.object_type = 'big_brother'
+              AND o.lat BETWEEN ? AND ? AND o.lng BETWEEN ? AND ?
+              AND NOT EXISTS (
+                  SELECT 1 FROM local_boss_fights f
+                  WHERE f.object_id = o.id AND f.user_id = ?
+              )
             LIMIT 1
         ");
-        $bossStmt->execute([$city, $lat - 0.01, $lat + 0.01, $lng - 0.014, $lng + 0.014]);
+        $bossStmt->execute([$city, $lat - 0.01, $lat + 0.01, $lng - 0.014, $lng + 0.014, (int)$user['id']]);
         if (!$bossStmt->fetchColumn()) {
             worldobjects_spawn_boss($pdo, $city, $lat, $lng);
         }

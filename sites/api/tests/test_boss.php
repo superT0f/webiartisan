@@ -146,7 +146,21 @@ $adminBoss = false;
 foreach ($r['json']['data']['objects'] ?? [] as $o) { if ($o['type'] === 'big_brother') $adminBoss = true; }
 check('admin : un boss apparaît à proximité', $adminBoss === true, json_encode(array_column($r['json']['data']['objects'] ?? [], 'type')));
 
+// 15. Garantie admin : un boss COMBATTU dans la zone ne bloque pas le respawn
+$pdo->exec("UPDATE local_world_objects SET status = 'expired' WHERE object_type = 'big_brother'");
+$pdo->prepare("INSERT INTO local_world_objects (city, object_type, lat, lng, xp_value, energy_cost, expires_at) VALUES ('livry', 'big_brother', 49.1081, -0.7658, 150, 0, DATE_ADD(NOW(), INTERVAL 2 HOUR))")->execute();
+$foughtBossId = (int)$pdo->lastInsertId();
+// Le joueur admin a déjà vaincu ce boss (masqué pour lui)
+$pdo->prepare("INSERT INTO local_boss_fights (user_id, object_id, result) VALUES (?, ?, 'win')")->execute([$adminUserId, $foughtBossId]);
+$r = api('GET', '/objects?lat=49.1081&lng=-0.7658&city=livry', null, $adminToken);
+$freshBoss = false;
+foreach ($r['json']['data']['objects'] ?? [] as $o) {
+    if ($o['type'] === 'big_brother' && (int)$o['id'] !== $foughtBossId) $freshBoss = true;
+}
+check('admin : respawn malgré un boss vaincu dans la zone', $freshBoss === true);
+
 // Cleanup
+$pdo->prepare("DELETE FROM local_boss_fights WHERE object_id = ?")->execute([$foughtBossId]);
 $pdo->prepare("DELETE FROM local_artisans WHERE id = ?")->execute([$adminArtisanId]);
 $pdo->prepare("DELETE FROM local_user_actions WHERE user_id = ?")->execute([$adminUserId]);
 $pdo->prepare("DELETE FROM local_user_cooldowns WHERE user_id = ?")->execute([$adminUserId]);
