@@ -66,10 +66,12 @@ foreach ($env as $key => $value) {
     $_ENV[$key] = $value;
 }
 
-// Ré-affirme les credentials DB de cette app depuis son .env, sauf si de
-// vraies variables d'environnement sont définies (docker-compose).
+// Les credentials DB du .env de cette app gagnent TOUJOURS : Gandi injecte
+// un DB_USER=hosting-db dans l'environnement FPM du vhost (incompatible avec
+// le DB_PASS du .env), et docker-compose fournit les mêmes valeurs que le
+// .env de toute façon. Ne pas conditionner à getenv() ici.
 foreach (['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASS'] as $dbKey) {
-    if (isset($env[$dbKey]) && getenv($dbKey) === false) {
+    if (isset($env[$dbKey])) {
         $_ENV[$dbKey] = $env[$dbKey];
     }
 }
