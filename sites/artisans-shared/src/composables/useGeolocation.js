@@ -49,7 +49,14 @@ export function useGeolocation() {
         error.value = 'Géolocalisation indisponible'
       }
     } catch (e) {
-      error.value = 'Position indisponible'
+      // Permission refusée (app : code string, web : code 1) → message actionnable
+      if (e?.code === 'permission_denied' || e?.code === 1) {
+        error.value = 'Permission GPS refusée — active-la dans les réglages du téléphone'
+      } else if (e?.code === 'service_disabled') {
+        error.value = 'Localisation désactivée — active le GPS du téléphone'
+      } else {
+        error.value = 'Position indisponible'
+      }
     }
   }
 

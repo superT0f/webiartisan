@@ -47,7 +47,7 @@ const mapTheme = computed(() => {
   if (code != null && code > 48) return 'rain'
   return 'sun'
 })
-const { position, start: startGeolocation, stop: stopGeolocation, refresh: refreshPosition } = useGeolocation()
+const { position, error: geoError, start: startGeolocation, stop: stopGeolocation, refresh: refreshPosition } = useGeolocation()
 const { showToast } = useGamification()
 
 const userToken = ref(getUserToken())
@@ -150,6 +150,9 @@ watch(effectivePosition, () => {
     }, 5000 - elapsed)
   }
 })
+
+// Échec GPS visible (sinon silencieux : permission refusée = aucune position, aucun message)
+watch(geoError, (msg) => { if (msg) showToast(msg) })
 
 async function refreshStatus() {
   if (!effectivePosition.value) return
@@ -558,10 +561,10 @@ onUnmounted(() => {
           <input v-model="adminHalo" type="checkbox" />
           <span>🛡️ Halo 500 m</span>
         </label>
-        <button v-if="!mockPosition" type="button" class="btn btn-outline btn-sm" :disabled="teleportArmed" @click="armTeleport">
+        <button type="button" class="btn btn-outline btn-sm" :disabled="teleportArmed" @click="armTeleport">
           {{ teleportArmed ? 'Cliquez sur la carte…' : '📍 Déplacer ma position' }}
         </button>
-        <button v-else type="button" class="btn btn-outline btn-sm" @click="resetPosition">↩︎ Position réelle</button>
+        <button v-if="mockPosition" type="button" class="btn btn-outline btn-sm" @click="resetPosition">↩︎ Position réelle</button>
       </div>
     </div>
 
