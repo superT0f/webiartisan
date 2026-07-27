@@ -22,10 +22,20 @@ const ITEM_META = {
 
 onMounted(async () => {
   if (!authenticated.value) { loading.value = false; return }
+  await loadItems()
+})
+
+async function loadItems() {
+  loading.value = true
   const res = await getInventory()
   if (res.success) items.value = res.data || []
   loading.value = false
-})
+}
+
+async function onAuthenticated() {
+  authenticated.value = true
+  await loadItems()
+}
 
 async function activate(item) {
   if (activatingId.value) return
@@ -64,7 +74,7 @@ async function activate(item) {
 
     <template v-if="!authenticated">
       <p class="hint">Connecte-toi pour voir ton inventaire.</p>
-      <AuthForm @authenticated="authenticated = true" />
+      <AuthForm @authenticated="onAuthenticated" />
     </template>
 
     <template v-else>
