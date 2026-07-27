@@ -416,7 +416,17 @@ function onSheetCheckin() {
 function openSheet(artisan) { selected.value = artisan }
 function closeSheet() { selected.value = null }
 
-function openPoiSheet(poi) { selectedPoi.value = poi }
+function openPoiSheet(poi) {
+  selectedPoi.value = poi
+  // Check-in activable (connecté, à portée, hors cooldown) → anneau direct,
+  // sans passer par la fiche. Sinon la fiche s'affiche (bouton grisé + compte à rebours).
+  const s = selectedPoiCheckin.value
+  const cooling = s?.dailyAvailable === false && s?.nextSpinAt && new Date(s.nextSpinAt).getTime() > Date.now()
+  if (authenticated.value && s?.inRange && !cooling) {
+    openRingForTarget({ target_type: 'poi', target_id: Number(poi.id), name: poi.name })
+    selectedPoi.value = null
+  }
+}
 function closePoiSheet() { selectedPoi.value = null }
 
 function onPoiSheetCheckin() {
