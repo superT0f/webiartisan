@@ -1,4 +1,4 @@
-import { ref, onUnmounted } from 'vue'
+import { ref, onUnmounted, getCurrentInstance } from 'vue'
 import { getPosition, watchPosition, clearWatch } from '../utils/flutterBridge.js'
 
 export function haversineM(lat1, lng1, lat2, lng2) {
@@ -14,13 +14,54 @@ function isFlutter() {
   return typeof FlutterBridge !== 'undefined' && FlutterBridge.postMessage
 }
 
+// ------------------------------------------------------------------
+// Position partagée (singleton) + cache localStorage.
+// Le GPS lâche souvent quelques secondes (intérieur, tunnel, changement
+// d'écran) : on conserve la dernière position connue plutôt que de
+// déclarer « Position indisponible » alors qu'on en avait une à l'instant.
+// ------------------------------------------------------------------
+const CACHE_KEY = 'geo_last_position'
+const CACHE_TTL_MS = 5 * 60 * 1000 // 5 min
+
+export function readPositionCache(storage = globalThis.localStorage) {
+  try {
+    const raw = storage?.getItem(CACHE_KEY)
+    if (!raw) return null
+    const { latitude, longitude, accuracy, at } = JSON.parse(raw)
+    if (typeof latitude !== 'number' || typeof longitude !== 'number') return null
+    if (Date.now() - at > CACHE_TTL_MS) return null
+    return { latitude, longitude, accuracy }
+  } catch {
+    return null
+  }
+}
+
+export function writePositionCache(p, storage = globalThis.localStorage) {
+  try {
+    storage?.setItem(CACHE_KEY, JSON.stringify({
+      latitude: p.latitude,
+      longitude: p.longitude,
+      accuracy: p.accuracy ?? null,
+      at: Date.now(),
+    }))
+  } catch { /* quota / mode privé : le cache est un bonus, jamais bloquant */ }
+}
+
+// Singleton : MapView, Inventaire, etc. partagent la même dernière position.
+const position = ref(readPositionCache()) // { latitude, longitude, accuracy } | null
+const error = ref('')
+
+function setPosition(p) {
+  position.value = p
+  writePositionCache(p)
+}
+
 /**
  * Watches the user's position via the Flutter bridge (app) or
- * navigator.geolocation (web). position is null until the first fix.
+ * navigator.geolocation (web). position est amorcée avec le cache local
+ * (si frais) puis mise à jour dès le premier fix réel.
  */
 export function useGeolocation() {
-  const position = ref(null) // { latitude, longitude, accuracy }
-  const error = ref('')
   let webWatchId = null
   let flutterWatchId = null
 
@@ -28,20 +69,20 @@ export function useGeolocation() {
     error.value = ''
     try {
       if (isFlutter()) {
-        position.value = await getPosition({ accuracy: 'best', timeout: 15000, maxAccuracy: 50 })
+        setPosition(await getPosition({ accuracy: 'best', timeout: 15000, maxAccuracy: 50 }))
         flutterWatchId = watchPosition((err, pos) => {
-          if (!err && pos) position.value = pos
+          if (!err && pos) setPosition(pos)
         }, { accuracy: 'best', distanceFilter: 10 })
       } else if (navigator.geolocation) {
-        position.value = await new Promise((resolve, reject) => {
+        setPosition(await new Promise((resolve, reject) => {
           navigator.geolocation.getCurrentPosition(
             p => resolve({ latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: p.coords.accuracy }),
             reject,
             { enableHighAccuracy: true, timeout: 15000 }
           )
-        })
+        }))
         webWatchId = navigator.geolocation.watchPosition(
-          p => { position.value = { latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: p.coords.accuracy } },
+          p => setPosition({ latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: p.coords.accuracy }),
           () => {},
           { enableHighAccuracy: true }
         )
@@ -49,6 +90,9 @@ export function useGeolocation() {
         error.value = 'Géolocalisation indisponible'
       }
     } catch (e) {
+      // Position précédente encore utilisable → on garde le silence, la
+      // carte et les actions continuent sur la dernière position connue.
+      if (position.value) return
       // Permission refusée (app : code string, web : code 1) → message actionnable
       if (e?.code === 'permission_denied' || e?.code === 1) {
         error.value = 'Permission GPS refusée — active-la dans les réglages du téléphone'
@@ -73,29 +117,29 @@ export function useGeolocation() {
 
   /**
    * Force une lecture fraîche de la position (one-shot, timeout court).
-   * À appeler avant une action sensible (check-in) : la watch peut être
-   * périmée (réseau/GPS lent, reloads) et tromper la cible et le POST.
+   * À appeler avant une action sensible (check-in). Si la lecture échoue,
+   * on retourne la dernière position connue (cache) plutôt que null.
    */
   async function refresh() {
     try {
       if (isFlutter()) {
-        position.value = await getPosition({ accuracy: 'best', timeout: 8000, maxAccuracy: 100 })
+        setPosition(await getPosition({ accuracy: 'best', timeout: 8000, maxAccuracy: 100 }))
       } else if (navigator.geolocation) {
-        position.value = await new Promise((resolve, reject) => {
+        setPosition(await new Promise((resolve, reject) => {
           navigator.geolocation.getCurrentPosition(
             p => resolve({ latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: p.coords.accuracy }),
             reject,
             { enableHighAccuracy: true, timeout: 8000 }
           )
-        })
+        }))
       }
     } catch (e) {
-      // Garde l'ancienne position si la lecture échoue
+      // Garde la dernière position connue si la lecture échoue
     }
     return position.value
   }
 
-  onUnmounted(stop)
+  if (getCurrentInstance()) onUnmounted(stop)
 
   return { position, error, start, stop, refresh }
 }
