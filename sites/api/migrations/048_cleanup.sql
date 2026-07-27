@@ -50,8 +50,9 @@ DELETE FROM email_queue
  WHERE status = 'sent' AND created_at < DATE_SUB(NOW(), INTERVAL 7 DAY);
 
 -- Buckets de rate limiting de +1 heure (transitoire par design)
+-- (pas de created_at en prod : window_start est un timestamp unix)
 DELETE FROM api_rate_limits
- WHERE created_at < DATE_SUB(NOW(), INTERVAL 1 HOUR);
+ WHERE window_start < UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 1 HOUR));
 
 -- Codes email expirés
 DELETE FROM local_user_email_codes
