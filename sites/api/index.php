@@ -18,24 +18,11 @@ ini_set('log_errors', 1);
 // Ensure consistent timezone for streaks and cooldowns
 date_default_timezone_set('Europe/Paris');
 
-// Load unified Logger - handle both local and production paths
-$adminLoggerPath = __DIR__ . '/../admin/lib/Logger.php';
-if (!file_exists($adminLoggerPath)) {
-    // Production: admin is in a different vhost
-    $adminLoggerPath = '/srv/data/web/vhosts/admin.prigent.tech/htdocs/lib/Logger.php';
-}
-if (file_exists($adminLoggerPath)) {
-    require_once $adminLoggerPath;
-    $logger = Logger::getInstance();
-} else {
-    // Fallback: create a simple logger stub
-    $logger = new class {
-        public function info($m, $c = []) { }
-        public function debug($m, $c = []) { }
-        public function error($m, $c = []) { error_log($m); }
-        public function warning($m, $c = []) { }
-    };
-}
+// Logger applicatif (Monolog → storage/logs/api-YYYY-MM-DD.log).
+// NB : découplé de l'ancien vhost admin (lib/Logger.php legacy), qui peut
+// désormais être archivé.
+require_once __DIR__ . '/lib/AppLogger.php';
+$logger = AppLogger::getInstance();
 
 header('Content-Type: application/json; charset=UTF-8');
 header('X-Content-Type-Options: nosniff');
@@ -79,9 +66,8 @@ foreach ($env as $key => $value) {
     $_ENV[$key] = $value;
 }
 
-// The shared admin Logger (loaded above) populates $_ENV from its own vhost's
-// .env, which can diverge from this app's. Re-assert this app's DB credentials
-// from its own .env unless real environment variables are set (docker-compose).
+// Ré-affirme les credentials DB de cette app depuis son .env, sauf si de
+// vraies variables d'environnement sont définies (docker-compose).
 foreach (['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASS'] as $dbKey) {
     if (isset($env[$dbKey]) && getenv($dbKey) === false) {
         $_ENV[$dbKey] = $env[$dbKey];
@@ -289,6 +275,19 @@ if ($module === 'objects') {
 if ($module === 'inventory') {
     applyRateLimit($pdo, 'public:' . $module);
     require_once __DIR__ . '/routes/inventory.php';
+    exit;
+}
+
+if ($module === 'ops') {
+    applyRateLimit($pdo, 'login');
+    require_once __DIR__ . '/routes/ops.php';
+    exit;
+}
+
+// Lecture publique du flag maintenance (les fronts peuvent afficher une bannière)
+if ($module === 'maintenance' && $method === 'GET') {
+    applyRateLimit($pdo, 'public:' . $module);
+    require_once __DIR__ . '/routes/maintenance.php';
     exit;
 }
 

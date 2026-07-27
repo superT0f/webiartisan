@@ -39,6 +39,13 @@ function migrations_apply(PDO $pdo): void
                 INDEX idx_user_status (user_id, status)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
         ],
+        '047_settings' => [
+            "CREATE TABLE IF NOT EXISTS local_settings (
+                setting_key VARCHAR(64) PRIMARY KEY,
+                setting_value TEXT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        ],
     ];
 
     foreach ($migrations as $name => $statements) {
