@@ -243,6 +243,34 @@ function renderMarkers() {
   props.objects.forEach(o => {
     if (!o.lat || !o.lng) return
     const isActive = props.activeObjectIds.includes(o.id)
+
+    // Affamer de Gaffe : vrai sprite au lieu d'un emoji
+    if (o.type === 'big_brother') {
+      const el = document.createElement('div')
+      el.className = 'boss-marker' + (isActive ? ' marker--active' : '')
+      el.innerHTML = `<img src="/boss/gafam.svg" alt="Affamer de Gaffe" />`
+      if (isActive) {
+        el.addEventListener('click', () => emit('select-object', o))
+        const marker = new Marker({ element: el, anchor: 'bottom' })
+          .setLngLat([parseFloat(o.lng), parseFloat(o.lat)])
+          .addTo(map.value)
+        markers.push(marker)
+        return
+      }
+      const popup = new Popup({ offset: 16 }).setHTML(
+        `<div class="map-popup object-popup">
+          <strong>🎩 Affamer de Gaffe</strong>
+          <span class="popup-type">Le magnat anti-artisans · ${o.distance_m} m — approche-toi pour l'affronter !</span>
+        </div>`
+      )
+      const marker = new Marker({ element: el, anchor: 'bottom' })
+        .setLngLat([parseFloat(o.lng), parseFloat(o.lat)])
+        .setPopup(popup)
+        .addTo(map.value)
+      markers.push(marker)
+      return
+    }
+
     const el = document.createElement('div')
     el.className = `object-marker object-marker--${o.type}`
     if (isActive) el.classList.add('marker--active')
@@ -416,14 +444,19 @@ function objectIcon(type) {
   animation: treasure-pulse 1.6s ease-in-out infinite;
 }
 :deep(.object-marker--cadeau_artisan) { border-color: #e11d48; }
-:deep(.object-marker--big_brother) {
-  border-color: #7c3aed;
-  background: #2e1065;
+:deep(.boss-marker) {
+  width: 46px;
+  height: 55px;
+  cursor: pointer;
+  filter: drop-shadow(0 3px 6px rgba(0,0,0,0.45));
+}
+:deep(.boss-marker img) { width: 100%; height: 100%; }
+:deep(.boss-marker.marker--active) {
   animation: boss-pulse 1.4s ease-in-out infinite;
 }
 @keyframes boss-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(124,58,237,0.6); }
-  50% { box-shadow: 0 0 0 14px rgba(124,58,237,0); }
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(124,58,237,0.7)); }
+  50% { transform: scale(1.12); filter: drop-shadow(0 0 14px rgba(124,58,237,0.9)); }
 }
 :deep(.marker--active) {
   animation: active-glow 1.8s ease-in-out infinite;

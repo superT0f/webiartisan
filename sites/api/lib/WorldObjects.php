@@ -22,7 +22,7 @@ const OBJECT_TYPES = [
     'papier'         => ['xp' => 10, 'energy' => 5,  'weight' => 14, 'category' => 'dechet', 'label' => 'Papier'],
     'tresor'         => ['xp' => 50, 'energy' => 10, 'weight' => 6,  'category' => 'tresor', 'label' => 'Trésor'],
     'cadeau_artisan' => ['xp' => 15, 'energy' => 0,  'weight' => 0,  'category' => 'cadeau', 'label' => 'Cadeau'],
-    'big_brother'    => ['xp' => 150, 'energy' => 0, 'weight' => 5,  'category' => 'boss',   'label' => 'Big Brother'],
+    'big_brother'    => ['xp' => 150, 'energy' => 0, 'weight' => 5,  'category' => 'boss',   'label' => 'Affamer de Gaffe'],
 ];
 
 /** Fait apparaître un Big Brother dans l'anneau 100–500 m (TTL 2 h). */

@@ -6,7 +6,7 @@
 
     <div class="arena__hud">
       <HpBar :hp="state.player_hp" label="Toi" />
-      <HpBar :hp="state.boss_hp" label="Big Brother" />
+      <HpBar :hp="state.boss_hp" label="Affamer de Gaffe" />
     </div>
 
     <div class="arena__panel card">
@@ -126,6 +126,7 @@ async function answer(payload) {
     scene?.celebrate()
     round.value = null
   } else if (res.data.status === 'lost') {
+    scene?.mock()
     round.value = null
   } else {
     // Manche terminée : retour au choix d'arme après un court délai

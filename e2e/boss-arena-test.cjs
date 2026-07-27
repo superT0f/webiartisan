@@ -59,10 +59,10 @@ async function api(method, path, body, headers = {}) {
   await sleep(5000);
 
   // 3. Marker boss → tap → arène
-  const bossMarker = await page.$('.object-marker--big_brother');
+  const bossMarker = await page.$('.boss-marker.marker--active');
   assert('marker Big Brother visible', !!bossMarker);
   if (bossMarker) {
-    await bossMarker.click();
+    await page.evaluate(() => document.querySelector('.boss-marker.marker--active').click());
     await sleep(2500);
     const url = page.url();
     assert('navigation vers /arene', url.includes('/arene'), url.slice(0, 80));

@@ -1,0 +1,6 @@
+# Override temporaire : réutilise le volume de l'ancien projet (zombie mysql
+# intact) pendant que l'ancien conteneur est bloqué.
+volumes:
+  mysql_data:
+    external: true
+    name: webiartisannew_mysql_data

@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 240">
+  <!-- Affamer de Gaffe — magnat des GAFAM, flat design charte WebiArtisan -->
+  <defs>
+    <linearGradient id="hatGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3a2f2a"/>
+      <stop offset="1" stop-color="#1f1813"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Canne à dollar (gauche) -->
+  <g stroke="#C07A2E" stroke-width="7" stroke-linecap="round" fill="none">
+    <path d="M26 150 L18 226"/>
+    <path d="M26 150 c-14 -4 -14 12 -2 12"/>
+  </g>
+
+  <!-- Corps : redingote -->
+  <path d="M60 150 Q60 128 100 128 Q140 128 140 150 L148 224 Q100 236 52 224 Z" fill="#232036"/>
+  <!-- Revers -->
+  <path d="M84 130 L100 158 L86 188 L76 132 Z" fill="#2f2b47"/>
+  <path d="M116 130 L100 158 L114 188 L124 132 Z" fill="#2f2b47"/>
+  <!-- Chemise + cravate -->
+  <path d="M92 130 L100 158 L108 130 L100 124 Z" fill="#F5F1E6"/>
+  <path d="M96 128 L100 138 L104 128 L100 122 Z" fill="#C07A2E"/>
+  <!-- Boutons dorés -->
+  <circle cx="100" cy="172" r="3.4" fill="#C07A2E"/>
+  <circle cx="100" cy="188" r="3.4" fill="#C07A2E"/>
+  <circle cx="100" cy="204" r="3.4" fill="#C07A2E"/>
+
+  <!-- Tête -->
+  <ellipse cx="100" cy="86" rx="34" ry="36" fill="#F0C8A0"/>
+  <!-- Oreilles -->
+  <circle cx="66" cy="88" r="7" fill="#F0C8A0"/>
+  <circle cx="134" cy="88" r="7" fill="#F0C8A0"/>
+
+  <!-- Monocle (œil droit) + chaîne -->
+  <circle cx="113" cy="82" r="12" fill="none" stroke="#C07A2E" stroke-width="3"/>
+  <circle cx="113" cy="82" r="12" fill="#CFE8F5" opacity="0.45"/>
+  <path d="M124 90 Q132 110 128 132" fill="none" stroke="#C07A2E" stroke-width="2"/>
+  <!-- Œil gauche + sourcils hautains -->
+  <circle cx="86" cy="82" r="4.5" fill="#2B2118"/>
+  <path d="M78 72 Q86 66 94 72" stroke="#2B2118" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <path d="M106 70 Q114 64 122 70" stroke="#2B2118" stroke-width="3" fill="none" stroke-linecap="round"/>
+
+  <!-- Moustache de magnat (recourbée) -->
+  <path d="M100 100
+           Q88 96 78 102
+           Q68 108 74 100
+           Q80 92 92 96
+           Q100 100 100 100
+           Q100 100 108 96
+           Q120 92 126 100
+           Q132 108 122 102
+           Q112 96 100 100 Z" fill="#3a2f2a"/>
+
+  <!-- Sourire suffisant -->
+  <path d="M90 112 Q100 118 110 112" stroke="#8a5a3a" stroke-width="3" fill="none" stroke-linecap="round"/>
+
+  <!-- Haut-de-forme -->
+  <ellipse cx="100" cy="58" rx="46" ry="10" fill="#1f1813"/>
+  <path d="M66 58 L66 18 Q66 6 78 6 L122 6 Q134 6 134 18 L134 58 Z" fill="url(#hatGrad)"/>
+  <!-- Bandeau du chapeau aux couleurs GAFAM -->
+  <path d="M66 44 L134 44 L134 54 L66 54 Z" fill="#232036"/>
+  <rect x="72" y="46" width="10" height="6" rx="1.5" fill="#EA4335"/>
+  <rect x="84" y="46" width="10" height="6" rx="1.5" fill="#FF9900"/>
+  <rect x="96" y="46" width="10" height="6" rx="1.5" fill="#1877F2"/>
+  <rect x="108" y="46" width="10" height="6" rx="1.5" fill="#A2AAAD"/>
+  <rect x="120" y="46" width="10" height="6" rx="1.5" fill="#7FBA00"/>
+
+  <!-- Sac de billets (droite) -->
+  <path d="M164 178 Q164 160 178 160 Q192 160 192 178 Q196 208 178 212 Q160 208 164 178 Z" fill="#C07A2E"/>
+  <path d="M172 158 L184 158 L182 150 L174 150 Z" fill="#9c611f"/>
+  <text x="178" y="196" font-family="DejaVu Sans, sans-serif" font-size="26" font-weight="bold" fill="#FEF8EC" text-anchor="middle">$</text>
+</svg>
