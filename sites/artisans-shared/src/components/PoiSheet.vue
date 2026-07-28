@@ -59,6 +59,7 @@ const deletingIds = ref(new Set())
 const reportedIds = ref(new Set())
 const fileInput = ref(null)
 const coverInput = ref(null)
+const sourceChooser = ref(false)
 
 // Couverture puis photos communautaires. Les URLs sont relatives (/uploads/...)
 // servies par l'API : même résolution que poi.image_url dans MapView.
@@ -92,14 +93,18 @@ function base64ToFile({ base64, mimeType, name }) {
 
 async function onAddPhoto() {
   if (!props.authenticated) { emit('toast', 'Connecte-toi pour ajouter une photo'); return }
-  let file = null
   if (isFlutterApp()) {
-    try { file = base64ToFile(await pickImage({ source: 'gallery', quality: 90, maxWidth: 2000 })) }
-    catch (e) { if (e?.code !== 'cancelled') emit('toast', 'Photo non récupérée'); return }
+    sourceChooser.value = true
   } else {
     fileInput.value?.click()
-    return
   }
+}
+
+async function onPickSource(source) {
+  sourceChooser.value = false
+  let file = null
+  try { file = base64ToFile(await pickImage({ source, quality: 90, maxWidth: 2000 })) }
+  catch (e) { if (e?.code !== 'cancelled') emit('toast', 'Photo non récupérée'); return }
   await doUpload(file)
 }
 
@@ -200,6 +205,11 @@ async function onCoverUpload(e) {
             </button>
             <button v-if="isAdmin" class="btn btn-secondary" @click="coverInput?.click()">📷 Couverture</button>
           </div>
+          <div v-if="sourceChooser" class="source-chooser">
+            <button class="btn btn-primary" @click="onPickSource('camera')">📷 Appareil photo</button>
+            <button class="btn btn-secondary" @click="onPickSource('gallery')">🖼️ Galerie</button>
+            <button class="btn btn-outline" @click="sourceChooser = false">Annuler</button>
+          </div>
           <input ref="fileInput" type="file" accept="image/*" hidden @change="onFilePicked" />
           <input ref="coverInput" type="file" accept="image/*" hidden @change="onCoverUpload" />
         </div>
@@ -281,10 +291,20 @@ async function onCoverUpload(e) {
 .gallery-item { position: relative; flex: 0 0 78%; scroll-snap-align: center; }
 .gallery-item img { width: 100%; max-height: 220px; object-fit: cover; border-radius: 12px; display: block; }
 .gallery-actions { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; }
-.gallery-actions button { background: rgba(255,255,255,0.9); border: none; border-radius: 999px; padding: 4px 8px; cursor: pointer; }
-.gallery-actions button:disabled { opacity: 0.5; cursor: default; }
+.gallery-actions button {
+  background: rgba(255,255,255,0.95);
+  border: none;
+  border-radius: 999px;
+  padding: 7px 11px;
+  cursor: pointer;
+  font-size: 1.05rem;
+  line-height: 1;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+}
+.gallery-actions button:disabled { opacity: 0.55; cursor: default; }
 .gallery-empty { color: var(--c-text-2); font-size: 0.9rem; text-align: center; margin: 12px 0; }
 .gallery-btns { display: flex; gap: 10px; margin-top: 10px; }
+.source-chooser { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 
 .slide-up-enter-active, .slide-up-leave-active { transition: transform 0.3s ease; }
 .slide-up-enter-from, .slide-up-leave-to { transform: translateY(100%); }
