@@ -880,16 +880,18 @@ function admin_moderation_photo_review(PDO $pdo, int $id, string $action): void
     }
 
     if ($action === 'keep') {
-        $pdo->prepare("UPDATE local_poi_photos SET status = 'validated' WHERE id = ?")->execute([$id]);
-        // Cadeau pour l'uploadeur, une seule fois par photo
-        $gifted = false;
-        if ($photo['gifted_at'] === null) {
+        // Garde atomique : le keep qui passe gifted_at est le seul à verser le cadeau
+        $upd = $pdo->prepare("UPDATE local_poi_photos SET status = 'validated', gifted_at = NOW() WHERE id = ? AND gifted_at IS NULL");
+        $upd->execute([$id]);
+        $gifted = $upd->rowCount() === 1;
+        if ($gifted) {
             $pdo->prepare("
                 INSERT INTO local_user_inventory (user_id, object_type, source_object_id, source_label)
                 VALUES (?, 'energy_store', NULL, 'Merci pour la photo, ami artisan')
             ")->execute([(int)$photo['user_id']]);
-            $pdo->prepare("UPDATE local_poi_photos SET gifted_at = NOW() WHERE id = ?")->execute([$id]);
-            $gifted = true;
+        } else {
+            // Déjà validée par un keep précédent : juste s'assurer du statut
+            $pdo->prepare("UPDATE local_poi_photos SET status = 'validated' WHERE id = ?")->execute([$id]);
         }
         app_log('info', '[POI-PHOTOS] keep', ['photo_id' => $id, 'gifted' => $gifted]);
         echo json_encode(['success' => true, 'data' => ['validated' => $id, 'gifted' => $gifted]]);
