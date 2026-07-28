@@ -17,6 +17,34 @@
       </div>
 
       <template v-else>
+        <section class="claims-section card" v-if="photoReportsLoaded">
+          <h2>🚩 Signalements photos<span v-if="photoReports.length"> ({{ photoReports.length }})</span></h2>
+          <p v-if="reportMessage" class="report-message">{{ reportMessage }}</p>
+          <p v-if="!photoReports.length" class="report-empty">Aucun signalement 🎉</p>
+          <ul v-else class="claims-list">
+            <li v-for="p in photoReports" :key="p.id" class="claims-item">
+              <span class="report-info">
+                <img
+                  v-if="resolveAvatarUrl(p.file_path)"
+                  :src="resolveAvatarUrl(p.file_path)"
+                  alt=""
+                  class="report-thumb"
+                  loading="lazy"
+                />
+                <span>
+                  <strong>{{ p.poi_name }}</strong> — {{ p.reports }} signalement{{ p.reports > 1 ? 's' : '' }}
+                  <span class="report-date">{{ formatReportDate(p.created_at) }}</span>
+                </span>
+              </span>
+              <span class="claims-actions">
+                <button type="button" class="btn btn-primary btn-sm" :disabled="busyPhotoId === p.id" @click="onReviewPhoto(p, 'keep')">Garder</button>
+                <button type="button" class="btn btn-outline btn-sm" :disabled="busyPhotoId === p.id" @click="onReviewPhoto(p, 'hide')">Masquer</button>
+                <button type="button" class="btn btn-sm btn-danger" :disabled="busyPhotoId === p.id" @click="onReviewPhoto(p, 'delete')">Supprimer</button>
+              </span>
+            </li>
+          </ul>
+        </section>
+
         <section class="claims-section card" v-if="poiClaims.length">
           <h2>Revendications à valider ({{ poiClaims.length }})</h2>
           <ul class="claims-list">
@@ -189,7 +217,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { getArtisanToken, fetchAdminPois, createAdminPoi, updateAdminPoi, deleteAdminPoi, createAdminSchedule, deleteAdminSchedule, fetchAdminPoiClaims, reviewPoiClaim, DAYS } from '../api.js'
+import { getArtisanToken, fetchAdminPois, createAdminPoi, updateAdminPoi, deleteAdminPoi, createAdminSchedule, deleteAdminSchedule, fetchAdminPoiClaims, reviewPoiClaim, fetchAdminPhotoReports, reviewPhotoReport, resolveAvatarUrl, DAYS } from '../api.js'
 
 const token = ref(getArtisanToken())
 const pois = ref([])
@@ -202,6 +230,10 @@ const showForm = ref(false)
 const editingId = ref(null)
 const formMessage = ref('')
 const formMessageType = ref('')
+const photoReports = ref([])
+const photoReportsLoaded = ref(false)
+const reportMessage = ref('')
+const busyPhotoId = ref(null)
 
 const poiTypes = ['mairie', 'piscine', 'bibliotheque', 'mediatheque', 'cinema', 'dechetterie', 'poste', 'supermarche', 'transport', 'ecole', 'hopital', 'pharmacie', 'parc', 'eglise', 'autre']
 
@@ -398,7 +430,58 @@ function formatSchedules(schedules) {
     .join(' — ')
 }
 
-onMounted(load)
+async function loadPhotoReports() {
+  if (!token.value) return
+  try {
+    const res = await fetchAdminPhotoReports(token.value)
+    if (res.success) {
+      // Section affichée uniquement si l'API répond (non-admin → 401/403 → masquée)
+      photoReportsLoaded.value = true
+      photoReports.value = res.data || []
+    }
+  } catch (e) {
+    // Erreur réseau : ne rien afficher
+  }
+}
+
+async function onReviewPhoto(photo, action) {
+  if (action === 'delete' && !confirm('Supprimer définitivement cette photo ?')) return
+  busyPhotoId.value = photo.id
+  reportMessage.value = ''
+  try {
+    const res = await reviewPhotoReport(token.value, photo.id, action)
+    if (res.success) {
+      photoReports.value = photoReports.value.filter(p => p.id !== photo.id)
+      if (action === 'keep') {
+        reportMessage.value = res.data?.gifted
+          ? 'Photo validée + cadeau envoyé à l\'auteur 🎁'
+          : 'Photo validée.'
+      } else if (action === 'hide') {
+        reportMessage.value = 'Photo masquée.'
+      } else {
+        reportMessage.value = 'Photo supprimée.'
+      }
+    } else {
+      reportMessage.value = res.error || 'Action impossible.'
+    }
+  } catch (e) {
+    reportMessage.value = 'Erreur réseau.'
+  } finally {
+    busyPhotoId.value = null
+  }
+}
+
+function formatReportDate(d) {
+  if (!d) return ''
+  const date = new Date(d)
+  if (isNaN(date)) return d
+  return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+onMounted(() => {
+  load()
+  loadPhotoReports()
+})
 </script>
 
 <style scoped>
@@ -494,4 +577,9 @@ onMounted(load)
 .claims-list { list-style: none; padding: 0; margin: 0; }
 .claims-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid #e2e8f0; flex-wrap: wrap; }
 .claims-actions { display: flex; gap: 8px; }
+.report-info { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.report-thumb { width: 56px; height: 56px; object-fit: cover; border-radius: var(--r-md); flex-shrink: 0; }
+.report-date { display: block; font-size: 0.8rem; color: var(--c-text-3); }
+.report-message { margin: 8px 0; font-size: 0.9rem; color: var(--c-green-dark); }
+.report-empty { margin: 4px 0 0; color: var(--c-text-2); }
 </style>
