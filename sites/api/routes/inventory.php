@@ -40,7 +40,7 @@ function inventory_list(PDO $pdo): void
 {
     $user = user_require_auth($pdo);
     $stmt = $pdo->prepare("
-        SELECT id, object_type, acquired_at
+        SELECT id, object_type, source_label, acquired_at
         FROM local_user_inventory
         WHERE user_id = ? AND status = 'active'
         ORDER BY id DESC
@@ -54,6 +54,7 @@ function inventory_list(PDO $pdo): void
             'id'          => (int)$row['id'],
             'type'        => $row['object_type'],
             'label'       => OBJECT_TYPES[$row['object_type']]['label'] ?? $row['object_type'],
+            'source_label' => $row['source_label'],
             'acquired_at' => $row['acquired_at'],
         ];
     }

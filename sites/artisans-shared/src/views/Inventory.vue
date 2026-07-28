@@ -87,6 +87,7 @@ async function activate(item) {
           <span class="item-icon">{{ ITEM_META[item.type]?.icon || '❓' }}</span>
           <div class="item-body">
             <strong>{{ item.label }}</strong>
+            <small v-if="item.source_label" class="item-source">{{ item.source_label }}</small>
             <small>{{ ITEM_META[item.type]?.desc || '' }}</small>
           </div>
           <button
@@ -132,5 +133,6 @@ async function activate(item) {
   gap: 2px;
 }
 .item-body small { color: var(--c-text-2); }
+.item-body small.item-source { color: var(--c-green); font-style: italic; }
 .back-link { display: inline-block; margin-top: 8px; }
 </style>
