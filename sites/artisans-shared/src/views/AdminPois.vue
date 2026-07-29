@@ -162,6 +162,15 @@
             </div>
 
             <div class="form-group">
+              <label>Ou pointer sur la carte</label>
+              <LocationPicker
+                :lat="form.latitude === '' ? null : Number(form.latitude)"
+                :lng="form.longitude === '' ? null : Number(form.longitude)"
+                @pick="onPickLocation"
+              />
+            </div>
+
+            <div class="form-group">
               <label for="poi-description">Description</label>
               <textarea id="poi-description" v-model="form.description" class="form-input" rows="3"></textarea>
             </div>
@@ -218,6 +227,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { getArtisanToken, fetchAdminPois, createAdminPoi, updateAdminPoi, deleteAdminPoi, createAdminSchedule, deleteAdminSchedule, fetchAdminPoiClaims, reviewPoiClaim, fetchAdminPhotoReports, reviewPhotoReport, resolveAvatarUrl, DAYS } from '../api.js'
+import LocationPicker from '../components/LocationPicker.vue'
 
 const token = ref(getArtisanToken())
 const pois = ref([])
@@ -299,6 +309,11 @@ function startCreate() {
   editingId.value = null
   form.value = emptyForm()
   showForm.value = true
+}
+
+function onPickLocation({ latitude, longitude }) {
+  form.value.latitude = latitude
+  form.value.longitude = longitude
 }
 
 function edit(poi) {
