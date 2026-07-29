@@ -1,6 +1,8 @@
 // Splash de démarrage WebiArtisan : l'avatar (gauche) affronte Affamer de
 // Gaffe (droite) — pluie de baguettes L→R vs pluie de billets R→L.
 // La scène appelle onDone() à la fin (~6 s) ou au premier tap.
+import { CITY_NAME } from '../api.js'
+
 export async function createSplashScene(container, { onDone } = {}) {
   const Phaser = await import('phaser')
   let done = false
@@ -15,7 +17,8 @@ export async function createSplashScene(container, { onDone } = {}) {
     preload() {
       this.load.image('splash-bg', '/boss/arena-backdrop.jpg')
       this.load.image('avatar', '/avatar/player-512.png')
-      this.load.image('boss', '/boss/boss-crop.jpg')
+      this.load.image('boss', '/boss/affamer-512.png')
+      this.load.svg('baguette-logo', '/logo-baguette.svg', { width: 96, height: 96 })
       this.load.audio('splash-music', '/sounds/splash.mp3')
     }
 
@@ -45,14 +48,20 @@ export async function createSplashScene(container, { onDone } = {}) {
       spark.generateTexture('spark', 6, 6)
       spark.destroy()
 
-      // Avatar (gauche) et boss (droite, plus petit) qui se rapprochent
+      // Avatar (gauche) et boss (droite, plus petit) — à distance respectable
       const avatar = this.add.image(-80, groundY, 'avatar')
       avatar.setScale(scaleH / avatar.height)
       const boss = this.add.image(w + 80, groundY, 'boss').setFlipX(true)
       boss.setScale((scaleH * 0.62) / boss.height)
-      this.tweens.add({ targets: avatar, x: w * 0.3, duration: 1400, ease: 'Sine.easeOut' })
-      this.tweens.add({ targets: boss, x: w * 0.72, duration: 1400, ease: 'Sine.easeOut' })
+      this.tweens.add({ targets: avatar, x: w * 0.22, duration: 1400, ease: 'Sine.easeOut' })
+      this.tweens.add({ targets: boss, x: w * 0.78, duration: 1400, ease: 'Sine.easeOut' })
       this.tweens.add({ targets: avatar, y: groundY - 8, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
+
+      // Logo baguette BBR au centre, les sépare (rotation « horloge » à la fin)
+      const baguette = this.add.image(w / 2, groundY - scaleH * 0.4, 'baguette-logo')
+        .setScale((scaleH * 0.32) / 96)
+        .setAlpha(0)
+      this.tweens.add({ targets: baguette, alpha: 1, duration: 700, delay: 1500 })
 
       // Pluie de baguettes : avatar → boss (toutes les 420 ms)
       this.time.addEvent({
@@ -118,12 +127,22 @@ export async function createSplashScene(container, { onDone } = {}) {
         this.tweens.add({ targets: music, volume: 0, duration: 900, delay: 4800 })
       } catch (e) { /* pas de son tant pis */ }
 
-      // Punchline + fin
-      const punch = this.add.text(w / 2, h * 0.86, 'Les artisans contre-attaquent !', {
-        fontFamily: 'Outfit, sans-serif', fontSize: `${Math.round(h * 0.03)}px`,
-        color: '#fff',
-      }).setOrigin(0.5).setAlpha(0)
-      this.tweens.add({ targets: punch, alpha: 1, duration: 700, delay: 3600 })
+      // Finale : les deux camps s'affichent face à face + baguette « horloge »
+      const labelStyle = (color) => ({
+        fontFamily: 'Outfit, sans-serif', fontSize: `${Math.round(h * 0.032)}px`,
+        fontStyle: 'bold', color, stroke: '#1a1330', strokeThickness: 4,
+      })
+      const leftLabel = this.add.text(w * 0.24, -50, `Artisans de ${CITY_NAME}`, labelStyle('#e8b04b'))
+        .setOrigin(0.5).setAlpha(0)
+      const rightLabel = this.add.text(w * 0.76, -50, 'Affamer de Gaffe', labelStyle('#ff8080'))
+        .setOrigin(0.5).setAlpha(0)
+      this.tweens.add({ targets: leftLabel, y: h * 0.22, alpha: 1, duration: 900, delay: 3800, ease: 'Back.easeOut' })
+      this.tweens.add({ targets: rightLabel, y: h * 0.22, alpha: 1, duration: 900, delay: 3800, ease: 'Back.easeOut' })
+
+      // La baguette centrale tourne comme une horloge
+      this.time.delayedCall(3900, () => {
+        this.tweens.add({ targets: baguette, rotation: Math.PI * 2, duration: 6000, repeat: -1, ease: 'Linear' })
+      })
 
       this.time.delayedCall(6000, () => finish(this))
       this.input.once('pointerdown', () => finish(this))

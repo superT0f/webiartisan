@@ -52,7 +52,7 @@ const { showToast } = useGamification()
 
 const userToken = ref(getUserToken())
 const isAdmin = ref(false)
-const adminControlsOpen = ref(true)
+const adminControlsOpen = ref(false)
 const mockPosition = ref(null)
 const teleportArmed = ref(false)
 
