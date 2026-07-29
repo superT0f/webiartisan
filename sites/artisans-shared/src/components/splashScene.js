@@ -128,13 +128,16 @@ export async function createSplashScene(container, { onDone } = {}) {
       } catch (e) { /* pas de son tant pis */ }
 
       // Finale : les deux camps s'affichent face à face + baguette « horloge »
+      // Taille pilotée par la largeur (mobile) + 2 lignes pour ne pas déborder
+      const fs = Math.max(18, Math.min(Math.round(h * 0.03), Math.round(w * 0.055)))
       const labelStyle = (color) => ({
-        fontFamily: 'Outfit, sans-serif', fontSize: `${Math.round(h * 0.032)}px`,
+        fontFamily: 'Outfit, sans-serif', fontSize: `${fs}px`,
         fontStyle: 'bold', color, stroke: '#1a1330', strokeThickness: 4,
+        align: 'center',
       })
-      const leftLabel = this.add.text(w * 0.24, -50, `Artisans de ${CITY_NAME}`, labelStyle('#e8b04b'))
+      const leftLabel = this.add.text(w * 0.25, -60, `Artisans de\n${CITY_NAME}`, labelStyle('#e8b04b'))
         .setOrigin(0.5).setAlpha(0)
-      const rightLabel = this.add.text(w * 0.76, -50, 'Affamer de Gaffe', labelStyle('#ff8080'))
+      const rightLabel = this.add.text(w * 0.75, -60, 'Affamer\nde Gaffe', labelStyle('#ff8080'))
         .setOrigin(0.5).setAlpha(0)
       this.tweens.add({ targets: leftLabel, y: h * 0.22, alpha: 1, duration: 900, delay: 3800, ease: 'Back.easeOut' })
       this.tweens.add({ targets: rightLabel, y: h * 0.22, alpha: 1, duration: 900, delay: 3800, ease: 'Back.easeOut' })
