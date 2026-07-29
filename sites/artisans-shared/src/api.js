@@ -1071,6 +1071,18 @@ export async function pickupObject(id, lat, lng) {
 }
 
 // ------------------------------------------------------------------
+// Inscription bêta fermée (landing /beta)
+// ------------------------------------------------------------------
+
+export async function betaSignup(email, city) {
+  return requestJson(`${API_BASE}/beta/signup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, city }),
+  }, 'Inscription impossible pour le moment.')
+}
+
+// ------------------------------------------------------------------
 // Inventaire joueur (leurres à boss, réserves d'énergie)
 // ------------------------------------------------------------------
 

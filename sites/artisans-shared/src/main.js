@@ -35,6 +35,7 @@ const routes = [
   { path: '/plaquette', redirect: '/flyers' },
   { path: '/roue', redirect: '/carte' },
   { path: '/profil', component: () => import('./views/UserProfile.vue'), meta: { title: 'Mon profil' } },
+  { path: '/beta', component: () => import('./views/BetaLanding.vue'), meta: { title: 'Rejoins la bêta fermée' } },
   { path: '/inventaire', component: () => import('./views/Inventory.vue'), meta: { title: 'Mon inventaire' } },
   { path: '/reinitialiser', component: () => import('./views/ResetPassword.vue'), meta: { title: 'Réinitialiser le mot de passe' } },
   { path: '/personnage', component: () => import('./views/CharacterEdit.vue'), meta: { title: 'Mon personnage' } },
