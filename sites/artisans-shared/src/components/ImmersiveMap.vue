@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { Map, NavigationControl, GeolocateControl, Marker, Popup } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useMapStyle, isMapTilerKey } from '../composables/useMapStyle.js'
@@ -94,6 +94,94 @@ function set3D(enabled) {
 }
 
 /**
+ * Thème « Saloon » (première personne) : parchemin + bois, icônes/POI masqués.
+ * Appliqué en modifiant les couches du style vectoriel à chaud ; à la sortie
+ * du mode FP, on recharge le style d'origine (setStyle) et on réinitialise.
+ */
+const WESTERN_HIDE = new Set([
+  'poi', 'poi-railway',
+  'road_oneway', 'road_oneway_opposite',
+  'highway-shield', 'highway-shield-us-interstate', 'highway-shield-us-other',
+  'airport-label-major',
+  'aeroway-taxiway-casing', 'aeroway-runway-casing', 'aeroway-area', 'aeroway-taxiway', 'aeroway-runway',
+  'cablecar', 'cablecar-dash',
+  'waterway-name', 'water-name-lakeline', 'water-name-ocean', 'water-name-other',
+  'highway-name-path', 'highway-name-minor',
+])
+const WESTERN_PAINT = {
+  'background': { 'background-color': '#E9D9B4' },
+  'landuse-residential': { 'fill-color': '#E2CEA6' },
+  'landuse-commercial': { 'fill-color': '#DCC49A' },
+  'landuse-industrial': { 'fill-color': '#D9C096' },
+  'landuse-cemetery': { 'fill-color': '#CFC09A' },
+  'landuse-hospital': { 'fill-color': '#DEC9A2' },
+  'landuse-school': { 'fill-color': '#DEC9A2' },
+  'landuse-railway': { 'fill-color': '#C9B896' },
+  'landcover-grass': { 'fill-color': '#C2C29A' },
+  'landcover-wood': { 'fill-color': '#A8B183' },
+  'landcover-sand': { 'fill-color': '#EAD9AE' },
+  'water': { 'fill-color': '#86AEA6' },
+  'water-offset': { 'fill-color': '#86AEA6' },
+  'water-intermittent': { 'fill-color': '#86AEA6' },
+  'water-pattern': { 'fill-color': '#86AEA6' },
+  'building': { 'fill-color': '#B0825A', 'fill-outline-color': '#8F6841' },
+  'building-top': { 'fill-color': '#A9714B', 'fill-outline-color': '#8F6841' },
+}
+const WESTERN_ROAD_FILL = {
+  'highway-motorway': '#D9B87C', 'highway-trunk': '#D9B87C', 'highway-primary': '#D9B87C',
+  'highway-secondary-tertiary': '#E4CD9E', 'highway-minor': '#E4CD9E',
+  'highway-link': '#E4CD9E', 'highway-motorway-link': '#E4CD9E', 'highway-path': '#C9B083',
+}
+const westernActive = ref(false)
+
+function applyWesternTheme() {
+  if (!map.value) return
+  for (const layer of map.value.getStyle().layers) {
+    if (WESTERN_HIDE.has(layer.id)) {
+      map.value.setLayoutProperty(layer.id, 'visibility', 'none')
+      continue
+    }
+    const paint = WESTERN_PAINT[layer.id]
+    if (paint) {
+      for (const [prop, value] of Object.entries(paint)) {
+        map.value.setPaintProperty(layer.id, prop, value)
+      }
+    }
+    if (layer.id.startsWith('highway-') && layer.id.endsWith('-casing')) {
+      map.value.setPaintProperty(layer.id, 'line-color', '#A98A62')
+    }
+    const roadFill = WESTERN_ROAD_FILL[layer.id]
+    if (roadFill) {
+      map.value.setPaintProperty(layer.id, 'line-color', roadFill)
+    }
+    if (layer.id.startsWith('waterway_')) {
+      map.value.setPaintProperty(layer.id, 'line-color', '#86AEA6')
+    }
+    if (layer.id.startsWith('place-') || layer.id.startsWith('highway-name-')) {
+      map.value.setPaintProperty(layer.id, 'text-color', '#5C4426')
+      map.value.setPaintProperty(layer.id, 'text-halo-color', '#E9D9B4')
+    }
+  }
+  if (map.value.getLayer('buildings-3d')) {
+    map.value.setPaintProperty('buildings-3d', 'fill-extrusion-color', '#A9714B')
+  }
+  westernActive.value = true
+}
+
+function clearWesternTheme() {
+  if (!map.value || !westernActive.value) return
+  westernActive.value = false
+  map.value.setStyle(useMapStyle(import.meta.env.VITE_MAPTILER_KEY))
+  map.value.once('style.load', () => {
+    setup3D(import.meta.env.VITE_MAPTILER_KEY)
+    renderMarkers()
+    upsertUserPosition()
+    syncHalo()
+    if (is3D.value) set3D(true)
+  })
+}
+
+/**
  * Vue première personne (expérimental) : caméra basse (pitch max), zoom
  * rapproché, recentrage sur le joueur à chaque mise à jour de position.
  * Bâtiments 3D forcés si disponibles. Le point joueur devient l'avatar.
@@ -107,6 +195,7 @@ function setFirstPerson(enabled) {
     if (has3D.value && map.value.getLayer('buildings-3d')) {
       map.value.setLayoutProperty('buildings-3d', 'visibility', 'visible')
     }
+    applyWesternTheme()
     const pos = props.userPosition
     map.value.easeTo({
       pitch: 70,
@@ -115,12 +204,17 @@ function setFirstPerson(enabled) {
       duration: 900,
     })
   } else {
+    clearWesternTheme()
     // Retour à l'inclinaison du mode courant (3D ou 2D)
     map.value.easeTo({ pitch: is3D.value ? 45 : 0, duration: 800 })
   }
 }
 
 defineExpose({ set3D, has3D, is3D, setFirstPerson, isFirstPerson })
+
+const overlayClass = computed(() =>
+  isFirstPerson.value ? 'map-theme-overlay--western' : `map-theme-overlay--${props.theme}`
+)
 
 let userMarker = null
 const USER_POS_SOURCE = 'user-pos'
@@ -362,7 +456,7 @@ function objectIcon(type) {
 
 <template>
   <div ref="mapEl" class="immersive-map">
-    <div class="map-theme-overlay" :class="`map-theme-overlay--${theme}`"></div>
+    <div class="map-theme-overlay" :class="overlayClass"></div>
   </div>
 </template>
 
@@ -382,6 +476,11 @@ function objectIcon(type) {
 .map-theme-overlay--sun { background: transparent; }
 .map-theme-overlay--rain { background: rgba(60, 90, 140, 0.20); }
 .map-theme-overlay--night { background: rgba(10, 15, 40, 0.38); }
+.map-theme-overlay--western {
+  background:
+    radial-gradient(ellipse at center, transparent 55%, rgba(92, 58, 20, 0.22) 100%),
+    rgba(214, 164, 84, 0.12);
+}
 :deep(.artisan-marker) {
   width: 40px;
   height: 40px;
