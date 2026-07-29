@@ -38,11 +38,18 @@ export async function createSplashScene(container, { onDone } = {}) {
       const groundY = h * 0.68
       const scaleH = h * 0.34
 
-      // Avatar (gauche) et boss (droite) qui se rapprochent
+      // Petit point lumineux pour les feux d'artifice
+      const spark = this.add.graphics()
+      spark.fillStyle(0xffffff, 1)
+      spark.fillCircle(3, 3, 3)
+      spark.generateTexture('spark', 6, 6)
+      spark.destroy()
+
+      // Avatar (gauche) et boss (droite, plus petit) qui se rapprochent
       const avatar = this.add.image(-80, groundY, 'avatar')
       avatar.setScale(scaleH / avatar.height)
       const boss = this.add.image(w + 80, groundY, 'boss').setFlipX(true)
-      boss.setScale((scaleH * 1.05) / boss.height)
+      boss.setScale((scaleH * 0.62) / boss.height)
       this.tweens.add({ targets: avatar, x: w * 0.3, duration: 1400, ease: 'Sine.easeOut' })
       this.tweens.add({ targets: boss, x: w * 0.72, duration: 1400, ease: 'Sine.easeOut' })
       this.tweens.add({ targets: avatar, y: groundY - 8, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
@@ -62,11 +69,19 @@ export async function createSplashScene(container, { onDone } = {}) {
             duration: 520,
             onComplete: () => {
               b.destroy()
-              boss.setTintFill(0xff6b6b)
-              this.tweens.add({
-                targets: boss, x: boss.x + 12, duration: 60, yoyo: true, repeat: 1,
-                onComplete: () => boss.clearTint(),
+              // Feu d'artifice à l'impact (or + ambre, additif)
+              const fw = this.add.particles(boss.x - 20, boss.y - 50, 'spark', {
+                speed: { min: 90, max: 260 },
+                angle: { min: 0, max: 360 },
+                lifespan: 480,
+                scale: { start: 1.6, end: 0 },
+                quantity: 14,
+                emitting: false,
+                tint: [0xffd166, 0xf4a261, 0xfff3d6],
+                blendMode: 'ADD',
               })
+              fw.explode(14)
+              this.time.delayedCall(600, () => fw.destroy())
             },
           })
         },

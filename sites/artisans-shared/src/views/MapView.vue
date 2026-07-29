@@ -600,7 +600,7 @@ onUnmounted(() => {
 
     <div v-if="loading" class="loading-chip card">Chargement de la carte…</div>
 
-    <div v-if="isAdmin" class="admin-controls card" :class="{ 'admin-controls--collapsed': !adminControlsOpen }">
+    <div v-if="isAdmin" class="admin-controls" :class="{ card: adminControlsOpen, 'admin-controls--collapsed': !adminControlsOpen }">
       <button type="button" class="admin-collapse" :aria-label="adminControlsOpen ? 'Masquer les contrôles admin' : 'Afficher les contrôles admin'" @click="adminControlsOpen = !adminControlsOpen">
         {{ adminControlsOpen ? '▾' : '▸' }}
       </button>
@@ -712,7 +712,11 @@ onUnmounted(() => {
   padding: 12px 16px;
   box-shadow: 0 4px 16px rgba(0,0,0,0.12);
 }
-.admin-controls--collapsed { padding: 6px 10px; }
+.admin-controls--collapsed {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
 .admin-collapse {
   display: block;
   background: none;
@@ -723,7 +727,13 @@ onUnmounted(() => {
   padding: 0;
   margin-left: auto;
 }
-.admin-controls--collapsed .admin-collapse { margin: 0; }
+.admin-controls--collapsed .admin-collapse {
+  margin: 0;
+  background: rgba(26,19,48,0.55);
+  color: #fff;
+  border-radius: 999px;
+  padding: 6px 10px;
+}
 .control-row {
   display: flex;
   align-items: center;
@@ -794,6 +804,7 @@ onUnmounted(() => {
     left: 12px;
     right: 12px;
   }
+  .admin-controls--collapsed { right: auto; }
   .control-row { flex-direction: column; align-items: flex-start; gap: 6px; }
 }
 </style>

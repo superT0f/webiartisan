@@ -42,6 +42,7 @@
         </RouterLink>
         <RouterLink to="/carte" class="nav-mobile-link nav-link-featured">🗺️ Carte</RouterLink>
         <RouterLink v-if="user" to="/inventaire" class="nav-mobile-link">🎒 Inventaire</RouterLink>
+        <button type="button" class="nav-mobile-link nav-link-button" @click="replayIntro">🎬 Intro</button>
         <RouterLink to="/annuaire" class="nav-mobile-link">🏠 Annuaire des artisans</RouterLink>
         <RouterLink to="/temoignages" class="nav-mobile-link">💬 Avis locaux</RouterLink>
         <RouterLink to="/annuaire#services-locaux" class="nav-mobile-link">🏙️ Services locaux</RouterLink>
@@ -90,6 +91,12 @@ function weatherIcon(code) {
 }
 
 function onScroll() { scrolled.value = window.scrollY > 20 }
+
+// Rejoue le splash de démarrage (menu > Intro)
+function replayIntro() {
+  sessionStorage.removeItem('splash_seen')
+  window.location.assign('/carte')
+}
 
 let isMounted = true
 let abortController = null
@@ -235,6 +242,16 @@ onUnmounted(() => {
 }
 .nav-mobile-link:last-of-type { border-bottom: none; }
 .nav-mobile-link:hover { background: var(--c-cream-2); }
+.nav-link-button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  font-family: inherit;
+}
 
 /* Météo inline en tête de menu */
 .nav-weather {
