@@ -270,7 +270,7 @@ function renderMarkers() {
     if (o.type === 'big_brother') {
       const el = document.createElement('div')
       el.className = 'boss-marker' + (isActive ? ' marker--active' : '')
-      el.innerHTML = `<img src="/boss/boss-crop.jpg" alt="Affamer de Gaffe" />`
+      el.innerHTML = `<img src="/boss/affamer-512.png" alt="Affamer de Gaffe" />`
       if (isActive) {
         el.addEventListener('click', () => emit('select-object', o))
         const marker = new Marker({ element: el, anchor: 'bottom' })
