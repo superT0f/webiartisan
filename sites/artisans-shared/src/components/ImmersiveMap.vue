@@ -96,12 +96,13 @@ function set3D(enabled) {
 /**
  * Vue première personne (expérimental) : caméra basse (pitch max), zoom
  * rapproché, recentrage sur le joueur à chaque mise à jour de position.
- * Bâtiments 3D forcés si disponibles.
+ * Bâtiments 3D forcés si disponibles. Le point joueur devient l'avatar.
  */
 const isFirstPerson = ref(false)
 function setFirstPerson(enabled) {
   if (!map.value) return
   isFirstPerson.value = enabled
+  syncUserMarkerMode()
   if (enabled) {
     if (has3D.value && map.value.getLayer('buildings-3d')) {
       map.value.setLayoutProperty('buildings-3d', 'visibility', 'visible')
@@ -124,6 +125,12 @@ defineExpose({ set3D, has3D, is3D, setFirstPerson, isFirstPerson })
 let userMarker = null
 const USER_POS_SOURCE = 'user-pos'
 
+/** Point bleu (2D/3D) ↔ avatar mascotte (première personne). */
+function syncUserMarkerMode() {
+  const el = userMarker?.getElement?.()
+  if (el) el.classList.toggle('user-location-marker--avatar', isFirstPerson.value)
+}
+
 function upsertUserPosition() {
   if (!map.value?.isStyleLoaded?.()) return
   const pos = props.userPosition
@@ -142,6 +149,7 @@ function upsertUserPosition() {
   } else {
     userMarker.setLngLat(lngLat)
   }
+  syncUserMarkerMode()
   // Première personne : la caméra suit le joueur
   if (isFirstPerson.value) {
     map.value.easeTo({ center: lngLat, duration: 400 })
@@ -491,6 +499,19 @@ function objectIcon(type) {
   border: 3px solid #fff;
   border-radius: 50%;
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+:deep(.user-location-marker--avatar) {
+  width: 52px;
+  height: 46px;
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background-image: url('/avatar/player-128.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center bottom;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.45));
 }
 
 :deep(.map-popup) {

@@ -1,5 +1,6 @@
 <template>
   <div id="layout">
+    <SplashOverlay v-if="showSplash" @done="onSplashDone" />
     <AppNav />
     <main>
       <RouterView v-slot="{ Component }">
@@ -20,10 +21,18 @@
 <script setup>
 import AppNav    from './components/AppNav.vue'
 import AppFooter from './components/AppFooter.vue'
-import { onUnmounted } from 'vue'
+import SplashOverlay from './components/SplashOverlay.vue'
+import { ref, onUnmounted } from 'vue'
 import { useGamification } from './composables/useGamification.js'
 
 const { toasts, clearToasts } = useGamification()
+
+// Splash au démarrage (une fois par session web/webview)
+const showSplash = ref(!sessionStorage.getItem('splash_seen'))
+function onSplashDone() {
+  showSplash.value = false
+  sessionStorage.setItem('splash_seen', '1')
+}
 
 onUnmounted(() => {
   clearToasts()
