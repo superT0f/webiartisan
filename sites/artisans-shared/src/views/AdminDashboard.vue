@@ -7,6 +7,7 @@
           <p class="text-muted">Gérez les artisans et leurs abonnements.</p>
         </div>
         <div class="header-actions">
+          <RouterLink to="/espace/admin/pois" class="btn btn-primary btn-sm">Gestion des POI</RouterLink>
           <RouterLink to="/espace/admin/comptes" class="btn btn-primary btn-sm">Gestion des comptes</RouterLink>
           <RouterLink to="/espace" class="btn btn-outline btn-sm">Retour à mon espace</RouterLink>
         </div>
