@@ -41,7 +41,10 @@ function share() {
       <p class="tagline">
         Ta ville devient un jeu. Gratuit, pour les habitants de {{ CITY_NAME }}.
       </p>
-      <img src="/avatar/player-512.png" alt="La mascotte artisan" class="beta-mascot" />
+      <div class="beta-duo">
+        <img src="/avatar/player-512.png" alt="La mascotte artisan" class="beta-mascot" />
+        <img src="/boss/affamer-512.png" alt="Affamer de Gaffe, le méchant" class="beta-boss" />
+      </div>
     </section>
 
     <section class="beta-features">
@@ -110,7 +113,15 @@ function share() {
 .beta-logo { width: 64px; height: 64px; }
 .beta-hero h1 { margin: 12px 0 6px; font-size: 1.6rem; }
 .tagline { color: var(--c-text-2); margin: 0; }
-.beta-mascot { width: 160px; margin-top: 12px; filter: drop-shadow(0 6px 12px rgba(0,0,0,0.25)); }
+.beta-mascot { width: 140px; filter: drop-shadow(0 6px 12px rgba(0,0,0,0.25)); }
+.beta-duo {
+  margin-top: 12px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 18px;
+}
+.beta-boss { width: 110px; filter: drop-shadow(0 6px 12px rgba(0,0,0,0.3)); }
 
 .beta-features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .feature { padding: 14px 10px; text-align: center; }
