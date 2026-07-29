@@ -52,7 +52,7 @@ const { showToast } = useGamification()
 
 const userToken = ref(getUserToken())
 const isAdmin = ref(false)
-const adminHalo = ref(true)
+const adminControlsOpen = ref(true)
 const mockPosition = ref(null)
 const teleportArmed = ref(false)
 
@@ -589,7 +589,7 @@ onUnmounted(() => {
       :active-target-ids="activeTargetIds"
       :center="[CITY_LNG, CITY_LAT]"
       :user-position="effectivePosition"
-      :halo="isAdmin && adminHalo"
+      :halo="isAdmin"
       :theme="mapTheme"
       @select="openSheet"
       @map-click="onMapClick"
@@ -600,12 +600,11 @@ onUnmounted(() => {
 
     <div v-if="loading" class="loading-chip card">Chargement de la carte…</div>
 
-    <div v-if="isAdmin" class="admin-controls card">
-      <div class="control-row">
-        <label class="toggle">
-          <input v-model="adminHalo" type="checkbox" />
-          <span>🛡️ Halo 500 m</span>
-        </label>
+    <div v-if="isAdmin" class="admin-controls card" :class="{ 'admin-controls--collapsed': !adminControlsOpen }">
+      <button type="button" class="admin-collapse" :aria-label="adminControlsOpen ? 'Masquer les contrôles admin' : 'Afficher les contrôles admin'" @click="adminControlsOpen = !adminControlsOpen">
+        {{ adminControlsOpen ? '▾' : '▸' }}
+      </button>
+      <div v-show="adminControlsOpen" class="control-row">
         <button type="button" class="btn btn-outline btn-sm" :disabled="teleportArmed" @click="armTeleport">
           {{ teleportArmed ? 'Cliquez sur la carte…' : '📍 Déplacer ma position' }}
         </button>
@@ -713,6 +712,18 @@ onUnmounted(() => {
   padding: 12px 16px;
   box-shadow: 0 4px 16px rgba(0,0,0,0.12);
 }
+.admin-controls--collapsed { padding: 6px 10px; }
+.admin-collapse {
+  display: block;
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: var(--c-text-2);
+  padding: 0;
+  margin-left: auto;
+}
+.admin-controls--collapsed .admin-collapse { margin: 0; }
 .control-row {
   display: flex;
   align-items: center;
