@@ -97,6 +97,20 @@ try {
     $logger->error('Migrations apply failed', ['error' => $e->getMessage()]);
 }
 
+// Fallback in-band de la file email (la console cron Gandi n'est pas toujours
+// configurée) : au plus 1 traitement / 5 min, 5 mails max, jamais bloquant.
+try {
+    $lastRun = (int)($pdo->query("SELECT setting_value FROM local_settings WHERE setting_key = 'email_queue_last_run'")->fetchColumn() ?: 0);
+    if (time() - $lastRun >= 300) {
+        $pdo->prepare("INSERT INTO local_settings (setting_key, setting_value) VALUES ('email_queue_last_run', ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)")
+            ->execute([(string)time()]);
+        require_once __DIR__ . '/lib/EmailQueue.php';
+        processEmailQueue($pdo, 5);
+    }
+} catch (Throwable $e) {
+    error_log('[EMAIL-QUEUE] fallback in-band : ' . $e->getMessage());
+}
+
 // Global exception handler — return JSON for API requests
 set_exception_handler(function (Throwable $e) use ($logger): void {
     $logger->error('Unhandled exception', ['error' => $e->getMessage(), 'file' => $e->getFile(), 'line' => $e->getLine()]);
