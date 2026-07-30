@@ -114,6 +114,24 @@
               Se déconnecter
             </button>
           </section>
+
+          <section class="profile-section card danger-zone">
+            <h2>⚠️ Zone dangereuse</h2>
+            <p class="danger-text">La suppression est définitive : ton identité est anonymisée et tes sessions révoquées.</p>
+            <button v-if="!confirmDelete" type="button" class="btn btn-outline btn-danger" @click="confirmDelete = true">
+              Supprimer mon compte
+            </button>
+            <div v-else class="danger-confirm">
+              <p><strong>Confirmer la suppression définitive ?</strong></p>
+              <div class="danger-actions">
+                <button type="button" class="btn btn-danger" :disabled="deleting" @click="deleteAccount">
+                  {{ deleting ? 'Suppression…' : 'Oui, supprimer définitivement' }}
+                </button>
+                <button type="button" class="btn btn-outline" :disabled="deleting" @click="confirmDelete = false">Annuler</button>
+              </div>
+              <p v-if="deleteError" class="danger-error">{{ deleteError }}</p>
+            </div>
+          </section>
         </div>
       </template>
     </template>
@@ -125,7 +143,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   getUserToken, fetchUserMe, removeUserToken, resolveAvatarUrl,
-  changeUserPassword, enableBiometric, disableBiometric,
+  changeUserPassword, enableBiometric, disableBiometric, deleteMyAccount,
 } from '../api.js'
 import { biometrics } from '../utils/biometrics.js'
 
@@ -266,6 +284,24 @@ function logout() {
   router.push('/profil')
 }
 
+const confirmDelete = ref(false)
+const deleting = ref(false)
+const deleteError = ref('')
+
+async function deleteAccount() {
+  if (deleting.value) return
+  deleting.value = true
+  deleteError.value = ''
+  const res = await deleteMyAccount()
+  deleting.value = false
+  if (res.success) {
+    removeUserToken()
+    router.push('/carte')
+  } else {
+    deleteError.value = res.error || 'Suppression impossible, réessaie plus tard.'
+  }
+}
+
 onMounted(async () => {
   const token = getUserToken()
   if (!token) {
@@ -374,6 +410,11 @@ onUnmounted(() => {
 
 .btn-danger { border-color: #b71c1c; color: #b71c1c; }
 .btn-danger:hover { background: #b71c1c; color: #fff; }
+.danger-zone { border: 1px solid rgba(183,28,28,0.3); }
+.danger-text { color: var(--c-text-2); font-size: 0.85rem; margin: 0 0 12px; }
+.danger-confirm p { margin: 0 0 10px; }
+.danger-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.danger-error { color: #b71c1c; font-size: 0.85rem; margin: 10px 0 0; }
 
 .text-muted { color: #64748b; }
 .small { font-size: 0.85rem; }

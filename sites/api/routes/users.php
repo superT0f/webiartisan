@@ -70,6 +70,15 @@ switch ($method) {
         }
         break;
 
+    case 'DELETE':
+        if ($action === 'me') {
+            user_delete_account($pdo);
+        } else {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'Endpoint inconnu']);
+        }
+        break;
+
     case 'GET':
         if ($action === 'me') {
             user_me($pdo);
@@ -297,6 +306,45 @@ function user_me(PDO $pdo): void
         return;
     }
     echo json_encode(['success' => true, 'data' => $profile]);
+}
+
+/**
+ * DELETE /users/me — suppression de compte (exigence Play Store / RGPD).
+ * Anonymise l'identité (email, pseudo, avatar, mot de passe) et révoque les
+ * sessions ; les statistiques de jeu non identifiantes sont conservées.
+ * L'artisan lié éventuel est détaché (user_id = NULL) mais conservé.
+ */
+function user_delete_account(PDO $pdo): void
+{
+    $user = user_require_auth($pdo);
+    $userId = (int)$user['id'];
+
+    $pdo->beginTransaction();
+    try {
+        $anonEmail = "deleted-{$userId}-" . bin2hex(random_bytes(6)) . "@deleted.local";
+        $pdo->prepare("
+            UPDATE local_users
+            SET email = ?, display_name = NULL, password_hash = NULL,
+                avatar_type = 'default', avatar_url = NULL
+            WHERE id = ?
+        ")->execute([$anonEmail, $userId]);
+        $pdo->prepare("DELETE FROM local_user_sessions WHERE user_id = ?")->execute([$userId]);
+        $pdo->prepare("DELETE FROM local_user_email_codes WHERE user_id = ?")->execute([$userId]);
+        $pdo->prepare("DELETE FROM local_user_password_resets WHERE email = ?")->execute([$user['email']]);
+        $pdo->prepare("UPDATE local_artisans SET user_id = NULL WHERE user_id = ?")->execute([$userId]);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        error_log('[USER-DELETE] ' . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'Erreur serveur']);
+        return;
+    }
+
+    app_log('warning', '[USER-DELETE] compte supprimé', ['user_id' => $userId]);
+    echo json_encode(['success' => true, 'data' => ['deleted' => true]]);
 }
 
 function user_update_profile(PDO $pdo): void

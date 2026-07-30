@@ -53,6 +53,7 @@
         <span>
           © {{ year }} WebiArtisan · {{ CITY_NAME }} · {{ CITY_CP }} · v{{ APP_VERSION }}
           · <a class="app-link" href="https://appdistribution.firebase.dev/i/1297b31002780ac2" target="_blank" rel="noopener">📱 Installer l'app Android ↗</a>
+          · <RouterLink to="/confidentialite">Confidentialité</RouterLink>
         </span>
         <span>Fait avec ❤️ en Seine-et-Marne</span>
       </div>

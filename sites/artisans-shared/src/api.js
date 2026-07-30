@@ -1082,6 +1082,13 @@ export async function betaSignup(email, city) {
   }, 'Inscription impossible pour le moment.')
 }
 
+export async function deleteMyAccount() {
+  return requestJson(`${API_BASE}/users/me`, {
+    method: 'DELETE',
+    headers: { ...userHeaders() },
+  }, 'Suppression impossible pour le moment.')
+}
+
 // ------------------------------------------------------------------
 // Inventaire joueur (leurres à boss, réserves d'énergie)
 // ------------------------------------------------------------------
