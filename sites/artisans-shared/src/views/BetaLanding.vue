@@ -56,7 +56,7 @@ function share() {
     <section class="beta-steps card">
       <h2>Comment ça marche ?</h2>
       <ol>
-        <li><strong>Laisse ton email</strong> ci-dessous.</li>
+        <li><strong>Laisse ton email</strong> ci-dessous — celui de ton <strong>compte Play Store</strong> (Play Store → touche ta photo de profil → ton email s'affiche, tu n'as qu'à le copier).</li>
         <li>On t'ajoute à la liste des testeurs Google <strong>sous 24-48 h</strong> (fait à la main, avec amour).</li>
         <li>Tu reçois le lien <strong>« Rejoindre le test »</strong> par email.</li>
         <li>Tu installes l'app depuis le <strong>Play Store</strong> et tu joues.</li>
