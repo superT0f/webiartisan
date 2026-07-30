@@ -54,6 +54,7 @@ docker compose exec -T php php -r '$pdo = new PDO("mysql:host=mysql;dbname=".get
 - **`origin` pousse sur GitHub ET GitLab** (2 push URLs) — un seul `git push` suffit.
 - **Position GPS** : `useGeolocation` est un **singleton** avec cache localStorage 5 min — ne pas ré-instancier d'état parallèle.
 - **Legacy admin archivé** (2026-07-27) : `admin.prigent.tech` = page statique ; backup dans `~/project/webiartisan/archives/`. Admin actuel = `/espace/admin*` sur chaque ville + `/api/ops/*`.
+- **File email** : la cron Gandi n'est pas configurée → fallback in-band dans `index.php` (1 traitement / 5 min, 5 mails, horodatage `local_settings.email_queue_last_run`). Trigger manuel : `GET /api/cron/process-email-queue?token=$CRON_SECRET`. Surveiller `email_queue_pending` dans `/ops/health`.
 - **Comptes de test prod** : admin = artisan id 18 (`is_admin=1`, user id 2) ; le boss garanti spawn sur l'admin (0 m) ; garanties/bbox dans `routes/objects.php`.
 - **RGPD** : exports anonymisés par défaut ; le ré-encodage GD des photos supprime l'EXIF.
 
