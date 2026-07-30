@@ -28,25 +28,24 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
 $pdo->prepare("INSERT IGNORE INTO local_beta_signups (email, city) VALUES (?, ?)")
     ->execute([$email, $city]);
 
-// Notification admin (premier compte admin trouvé), sans bloquer la réponse
+// Notification admin (admin unique du projet — pas de requête : les comptes
+// de test sont aussi is_admin=1 et captaient la notif par id croissant)
+const BETA_NOTIFY_EMAIL = 'supert0f@proton.me';
+
 try {
-    $adminEmail = $pdo->query("SELECT email FROM local_artisans WHERE is_admin = 1 AND status = 'active' ORDER BY id ASC LIMIT 1")
-        ->fetchColumn();
-    if ($adminEmail) {
-        $safeEmail = htmlspecialchars($email, ENT_QUOTES, 'UTF-8');
-        $safeCity = htmlspecialchars($city ?? '—', ENT_QUOTES, 'UTF-8');
-        queueEmail(
-            $adminEmail,
-            '[Bêta] Nouvelle inscription — ' . $email,
-            "<p>Nouvelle inscription à la bêta WebiArtisan :</p>"
-            . "<p><strong>{$safeEmail}</strong><br>Ville : {$safeCity}</p>"
-            . "<p>À ajouter à la liste des testeurs dans la Play Console (24-48 h), puis l'utilisateur suit le lien « Rejoindre le test ».</p>",
-            null,
-            null,
-            $email,
-            ['kind' => 'beta_signup', 'email' => $email, 'city' => $city]
-        );
-    }
+    $safeEmail = htmlspecialchars($email, ENT_QUOTES, 'UTF-8');
+    $safeCity = htmlspecialchars($city ?? '—', ENT_QUOTES, 'UTF-8');
+    queueEmail(
+        BETA_NOTIFY_EMAIL,
+        '[Bêta] Nouvelle inscription — ' . $email,
+        "<p>Nouvelle inscription à la bêta WebiArtisan :</p>"
+        . "<p><strong>{$safeEmail}</strong><br>Ville : {$safeCity}</p>"
+        . "<p>À ajouter à la liste des testeurs dans la Play Console (24-48 h), puis l'utilisateur suit le lien « Rejoindre le test ».</p>",
+        null,
+        null,
+        $email,
+        ['kind' => 'beta_signup', 'email' => $email, 'city' => $city]
+    );
 } catch (Throwable $e) {
     error_log('[BETA] notification admin impossible : ' . $e->getMessage());
 }
