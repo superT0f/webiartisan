@@ -71,4 +71,12 @@ Boucle Superpowers pour toute évolution non triviale : **brainstorming** (quest
 
 ## Environnement utilisateur
 
-Linux, tests en prod depuis un téléphone Android (app Flutter ou Firefox mobile). L'utilisateur déploie et teste en conditions réelles ; les retours arrivent en screenshots (zips dans `~/Downloads`).
+Linux, tests en prod depuis un téléphone Android (app Flutter ou Firefox mobile). L'utilisateur déploie et teste en conditions réelles ; les retours arrivent en screenshots.
+
+## Screenshots de test (où les trouver)
+
+L'utilisateur envoie ses retours en images — aller les chercher soi-même :
+
+- **Depuis le PC** : `/home/tof/Pictures/Screenshots/` — trier par date, prendre les X plus récents. « Regarde mes 2 derniers screens » → `ls -t /home/tof/Pictures/Screenshots/ | head -2`.
+- **Depuis son téléphone (via WhatsApp)** : `ls -t /home/tof/Downloads/WhatsApp\ *.jpeg /home/tof/Downloads/WhatsApp\ *.zip` — prendre les plus récents (les zips se décompressent dans /tmp).
+- Dossiers ponctuels : il dépose parfois des assets dans `test-tof/<n>/` (avatars, images IA).
