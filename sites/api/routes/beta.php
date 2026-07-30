@@ -35,12 +35,27 @@ const BETA_NOTIFY_EMAIL = 'supert0f@proton.me';
 try {
     $safeEmail = htmlspecialchars($email, ENT_QUOTES, 'UTF-8');
     $safeCity = htmlspecialchars($city ?? '—', ENT_QUOTES, 'UTF-8');
+    $testingUrl = 'https://play.google.com/apps/testing/tech.prigent.webiartisan';
     queueEmail(
         BETA_NOTIFY_EMAIL,
         '[Bêta] Nouvelle inscription — ' . $email,
         "<p>Nouvelle inscription à la bêta WebiArtisan :</p>"
         . "<p><strong>{$safeEmail}</strong><br>Ville : {$safeCity}</p>"
-        . "<p>À ajouter à la liste des testeurs dans la Play Console (24-48 h), puis l'utilisateur suit le lien « Rejoindre le test ».</p>",
+        . "<p>➡️ À ajouter à la liste des testeurs dans la "
+        . "<a href=\"https://play.google.com/console/u/4/developers\">Play Console</a> (24-48 h), "
+        . "puis l'utilisateur suit le lien « Rejoindre le test ».</p>"
+        . "<hr><p><strong>Réponse à lui envoyer une fois ajouté (copier-coller) :</strong></p>"
+        . "<blockquote style=\"background:#f7f3ea;padding:12px;border-radius:8px\">"
+        . "<p><em>Objet : WebiArtisan — ton accès bêta Android 🥖</em></p>"
+        . "<p>Bonjour,</p>"
+        . "<p>Bonne nouvelle : tu es dans la liste des bêta-testeurs WebiArtisan !</p>"
+        . "<ol>"
+        . "<li>Ouvre ce lien sur ton téléphone Android : <a href=\"{$testingUrl}\">{$testingUrl}</a></li>"
+        . "<li>Accepte l'invitation « Rejoindre le test »</li>"
+        . "<li>Installe WebiArtisan depuis le Play Store</li>"
+        . "</ol>"
+        . "<p>À très vite dans les rues !<br>L'équipe WebiArtisan</p>"
+        . "</blockquote>",
         null,
         null,
         $email,
