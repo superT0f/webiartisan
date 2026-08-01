@@ -606,7 +606,7 @@ function objectIcon(type) {
   border: none;
   border-radius: 0;
   box-shadow: none;
-  background-image: url('/avatar/player-128.png');
+  background-image: url('/avatar/player-back-walk-128.gif');
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center bottom;
