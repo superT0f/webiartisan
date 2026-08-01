@@ -50,6 +50,7 @@
         <RouterLink v-if="!user" to="/profil" class="nav-mobile-link">👤 Se connecter / Mon compte</RouterLink>
         <RouterLink to="/espace" class="nav-mobile-link">🔐 Mon espace</RouterLink>
         <RouterLink v-if="isAdmin" to="/espace/admin" class="nav-mobile-link nav-link-featured">🛡️ Administration</RouterLink>
+        <button v-if="user" type="button" class="nav-mobile-link nav-link-button" @click="logout">🚪 Se déconnecter</button>
         <RouterLink to="/inscrire" class="btn btn-primary" style="margin: 12px 20px;">
           + Inscrire mon entreprise
         </RouterLink>
@@ -60,7 +61,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { CITY_NAME, CITY_LAT, CITY_LNG, getUserToken, getArtisanToken, fetchUserMe, fetchMe, removeUserToken, resolveAvatarUrl, authEvents } from '../api.js'
+import { CITY_NAME, CITY_LAT, CITY_LNG, getUserToken, getArtisanToken, fetchUserMe, fetchMe, removeUserToken, logoutUser, resolveAvatarUrl, authEvents } from '../api.js'
 import { useWeather } from '../composables/useWeather.js'
 
 const scrolled   = ref(false)
@@ -96,6 +97,19 @@ function onScroll() { scrolled.value = window.scrollY > 20 }
 function replayIntro() {
   sessionStorage.removeItem('splash_seen')
   window.location.assign('/carte')
+}
+
+// Déconnexion joueur (menu burger) : appel API + purge locale garantie
+async function logout() {
+  menuOpen.value = false
+  const token = getUserToken()
+  if (!token) return
+  try {
+    await logoutUser(token)
+  } catch (e) {
+    console.warn('Erreur lors de la déconnexion', e)
+    removeUserToken()
+  }
 }
 
 let isMounted = true
