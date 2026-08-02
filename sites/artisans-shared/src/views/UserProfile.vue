@@ -109,6 +109,14 @@
           </section>
 
           <section class="profile-section card">
+            <h2>⚙️ Paramètres</h2>
+            <label class="setting-toggle">
+              <input type="checkbox" v-model="showMapModeSwitch" @change="saveMapModeSwitch" />
+              <span>Afficher le bouton de changement de vue (2D / 3D / 1ère pers.)</span>
+            </label>
+          </section>
+
+          <section class="profile-section card">
             <h2>🚪 Session</h2>
             <button type="button" class="btn btn-outline btn-danger" @click="logout">
               Se déconnecter
@@ -288,6 +296,13 @@ const confirmDelete = ref(false)
 const deleting = ref(false)
 const deleteError = ref('')
 
+// Paramètres : réafficher le bouton de changement de vue de la carte (masqué par défaut).
+const showMapModeSwitch = ref(localStorage.getItem('map_mode_switch') === '1')
+function saveMapModeSwitch() {
+  if (showMapModeSwitch.value) localStorage.setItem('map_mode_switch', '1')
+  else localStorage.removeItem('map_mode_switch')
+}
+
 async function deleteAccount() {
   if (deleting.value) return
   deleting.value = true
@@ -418,4 +433,5 @@ onUnmounted(() => {
 
 .text-muted { color: #64748b; }
 .small { font-size: 0.85rem; }
+.setting-toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; }
 </style>

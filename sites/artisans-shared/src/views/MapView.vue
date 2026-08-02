@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import ImmersiveMap from '../components/ImmersiveMap.vue'
 import ArtisanSheet from '../components/ArtisanSheet.vue'
 import PoiSheet from '../components/PoiSheet.vue'
-import EnergyBar from '../components/EnergyBar.vue'
+import HeroWidget from '../components/HeroWidget.vue'
 import QuestsPanel from '../components/QuestsPanel.vue'
 import CleanCityPanel from '../components/CleanCityPanel.vue'
 import SwipeRingOverlay from '../components/SwipeRingOverlay.vue'
@@ -86,10 +86,12 @@ const immersiveMap = ref(null)
 const can3D = isMapTilerKey(import.meta.env.VITE_MAPTILER_KEY)
 const mapMode = ref(
   localStorage.getItem('map_mode')
-  || (localStorage.getItem('map_3d') === '1' ? '3d' : '2d')
+  || (localStorage.getItem('map_3d') === '1' ? '3d' : 'fp')
 )
 const MAP_MODES = ['2d', '3d', 'fp']
 const MAP_MODE_LABELS = { '2d': '🗺️ 2D', '3d': '🏙️ 3D', 'fp': '🚶 1ère pers.' }
+// Bouton 2D/3D/FP : masqué par défaut, réactivable dans /profil > Paramètres.
+const showMapModeSwitch = ref(localStorage.getItem('map_mode_switch') === '1')
 
 function applyMapMode() {
   if (mapMode.value === 'fp') {
@@ -612,14 +614,14 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <EnergyBar v-if="authenticated" />
+    <HeroWidget v-if="authenticated" />
 
     <button v-if="authenticated" type="button" class="quests-fab card" @click="questsOpen = !questsOpen">
       📜 {{ quests.filter(q => q.claimed).length }}/{{ quests.length }}
       <span v-if="unclaimedCount" class="quests-fab__badge">{{ unclaimedCount }}</span>
     </button>
 
-    <button v-if="can3D" type="button" class="map3d-fab card" :class="{ 'map3d-fab--active': mapMode !== '2d' }" @click="cycleMapMode">
+    <button v-if="can3D && showMapModeSwitch" type="button" class="map3d-fab card" :class="{ 'map3d-fab--active': mapMode !== '2d' }" @click="cycleMapMode">
       {{ MAP_MODE_LABELS[mapMode] }}
     </button>
 
