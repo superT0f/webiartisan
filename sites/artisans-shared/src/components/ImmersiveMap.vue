@@ -219,6 +219,30 @@ const overlayClass = computed(() =>
 let userMarker = null
 const USER_POS_SOURCE = 'user-pos'
 
+// Animation de marche : GIF seulement pendant 5 s après un déplacement > 3 m.
+let lastMoveLngLat = null
+let moveTimer = null
+const MOVE_THRESHOLD_M = 3
+const MOVE_ANIM_MS = 5000
+
+function distanceM(a, b) {
+  const R = 6371000, toRad = (d) => (d * Math.PI) / 180
+  const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng)
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2
+  return 2 * R * Math.asin(Math.sqrt(h))
+}
+
+function markUserMoving(next) {
+  const el = userMarker?.getElement?.()
+  if (!el) return
+  const moved = lastMoveLngLat && distanceM(lastMoveLngLat, next) > MOVE_THRESHOLD_M
+  lastMoveLngLat = next
+  if (!moved) return
+  el.classList.add('is-moving')
+  clearTimeout(moveTimer)
+  moveTimer = setTimeout(() => el.classList.remove('is-moving'), MOVE_ANIM_MS)
+}
+
 /** Point bleu (2D/3D) ↔ avatar mascotte (première personne). */
 function syncUserMarkerMode() {
   const el = userMarker?.getElement?.()
@@ -244,6 +268,7 @@ function upsertUserPosition() {
     userMarker.setLngLat(lngLat)
   }
   syncUserMarkerMode()
+  markUserMoving({ lat: lngLat[1], lng: lngLat[0] })
   // Première personne : la caméra suit le joueur
   if (isFirstPerson.value) {
     map.value.easeTo({ center: lngLat, duration: 400 })
@@ -606,11 +631,14 @@ function objectIcon(type) {
   border: none;
   border-radius: 0;
   box-shadow: none;
-  background-image: url('/avatar/player-back-walk-128.gif');
+  background-image: url('/avatar/player-back-512.png');
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center bottom;
   filter: drop-shadow(0 2px 4px rgba(0,0,0,0.45));
+}
+:deep(.user-location-marker--avatar.is-moving) {
+  background-image: url('/avatar/player-back-walk-128.gif');
 }
 
 :deep(.map-popup) {
