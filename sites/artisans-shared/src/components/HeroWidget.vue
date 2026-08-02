@@ -11,6 +11,8 @@
           transform="rotate(-90 38 38)" />
       </svg>
       <img :src="avatarUrl" class="hero-avatar" alt="" />
+      <!-- Compagnon (baby groot de face), plus petit, en surimpression. -->
+      <img src="/avatar/companion-front-256.png" class="hero-companion" alt="" />
     </div>
     <div class="hero-level">Nv.{{ profile?.level ?? '–' }}</div>
     <div v-if="energyCurrent !== null && energy" class="hero-energy" :title="regenLabel">
@@ -150,6 +152,15 @@ onBeforeUnmount(() => {
   position: absolute; top: 5px; left: 5px;
   width: 50px; height: 50px; border-radius: 50%; object-fit: cover;
   background: var(--c-cream-2);
+}
+.hero-companion {
+  position: absolute;
+  right: -14px;
+  bottom: -8px;
+  width: 34px;
+  height: auto;
+  filter: drop-shadow(0 2px 3px rgba(0,0,0,0.35));
+  pointer-events: none;
 }
 .ring-bg { fill: none; stroke: var(--c-border, #e5e2d8); stroke-width: 5; }
 .ring-fill {
