@@ -1,16 +1,19 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { getUserToken, getInventory, activateInventoryItem, CITY_SLUG } from '../api.js'
 import { useGeolocation } from '../composables/useGeolocation.js'
 import { useEnergy } from '../composables/useEnergy.js'
 import { useGamification } from '../composables/useGamification.js'
-import { ITEM_META } from '../utils/inventoryItems.js'
+import { ITEM_META, groupInventoryByType } from '../utils/inventoryItems.js'
 import AuthForm from '../components/AuthForm.vue'
 
 const authenticated = ref(!!getUserToken())
 const items = ref([])
 const loading = ref(true)
 const activatingId = ref(null)
+
+// Regroupement par type (×N) — une ligne par objet, activation = 1 exemplaire.
+const groups = computed(() => groupInventoryByType(items.value))
 
 const { refresh: refreshPosition } = useGeolocation()
 const { setEnergy } = useEnergy()
@@ -33,8 +36,11 @@ async function onAuthenticated() {
   await loadItems()
 }
 
-async function activate(item) {
+async function activate(group) {
   if (activatingId.value) return
+  // On consomme le premier exemplaire du type (le plus ancien).
+  const item = items.value.find(i => i.type === group.type)
+  if (!item) return
   activatingId.value = item.id
   try {
     const pos = await refreshPosition()
@@ -78,20 +84,19 @@ async function activate(item) {
 
       <p v-if="loading" class="hint">Chargement…</p>
 
-      <div v-else-if="items.length" class="inventory-list">
-        <div v-for="item in items" :key="item.id" class="inventory-item card">
-          <span class="item-icon">{{ ITEM_META[item.type]?.emoji || '❓' }}</span>
+      <div v-else-if="groups.length" class="inventory-list">
+        <div v-for="g in groups" :key="g.type" class="inventory-item card">
+          <span class="item-icon">{{ g.emoji }}</span>
           <div class="item-body">
-            <strong>{{ item.label }}</strong>
-            <small v-if="item.source_label" class="item-source">{{ item.source_label }}</small>
-            <small>{{ ITEM_META[item.type]?.description || '' }}</small>
+            <strong>{{ g.label }} <span v-if="g.count > 1" class="item-count">×{{ g.count }}</span></strong>
+            <small>{{ ITEM_META[g.type]?.description || '' }}</small>
           </div>
           <button
             type="button"
             class="btn btn-primary"
-            :disabled="activatingId === item.id"
-            @click="activate(item)"
-          >{{ activatingId === item.id ? 'Activation…' : 'Activer' }}</button>
+            :disabled="!!activatingId"
+            @click="activate(g)"
+          >{{ activatingId ? 'Activation…' : 'Activer' }}</button>
         </div>
       </div>
 
@@ -129,6 +134,9 @@ async function activate(item) {
   gap: 2px;
 }
 .item-body small { color: var(--c-text-2); }
-.item-body small.item-source { color: var(--c-green); font-style: italic; }
+.item-count {
+  color: var(--c-green);
+  font-weight: 700;
+}
 .back-link { display: inline-block; margin-top: 8px; }
 </style>
