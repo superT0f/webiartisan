@@ -1,4 +1,7 @@
 <template>
+  <!-- Teleport body : .map-view crée un stacking context (z-index 1) qui
+       piégerait le widget sous le header AppNav (z-index 100). -->
+  <Teleport to="body">
   <div class="hero-widget card">
     <div class="hero-ring">
       <svg class="hero-ring-svg" viewBox="0 0 76 76" aria-hidden="true">
@@ -33,6 +36,7 @@
       </div>
     </div>
   </div>
+  </Teleport>
 </template>
 
 <script setup>
@@ -129,10 +133,10 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .hero-widget {
-  position: absolute;
+  position: fixed;
   top: 12px;
   left: 12px;
-  z-index: 20;
+  z-index: 110;
   display: flex;
   flex-direction: column;
   align-items: center;

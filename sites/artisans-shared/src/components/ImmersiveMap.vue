@@ -52,6 +52,10 @@ onMounted(async () => {
     upsertUserPosition()
     emit('ready')
   })
+
+  // L'avatar du joueur suit l'échelle de la carte (zoom) pour rester
+  // proportionné aux bâtiments — sinon il « rapetisse » visuellement.
+  map.value.on('zoom', syncAvatarScale)
 })
 
 /**
@@ -247,6 +251,20 @@ function markUserMoving(next) {
 function syncUserMarkerMode() {
   const el = userMarker?.getElement?.()
   if (el) el.classList.toggle('user-location-marker--avatar', isFirstPerson.value)
+  syncAvatarScale()
+}
+
+/**
+ * Zoom de référence de la vue première personne : à ce niveau l'avatar a sa
+ * taille nominale (52×46). L'échelle suit celle de la carte (×2 par niveau),
+ * bornée pour rester lisible et ne pas recouvrir l'écran.
+ */
+const AVATAR_REF_ZOOM = 17.5
+function syncAvatarScale() {
+  const el = userMarker?.getElement?.()
+  if (!el || !map.value) return
+  const scale = Math.min(4, Math.max(0.4, Math.pow(2, map.value.getZoom() - AVATAR_REF_ZOOM)))
+  el.style.setProperty('--avatar-scale', scale.toFixed(3))
 }
 
 function upsertUserPosition() {
@@ -625,8 +643,8 @@ function objectIcon(type) {
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 :deep(.user-location-marker--avatar) {
-  width: 52px;
-  height: 46px;
+  width: calc(52px * var(--avatar-scale, 1));
+  height: calc(46px * var(--avatar-scale, 1));
   background: none;
   border: none;
   border-radius: 0;
