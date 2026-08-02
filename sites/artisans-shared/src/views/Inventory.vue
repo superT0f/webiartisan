@@ -4,6 +4,7 @@ import { getUserToken, getInventory, activateInventoryItem, CITY_SLUG } from '..
 import { useGeolocation } from '../composables/useGeolocation.js'
 import { useEnergy } from '../composables/useEnergy.js'
 import { useGamification } from '../composables/useGamification.js'
+import { ITEM_META } from '../utils/inventoryItems.js'
 import AuthForm from '../components/AuthForm.vue'
 
 const authenticated = ref(!!getUserToken())
@@ -14,11 +15,6 @@ const activatingId = ref(null)
 const { refresh: refreshPosition } = useGeolocation()
 const { setEnergy } = useEnergy()
 const { showToast } = useGamification()
-
-const ITEM_META = {
-  boss_spawner: { icon: '🎯', desc: 'Invoque Affamer de Gaffe près de ta position (il reste 2 h).' },
-  energy_store: { icon: '🔋', desc: '+30 ⚡ d\'énergie immédiatement.' },
-}
 
 onMounted(async () => {
   if (!authenticated.value) { loading.value = false; return }
@@ -84,11 +80,11 @@ async function activate(item) {
 
       <div v-else-if="items.length" class="inventory-list">
         <div v-for="item in items" :key="item.id" class="inventory-item card">
-          <span class="item-icon">{{ ITEM_META[item.type]?.icon || '❓' }}</span>
+          <span class="item-icon">{{ ITEM_META[item.type]?.emoji || '❓' }}</span>
           <div class="item-body">
             <strong>{{ item.label }}</strong>
             <small v-if="item.source_label" class="item-source">{{ item.source_label }}</small>
-            <small>{{ ITEM_META[item.type]?.desc || '' }}</small>
+            <small>{{ ITEM_META[item.type]?.description || '' }}</small>
           </div>
           <button
             type="button"
