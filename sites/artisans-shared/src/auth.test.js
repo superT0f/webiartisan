@@ -4,6 +4,7 @@ import {
   getUserToken, setUserToken, removeUserToken,
   getArtisanToken, setArtisanToken, removeArtisanToken,
   extractLinkToken, consumeTokenFromQuery,
+  cookieDeleteDomains, authEvents,
 } from './auth.js'
 
 function clearCookies() {
@@ -57,6 +58,43 @@ describe('stockage token artisan', () => {
     setArtisanToken('a', false)
     removeArtisanToken()
     expect(getArtisanToken()).toBe('')
+  })
+})
+
+describe('cookieDeleteDomains', () => {
+  it('sous-domaine → host-only + domaine parent (cookie WebView Flutter)', () => {
+    expect(cookieDeleteDomains('artisans-combs.prigent.tech')).toEqual([null, 'prigent.tech'])
+  })
+
+  it('domaine simple → host-only + domaine parent', () => {
+    expect(cookieDeleteDomains('prigent.tech')).toEqual([null, 'prigent.tech'])
+  })
+
+  it('localhost / host sans point → host-only seul', () => {
+    expect(cookieDeleteDomains('localhost')).toEqual([null])
+    expect(cookieDeleteDomains('')).toEqual([null])
+  })
+})
+
+describe('garde anti-boucle removeUserToken', () => {
+  it('notifie quand un token existait', () => {
+    setUserToken('tok', false)
+    let count = 0
+    const listener = () => { count++ }
+    authEvents.addEventListener('change', listener)
+    removeUserToken()
+    authEvents.removeEventListener('change', listener)
+    expect(count).toBe(1)
+  })
+
+  it('ne notifie pas sur un stockage déjà vide (anti-boucle 401)', () => {
+    let count = 0
+    const listener = () => { count++ }
+    authEvents.addEventListener('change', listener)
+    removeUserToken()
+    removeUserToken()
+    authEvents.removeEventListener('change', listener)
+    expect(count).toBe(0)
   })
 })
 

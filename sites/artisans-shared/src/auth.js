@@ -28,8 +28,24 @@ function getCookie(name) {
   return match ? decodeURIComponent(match[2]) : null
 }
 
+/**
+ * Domaines candidats pour l'effacement d'un cookie.
+ * La WebView Flutter écrit `user_token` avec `Domain=.prigent.tech` : sans
+ * l'attribut Domain identique, `document.cookie` ne supprime que le cookie
+ * host-only et le cookie de domaine survit (boucle 401 → 429, incident 2026-08-02).
+ */
+export function cookieDeleteDomains(hostname) {
+  const parts = (hostname || '').split('.').filter(Boolean)
+  const domains = [null] // null = cookie host-only (sans attribut Domain)
+  if (parts.length >= 2) domains.push(parts.slice(-2).join('.'))
+  return domains
+}
+
 function deleteCookie(name) {
-  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Lax`
+  const past = 'expires=Thu, 01 Jan 1970 00:00:00 GMT'
+  for (const domain of cookieDeleteDomains(location.hostname)) {
+    document.cookie = `${name}=; ${past}; path=/; SameSite=Lax${domain ? `; Domain=.${domain}` : ''}`
+  }
 }
 
 export const authEvents = new EventTarget()
@@ -90,9 +106,13 @@ export function setUserToken(token, remember = false) {
 }
 
 export function removeUserToken() {
+  // Garde anti-boucle : ne notifier que si un token existait réellement,
+  // sinon un 401 sur session expirée déclenche une cascade de re-requêtes
+  // (incident 2026-08-02 : saturation des rate limits → 429).
+  const had = !!getUserToken()
   localStorage.removeItem(USER_TOKEN_KEY)
   deleteCookie(USER_TOKEN_COOKIE)
-  notifyAuthChanged()
+  if (had) notifyAuthChanged()
 }
 
 // --- Liens magiques (?token= dans l'URL) ------------------------------
